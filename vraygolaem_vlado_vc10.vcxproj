@@ -86,7 +86,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pluginenumcallbacks.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="vraygolaem.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="vraygolaem.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

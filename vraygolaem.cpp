@@ -5,6 +5,15 @@
 #include "vrender_unicode.h"
 #include "hash_map.h"
 #include "pluginenumcallbacks.h"
+#include "resource.h"
+
+#if GET_MAX_RELEASE(VERSION_3DSMAX) >= 9000
+#include "IPathConfigMgr.h"
+#endif
+#if GET_MAX_RELEASE(VERSION_3DSMAX) >= 11900
+#include "IFileResolutionManager.h"
+#pragma comment(lib, "assetmanagement.lib")
+#endif
 
 // no param block script access for VRay free
 #ifdef _FREE_
@@ -40,7 +49,7 @@ public:
 IObjParam* VRayGolaem::ip = NULL;
 const float iconSize=40.0f;
 TCHAR *iconText=_T("VRayGolaem");
-static VRayGolaemClassDesc classDesc;
+static VRayGolaemClassDesc vrayGolaemClassDesc;
 
 //************************************************************
 // DLL stuff
@@ -67,7 +76,7 @@ __declspec( dllexport ) const TCHAR* LibDescription(void) { return STR_LIBDESC; 
 __declspec( dllexport ) int LibNumberClasses(void) { return 1; }
 
 __declspec( dllexport ) ClassDesc* LibClassDesc(int i) {
-	switch(i) { case 0: return &classDesc; }
+	switch(i) { case 0: return &vrayGolaemClassDesc; }
 	return NULL;
 }
 
@@ -85,6 +94,19 @@ __declspec( dllexport ) int LibShutdown(void) {
 	return TRUE;
 }
 
+class VRayGolaemDlgProc: public ParamMap2UserDlgProc {
+	void chooseFileName(IParamBlock2 *pblock2, ParamID paramID, const TCHAR *title);
+public:
+	VRayGolaemDlgProc() {}
+
+	INT_PTR DlgProc(TimeValue t, IParamMap2 *map, HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+	void DeleteThis() { }
+
+	void SetThing(ReferenceTarget *m) {}
+};
+
+static VRayGolaemDlgProc vrayGolaemDlgProc;
+
 //************************************************************
 // Parameter block
 //************************************************************
@@ -96,16 +118,17 @@ static int ctrlID=100;
 
 int nextID(void) { return ctrlID++; }
 
-static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &classDesc, P_AUTO_CONSTRUCT, REFNO_PBLOCK, 
+static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc, P_AUTO_CONSTRUCT+P_AUTO_UI, REFNO_PBLOCK,
+	IDD_VRAYGOLAEM, IDS_VRAYGOLAEM_PARAMS, 0, 0, &vrayGolaemDlgProc,
 	// Params
 	pb_file, _T("cache_file"), TYPE_FILENAME, 0, 0,
-		p_ui, TYPE_FILEOPENBUTTON, nextID(),
+		p_ui, TYPE_EDITBOX, ed_golaemVrscene,
 #if GET_MAX_RELEASE(VERSION_3DSMAX) >= 11900
 		p_assetTypeID, MaxSDK::AssetManagement::AssetType::kExternalLink,
 #endif
 	PB_END,
 	pb_shaders_file, _T("shaders_file"), TYPE_FILENAME, 0, 0,
-		p_ui, TYPE_FILEOPENBUTTON, nextID(),
+		p_ui, TYPE_EDITBOX, ed_shadersVrscene,
 #if GET_MAX_RELEASE(VERSION_3DSMAX) >= 11900
 		p_assetTypeID, MaxSDK::AssetManagement::AssetType::kExternalLink,
 #endif
@@ -124,7 +147,7 @@ VRayGolaem::VRayGolaem() {
 		pblockDesc_inited=true;
 	}
 	pblock2=NULL;
-	classDesc.MakeAutoParamBlocks(this);
+	vrayGolaemClassDesc.MakeAutoParamBlocks(this);
 	assert(pblock2);
 	suspendSnap=FALSE;
 }
@@ -139,14 +162,11 @@ void VRayGolaem::InvalidateUI() {
 static Pb2TemplateGenerator templateGenerator;
 
 void VRayGolaem::BeginEditParams(IObjParam *ip, ULONG flags, Animatable *prev) {
-	// Automatic UI generation
-	DLGTEMPLATE* tmp=templateGenerator.GenerateTemplate(pblock2, STR_DLGTITLE, 108);
-	pmap=CreateCPParamMap2(pblock2, ip, hInstance, tmp, STR_DLGTITLE, 0);
-	templateGenerator.ReleaseDlgTemplate(tmp);
+	vrayGolaemClassDesc.BeginEditParams(ip, this, flags, prev);
 }
 
 void VRayGolaem::EndEditParams(IObjParam *ip, ULONG flags, Animatable *next) {
-	DestroyCPParamMap2(pmap);
+	vrayGolaemClassDesc.EndEditParams(ip, this, flags, next);
 }
 
 RefTargetHandle VRayGolaem::Clone(RemapDir& remap) {
@@ -423,6 +443,95 @@ void VRayGolaem::ReleaseInterface(ULONG id, void *ip) {
 Mesh* VRayGolaem::GetRenderMesh(TimeValue t, INode *inode, View& view, BOOL& needDelete) {
 	needDelete=false;
 	return &mesh;
+}
+
+INT_PTR VRayGolaemDlgProc::DlgProc(TimeValue t, IParamMap2 *map, HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+	int id=LOWORD(wParam);
+
+	IParamBlock2 *pblock=NULL;
+	VRayGolaem *vrayGolaem=NULL;
+
+	if (map) pblock=map->GetParamBlock();
+	if (pblock) vrayGolaem= static_cast<VRayGolaem*>(pblock->GetOwner());
+
+	switch (msg) {
+		case WM_INITDIALOG: {
+			break;
+		}
+		case WM_DESTROY:
+			break;
+		case WM_COMMAND: {
+			int ctrlID=LOWORD(wParam);
+			int notifyCode=HIWORD(wParam);
+			HWND ctrlHWnd=(HWND) lParam;
+
+			if (notifyCode==BN_CLICKED) {
+				if (ctrlID==bn_golaemBrowse && vrayGolaem) {
+					chooseFileName(pblock, pb_file, _T("Choose Golaem .vrscene file"));
+				}
+				if (ctrlID==bn_shadersBrowse && vrayGolaem) {
+					chooseFileName(pblock, pb_shaders_file, _T("Choose shaders .vrscene file"));
+				}
+			}
+			break;
+		}
+	}
+
+	return FALSE;
+}
+
+static const TCHAR *vrsceneExtList=_T("V-Ray scene file (*.vrscene)\0*.vrscene\0All files(*.*)\0*.*\0\0");
+static const TCHAR *vrsceneDefExt=_T("vrscene");
+
+void VRayGolaemDlgProc::chooseFileName(IParamBlock2 *pblock2, ParamID paramID, const TCHAR *title) {
+	TCHAR fname[512]=_T("");
+	fname[0]='\0';
+
+	const TCHAR *storedName=pblock2->GetStr(paramID);
+	if (storedName) vutils_strcpy_n(fname, storedName, COUNT_OF(fname));
+
+	OPENFILENAME fn;
+	fn.lStructSize=sizeof(fn);
+	fn.hwndOwner=GetCOREInterface()->GetMAXHWnd();
+	fn.hInstance=hInstance;
+	fn.lpstrFilter=vrsceneExtList;
+	fn.lpstrCustomFilter=NULL;
+	fn.nMaxCustFilter=0;
+	fn.nFilterIndex=1;
+	fn.lpstrFile=fname;
+	fn.nMaxFile=512;
+	fn.lpstrFileTitle=NULL;
+	fn.nMaxFileTitle=0;
+	fn.lpstrInitialDir=NULL;
+	fn.lpstrTitle=title;
+	fn.Flags=0;
+	fn.lpstrDefExt=vrsceneDefExt;
+	fn.lCustData=NULL;
+	fn.lpfnHook=NULL;
+	fn.lpTemplateName=NULL;
+
+	BOOL res=GetOpenFileName(&fn);
+
+	const TCHAR *fullFname=NULL;
+#if GET_MAX_RELEASE(VERSION_3DSMAX) >= 9000
+	MaxSDK::Util::Path fpath(fname);
+#if GET_MAX_RELEASE(VERSION_3DSMAX) < 11900
+	IPathConfigMgr::GetPathConfigMgr()->NormalizePathAccordingToSettings(fpath);
+	fullFname=fpath.GetCStr();
+#else
+	TSTR mstrfname(fname);
+	IFileResolutionManager::GetInstance()->DoGetUniversalFileName(mstrfname);
+	fullFname=mstrfname.data();
+#endif
+#else
+	fullFname = fname;
+#endif
+
+	if (res) {
+		pblock2->SetValue(paramID, 0, const_cast<TCHAR*>(fullFname));
+		IParamMap2 *map=pblock2->GetMap();
+		if (map) map->Invalidate(paramID);
+	}
 }
 
 //**************************************************************

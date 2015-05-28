@@ -105,6 +105,10 @@ SOURCE=.\plugin.def
 
 SOURCE=.\vraygolaem.cpp
 # End Source File
+# Begin Source File
+
+SOURCE=.\vraygolaem.rc
+# End Source File
 # End Group
 # Begin Group "Header Files"
 
