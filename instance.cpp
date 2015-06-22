@@ -36,12 +36,12 @@ void VRayGolaemInstanceBase::frameBegin(TimeValue t, VRayCore *vray) {
 
 void VRayGolaemInstanceBase::frameEnd(VRayCore *vray) {
 	VRenderInstance::frameEnd(vray);
-	if (!vrayGolaem) return;
-	vrayGolaem->clearGeometry(vray);
+	if (!renderObject) return;
+	static_cast<VRayGolaem*>(renderObject)->clearGeometry(vray);
 }
 
 void VRayGolaemInstanceBase::compileGeometry(VR::VRayCore *vray) {
-	if (!vrayGolaem) return;
-	vrayGolaem->compileGeometry(vray);
+	if (!renderObject) return;
+	static_cast<VRayGolaem*>(renderObject)->compileGeometry(vray);
 }
 

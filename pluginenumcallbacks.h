@@ -156,6 +156,16 @@ struct CompileGeometryCB: EnumPluginCallback {
 		VR::GeomGenInterface *geom=static_cast<VR::GeomGenInterface*>(GET_INTERFACE(plugin, EXT_GEOM_GEN));
 		if (geom) {
 			try {
+				const VR::VRaySequenceData &sdata=renderer->getSequenceData();
+				if (sdata.progress) {
+					VR::VRayPlugin *vrayPlugin=queryInterface<VR::VRayPlugin>(plugin, EXT_VRAY_PLUGIN);
+					if (vrayPlugin) {
+						const tchar *name=vrayPlugin->getPluginName();
+						if (name) {
+							sdata.progress->debug("VRayGolaem: Compiling geometry for plugin \"%s\"", name);
+						}
+					}
+				}
 				geom->compileGeometry(static_cast<VR::VRayRenderer*>(renderer));
 			}
 			catch (...) {

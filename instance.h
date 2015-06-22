@@ -7,8 +7,6 @@ class VRayGolaemInstanceBase: public VR::VRenderInstance {
 protected:
 	Mesh dummyMesh; // Dummy 3dsmax mesh
 	void freeMem(void);
-
-	VRayGolaem *vrayGolaem;
 public:
 	VRayGolaemInstanceBase(VRayGolaem *vrayGolaem, INode *node, VR::VRayCore *vray, int renderID);
 	virtual ~VRayGolaemInstanceBase(void);

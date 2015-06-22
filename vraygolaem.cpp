@@ -677,6 +677,14 @@ void VRayGolaem::frameEnd(VR::VRayCore *_vray) {
 }
 
 VR::VRenderInstance* VRayGolaem::newRenderInstance(INode *node, VR::VRayCore *vray, int renderID) {
+	if (vray) {
+		const VR::VRaySequenceData &sdata=vray->getSequenceData();
+		if (sdata.progress) {
+			const TCHAR *nodeName=node? node->GetName() : _T("");
+			GET_MBCS(nodeName, nodeName_mbcs);
+			sdata.progress->debug("VRayGolaem: newRenderInstance() for node \"%s\"", nodeName_mbcs);
+		}
+	}
 	VRayGolaemInstanceBase *golaemInstance=new VRayGolaemInstanceBase(this, node, vray, renderID);
 	return golaemInstance;
 }
@@ -730,15 +738,29 @@ void VRayGolaem::callFrameEnd(VR::VRayCore *vray) {
 void VRayGolaem::compileGeometry(VR::VRayCore *vray) {
 	TimeConversionRAII timeConversion(vray);
 
+	const VR::VRaySequenceData &sdata=vray->getSequenceData();
+	if (sdata.progress)
+		sdata.progress->debug("VRayGolaem: Compiling geometry");
+
 	CompileGeometryCB compileGeometryCb(vray);
-	golaemPlugman->enumPlugins(&compileGeometryCb);
+	int res=golaemPlugman->enumPlugins(&compileGeometryCb);
+
+	if (sdata.progress)
+		sdata.progress->debug("VRayGolaem: %i plugins enumerated for compileGeometry()", res);
 }
 
 void VRayGolaem::clearGeometry(VR::VRayCore *vray) {
 	TimeConversionRAII timeConversion(vray);
 
+	const VR::VRaySequenceData &sdata=vray->getSequenceData();
+	if (sdata.progress)
+		sdata.progress->debug("VRayGolaem: Clearing geometry");
+
 	ClearGeometryCB clearGeometryCb(vray);
-	golaemPlugman->enumPlugins(&clearGeometryCb);
+	int res=golaemPlugman->enumPlugins(&clearGeometryCb);
+
+	if (sdata.progress)
+		sdata.progress->debug("VRayGolaem: %i plugins enumerated for clearGeometry()", res);
 }
 
 PluginManager* VRayGolaem::getPluginManager(void) {
