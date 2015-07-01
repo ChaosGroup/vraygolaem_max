@@ -7,6 +7,9 @@
 #include "pluginenumcallbacks.h"
 #include "resource.h"
 
+#include <fstream>	// std::ofstream
+#include <sstream>	// std::stringstream
+
 #if GET_MAX_RELEASE(VERSION_3DSMAX) >= 9000
 #include "IPathConfigMgr.h"
 #endif
@@ -14,6 +17,10 @@
 #include "IFileResolutionManager.h"
 #pragma comment(lib, "assetmanagement.lib")
 #endif
+
+#define GLMC_IMPLEMENTATION
+#define GLMC_NOT_INCLUDE_MINIZ
+#include "glm_crowd.h"	// golaem cache reader
 
 // no param block script access for VRay free
 #ifdef _FREE_
@@ -23,6 +30,9 @@
 #define _FT(X) _T(X)
 #define IS_PUBLIC 1
 #endif // _FREE_
+
+#define BIGFLOAT	float(999999) // from bendmod sample
+#define BIGINT		int(999999)
 
 //************************************************************
 // Class descriptor
@@ -122,17 +132,110 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	IDD_VRAYGOLAEM, IDS_VRAYGOLAEM_PARAMS, 0, 0, &vrayGolaemDlgProc,
 	// Params
 	pb_file, _T("cache_file"), TYPE_FILENAME, 0, 0,
-		p_ui, TYPE_EDITBOX, ed_golaemVrscene,
+		p_ui, TYPE_EDITBOX, ED_GOLAEMVRSCENE,
 #if GET_MAX_RELEASE(VERSION_3DSMAX) >= 11900
 		p_assetTypeID, MaxSDK::AssetManagement::AssetType::kExternalLink,
 #endif
 	PB_END,
 	pb_shaders_file, _T("shaders_file"), TYPE_FILENAME, 0, 0,
-		p_ui, TYPE_EDITBOX, ed_shadersVrscene,
+		p_ui, TYPE_EDITBOX, ED_SHADERSVRSCENE,
 #if GET_MAX_RELEASE(VERSION_3DSMAX) >= 11900
 		p_assetTypeID, MaxSDK::AssetManagement::AssetType::kExternalLink,
 #endif
 	PB_END,
+	pb_use_node_attributes, _T("use_node_attributes"), TYPE_BOOL, 0, 0,
+	p_default, FALSE,
+	p_ui, TYPE_SINGLECHEKBOX, ED_USERNODEATTRIBUTES,
+	PB_END,
+
+	// cache attributes
+	pb_crowd_fields, _T("crowd_fields"), TYPE_STRING, 0, 0,
+	p_ui, TYPE_EDITBOX, ED_CROWDFIELDS,
+	PB_END,
+	pb_cache_name, _T("cache_name"), TYPE_STRING, 0, 0,
+	p_ui, TYPE_EDITBOX, ED_CACHENAME,
+	PB_END,
+	pb_cache_dir, _T("cache_dir"), TYPE_STRING, 0, 0,
+	p_ui, TYPE_EDITBOX, ED_CACHEDIR,
+	PB_END,
+	pb_character_files, _T("character_files"), TYPE_STRING, 0, 0,
+	p_ui, TYPE_EDITBOX, ED_CHARACTERFILES,
+	PB_END,
+
+	// motion blur attributes
+	pb_motion_blur_enable, _T("motion_blur_enable"), TYPE_BOOL, 0, 0,
+	p_default, FALSE,
+	p_ui, TYPE_SINGLECHEKBOX, ED_MBLURENABLE,
+	PB_END,
+	pb_motion_blur_start, _T("motion_blur_start"), TYPE_FLOAT, 0, 0,
+	p_default, -0.5f,
+	p_range, -BIGFLOAT, BIGFLOAT, 
+	p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_MBLURSTART, ED_MBLURSTARTSPIN, 0.50f,
+	PB_END,
+	pb_motion_blur_window_size, _T("motion_blur_window_size"), TYPE_FLOAT, 0, 0,
+	p_default, 1.f,
+	p_range, 0.f, BIGFLOAT, 
+	p_ui, TYPE_SPINNER, EDITTYPE_POS_FLOAT, ED_MBLURWINDOWSIZE, ED_MBLURWINDOWSIZESPIN, 0.50f,
+	PB_END,
+	pb_motion_blur_samples, _T("motion_blur_samples"), TYPE_INT, 0, 0,
+	p_default, 1,
+	p_range, 0, BIGINT, 
+	p_ui, TYPE_SPINNER,  EDITTYPE_POS_INT, ED_MBLURSAMPLES, ED_MBLURSAMPLESSPIN, 1,
+	PB_END,
+
+	// culling attributes
+	pb_frustum_enable, _T("frustum_enable"), TYPE_BOOL, 0, 0,
+	p_default, FALSE,
+	p_ui, TYPE_SINGLECHEKBOX, ED_FRUSTUMENABLE,
+	PB_END,
+	pb_frustum_margin, _T("frustum_margin"), TYPE_FLOAT, 0, 0,
+	p_default, 10.f,
+	p_range, -BIGFLOAT, BIGFLOAT, 
+	p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_FRUSTUMMARGIN, ED_FRUSTUMMARGINSPIN, 1.f,
+	PB_END,
+	pb_camera_margin, _T("camera_margin"), TYPE_FLOAT, 0, 0,
+	p_default, 10.f,
+	p_range, -BIGFLOAT, BIGFLOAT, 
+	p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_CAMERAMARGIN, ED_CAMERAMARGINSPIN, 1.f,
+	PB_END,
+
+	// vray attributes
+	pb_frame_offset, _T("frame_offset"), TYPE_INT, 0, 0,
+	p_default, 0,
+	p_range, -BIGINT, BIGINT, 
+	p_ui, TYPE_SPINNER,  EDITTYPE_INT, ED_FRAMEOFFSET, ED_FRAMEOFFSETSPIN, 1,
+	PB_END,
+	pb_scale_transform, _T("scale_transform"), TYPE_FLOAT, 0, 0,
+	p_default, 10.f,
+	p_range, -BIGFLOAT, BIGFLOAT, 
+	p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_SCALETRANSFORM, ED_SCALETRANSFORMSPIN, 1.f,
+	PB_END,
+	pb_object_id_base, _T("object_id_base"), TYPE_INT, 0, 0,
+	p_default, 0,
+	p_range, 0, BIGINT, 
+	p_ui, TYPE_SPINNER,  EDITTYPE_POS_INT, ED_OBJECTIDBASE, ED_OBJECTIDBASESPIN, 1,
+	PB_END,
+	pb_primary_visibility, _T("primary_visibility"), TYPE_BOOL, 0, 0,
+	p_default, TRUE,
+	p_ui, TYPE_SINGLECHEKBOX, ED_PRIMARYVISIBILITY,
+	PB_END,
+	pb_casts_shadows, _T("casts_shadows"), TYPE_BOOL, 0, 0,
+	p_default, TRUE,
+	p_ui, TYPE_SINGLECHEKBOX, ED_CASTSSHADOWS,
+	PB_END,
+	pb_visible_in_reflections, _T("visible_in_reflections"), TYPE_BOOL, 0, 0,
+	p_default, TRUE,
+	p_ui, TYPE_SINGLECHEKBOX, ED_VISIBLEINREFLECTIONS,
+	PB_END,
+	pb_visible_in_refractions, _T("visible_in_refractions"), TYPE_BOOL, 0, 0,
+	p_default, TRUE,
+	p_ui, TYPE_SINGLECHEKBOX, ED_VISIBLEINREFRACTIONS,
+	PB_END,
+	pb_temp_vrscene_file_dir, _T("temp_vrscene_file_dir"), TYPE_STRING, 0, 0,
+	p_default, _T("TEMP"),
+	p_ui, TYPE_EDITBOX, ED_TEMPVRSCENEFILEDIR,
+	PB_END,
+
 PB_END
 );
 
@@ -327,33 +430,108 @@ inline void drawLine(GraphicsWindow *gw, Point3 &p0, Point3 &p1) {
 	gw->segment(p, TRUE);
 }
 
-inline void drawTriangle(GraphicsWindow *gw, Point3 &p0, Point3 &p1, Point3 &p2) {
-	Point3 n=Normalize((p1-p0)^(p2-p0));
-	Point3 p[4]={ p0, p1, p2 };
-	Point3 uvw[4]={ Point3(0,0,0), Point3(0,0,0), Point3(0,0,0) };
-	Point3 nrm[4]={ n, n, n };
-	gw->triangleN(p, nrm, uvw);
-}
-
-inline void drawBBox(GraphicsWindow *gw, Box3 &b) {
+inline void drawBBox(GraphicsWindow *gw, const Box3 &b) {
 	gw->setTransform(Matrix3(1));
 	Point3 p[8];
 	for (int i=0; i<8; i++) p[i]=b[i];
 	gw->startSegments();
-
 	drawLine(gw, p[0], p[1]);
 	drawLine(gw, p[0], p[2]);
-	drawLine(gw, p[0], p[4]);
+	drawLine(gw, p[3], p[1]);
+	drawLine(gw, p[3], p[2]);
 
-	/*
 	drawLine(gw, p[7], p[6]);
 	drawLine(gw, p[7], p[5]);
-	drawLine(gw, p[7], p[3]);
-	*/
+	drawLine(gw, p[4], p[5]);
+	drawLine(gw, p[4], p[6]);
+
+	drawLine(gw, p[0], p[4]);
+	drawLine(gw, p[1], p[5]);
+	drawLine(gw, p[2], p[6]);
+	drawLine(gw, p[3], p[7]);
 	gw->endSegments();
 }
 
-const float size=40.0f;
+inline void drawText(GraphicsWindow *gw, const TCHAR* text, const Point3& pos) 
+{
+	IPoint3 ipt;
+	gw->wTransPoint(&pos, &ipt);
+
+	// text position
+	SIZE sp;
+	gw->getTextExtents(text, &sp);
+
+	// draw shadow text
+	ipt.x-=sp.cx/2;
+	ipt.y-=sp.cy/2;
+	gw->setColor(TEXT_COLOR, 0.0f, 0.0f, 0.0f);
+	gw->wText(&ipt, text);
+
+	// draw white text
+	ipt.x--;
+	ipt.y--;
+	gw->setColor(TEXT_COLOR, 1.0f, 1.0f, 1.0f);
+	gw->wText(&ipt, text);
+}
+
+void VRayGolaem::drawEntityPositions(GraphicsWindow *gw, TimeValue t)
+{
+	// open cache if set
+	if (_cacheName.length())
+	{
+		int currentFrame = (int)((float)t / (float)TIME_TICKSPERSEC * (float)GetFrameRate()); 
+		std::stringstream gscsFileStr, gscfFileStr;
+		gscsFileStr << _cacheDir.ptr() << "/" << _cacheName.ptr() << "." << _crowdFields.ptr() << ".gscs";
+		gscfFileStr << _cacheDir.ptr() << "/" << _cacheName.ptr() << "." << _crowdFields.ptr() << "." << currentFrame << ".gscf";
+	
+		GlmSimulationCacheStatus status;
+		GlmSimulationData* simulationData;
+		status = glmCreateAndReadSimulationData(&simulationData, gscsFileStr.str().c_str());
+		if (status == GSC_SUCCESS)
+		{
+			GlmFrameData* frameData;
+			glmCreateFrameData(&frameData, simulationData);
+			status = glmReadFrameData(frameData, simulationData, gscfFileStr.str().c_str());
+			
+			if (status == GSC_SUCCESS)
+			{
+				for (size_t iEntity=0, entityCount = simulationData->_entityCount; iEntity<entityCount; ++iEntity)
+				{
+					unsigned int entityType = simulationData->_entityTypes[iEntity];
+					float entityRadius = simulationData->_entityRadius[iEntity];
+					float entityHeight = simulationData->_entityHeight[iEntity];
+					if(simulationData->_boneCount[entityType])
+					{
+						// draw bbox
+						unsigned int iBoneIndex = simulationData->_iBoneOffsetPerEntityType[entityType] + simulationData->_indexInEntityType[iEntity] * simulationData->_boneCount[entityType];
+						Point3 entityPosition(frameData->_bonePositions[iBoneIndex][0], frameData->_bonePositions[iBoneIndex][1], frameData->_bonePositions[iBoneIndex][2]);
+						// axis transformation for max
+						Matrix3 axisTranform = RotateXMatrix(-pi/2);
+						entityPosition = axisTranform * entityPosition;
+						Box3 entityBbox(Point3(entityPosition[0]-entityRadius, entityPosition[1]-entityRadius, entityPosition[2]), Point3(entityPosition[0]+entityRadius, entityPosition[1]+entityRadius, entityPosition[2]+entityHeight));
+						entityPosition *= _scaleTransform,
+						entityBbox.pmin *= _scaleTransform;
+						entityBbox.pmax *= _scaleTransform;
+						drawBBox(gw, entityBbox);
+
+						// draw EntityID
+						std::basic_stringstream<TCHAR, std::char_traits<TCHAR>, std::allocator<TCHAR> > entityIdStr;
+						entityIdStr << simulationData->_entityIds[iEntity];
+						drawText(gw, entityIdStr.str().c_str(), 0.5f, entityPosition);	
+					}
+				}
+			}
+			else
+			{
+				DebugPrint(_T("VRayGolaem: Error loading .gscf file \"%s\""), gscfFileStr.str().c_str());
+			}
+		}
+		else
+		{
+			DebugPrint(_T("VRayGolaem: Error loading .gscs file \"%s\""), gscsFileStr.str().c_str());
+		}
+	}
+}
 
 void VRayGolaem::draw(TimeValue t, INode *node, ViewExp *vpt) {
 	GraphicsWindow *gw=vpt->getGW();
@@ -371,6 +549,7 @@ void VRayGolaem::draw(TimeValue t, INode *node, ViewExp *vpt) {
 	float u0=radius, v0=0.0f;
 	Point3 pt[3];
 
+	// draw locator sphere
 	gw->startSegments();
 
 	for (int i=0; i<nsegs; i++) {
@@ -397,33 +576,19 @@ void VRayGolaem::draw(TimeValue t, INode *node, ViewExp *vpt) {
 
 	gw->endSegments();
 
+	drawEntityPositions(gw, t);
+
 	tm.NoScale();
 	float scaleFactor=vpt->NonScalingObjectSize()*vpt->GetVPWorldWidth(tm.GetTrans())/(float)360.0;
 	tm.Scale(Point3(scaleFactor,scaleFactor,scaleFactor));
 	gw->setTransform(tm);
 
-	IPoint3 ipt;
-	Point3 org(0,0,0);
-	gw->wTransPoint(&org, &ipt);
-
-	SIZE sp;
-	gw->getTextExtents(iconText, &sp);
-
-	ipt.x-=sp.cx/2;
-	ipt.y-=sp.cy/2;
-
-	gw->setColor(TEXT_COLOR, 0.0f, 0.0f, 0.0f);
-	gw->wText(&ipt, iconText);
-
-	ipt.x--;
-	ipt.y--;
-	gw->setColor(TEXT_COLOR, 1.0f, 1.0f, 1.0f);
-	gw->wText(&ipt, iconText);
+	drawText(gw, iconText, 1.5, Point3::Origin);
 }
 
 int VRayGolaem::Display(TimeValue t, INode* node, ViewExp *vpt, int flags) {
 	draw(t, node, vpt);
-	return 0;
+	return 1;
 }
 
 ObjectState VRayGolaem::Eval(TimeValue time) {
@@ -442,7 +607,7 @@ void VRayGolaem::ReleaseInterface(ULONG id, void *ip) {
 
 Mesh* VRayGolaem::GetRenderMesh(TimeValue t, INode *inode, View& view, BOOL& needDelete) {
 	needDelete=false;
-	return &mesh;
+	return &_mesh;
 }
 
 INT_PTR VRayGolaemDlgProc::DlgProc(TimeValue t, IParamMap2 *map, HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -466,10 +631,17 @@ INT_PTR VRayGolaemDlgProc::DlgProc(TimeValue t, IParamMap2 *map, HWND hWnd, UINT
 			HWND ctrlHWnd=(HWND) lParam;
 
 			if (notifyCode==BN_CLICKED) {
-				if (ctrlID==bn_golaemBrowse && vrayGolaem) {
+				if (ctrlID==BN_GOLAEMBROWSE && vrayGolaem) {
 					chooseFileName(pblock, pb_file, _T("Choose Golaem .vrscene file"));
+					// if the vrscene has been loaded, fill the node attributes
+					const TCHAR *fname_wstr=pblock->GetStr(pb_file, t);
+					if (fname_wstr)
+					{
+						GET_MBCS(fname_wstr, fname_mbcs);
+						vrayGolaem->readCrowdVRScene(fname_mbcs);
+					}
 				}
-				if (ctrlID==bn_shadersBrowse && vrayGolaem) {
+				if (ctrlID==BN_SHADERSBROWSE && vrayGolaem) {
 					chooseFileName(pblock, pb_shaders_file, _T("Choose shaders .vrscene file"));
 				}
 			}
@@ -589,20 +761,164 @@ const tchar* getVRayPluginPath() {
 	return s;
 }
 
-void VRayGolaem::updateVRayParams(TimeValue t, VR::VRayCore *vray) {
+void VRayGolaem::updateVRayParams(TimeValue t, VR::VRayCore *vray) 
+{
+	// vrscene attributes
 	const TCHAR *fname_wstr=pblock2->GetStr(pb_file, t);
-	if (!fname_wstr) vrsceneFile="";
+	if (!fname_wstr) _vrsceneFile="";
 	else {
 		GET_MBCS(fname_wstr, fname_mbcs);
-		vrsceneFile=fname_mbcs;
+		_vrsceneFile=fname_mbcs;
 	}
 
 	const TCHAR *shadersName_wstr=pblock2->GetStr(pb_shaders_file, t);
-	if (!shadersName_wstr) shadersFile="";
+	if (!shadersName_wstr) _shadersFile="";
 	else {
 		GET_MBCS(shadersName_wstr, shadersName_mbcs);
-		shadersFile=shadersName_mbcs;
+		_shadersFile=shadersName_mbcs;
 	}
+	_useNodeAttributes = pblock2->GetInt(pb_use_node_attributes, t) == 1;
+
+	// cache attributes
+	const TCHAR *crowdFields_wstr=pblock2->GetStr(pb_crowd_fields, t);
+	if (!crowdFields_wstr) _crowdFields="";
+	else {
+		GET_MBCS(crowdFields_wstr, crowdFields_mbcs);
+		_crowdFields=crowdFields_mbcs;
+	}
+
+	const TCHAR *cacheName_wstr=pblock2->GetStr(pb_cache_name, t);
+	if (!cacheName_wstr) _cacheName="";
+	else {
+		GET_MBCS(cacheName_wstr, cacheName_mbcs);
+		_cacheName=cacheName_mbcs;
+	}
+
+	const TCHAR *cacheDir_wstr=pblock2->GetStr(pb_cache_dir, t);
+	if (!cacheDir_wstr) _cacheDir="";
+	else {
+		GET_MBCS(cacheDir_wstr, cacheDir_mbcs);
+		_cacheDir=cacheDir_mbcs;
+	}
+
+	const TCHAR *characterFiles_wstr=pblock2->GetStr(pb_character_files, t);
+	if (!characterFiles_wstr) _characterFiles="";
+	else {
+		GET_MBCS(characterFiles_wstr, characterFiles_mbcs);
+		_characterFiles=characterFiles_mbcs;
+	}
+
+	// motion blur attributes
+	_mBlurEnable = pblock2->GetInt(pb_motion_blur_enable, t) == 1;
+	_mBlurStart = pblock2->GetFloat(pb_motion_blur_start, t);
+	_mBlurWindowSize = pblock2->GetFloat(pb_motion_blur_window_size, t);
+	_mBlurSamples = pblock2->GetInt(pb_motion_blur_samples, t);
+
+	// culling attributes
+	_frustumEnable = pblock2->GetInt(pb_frustum_enable, t) == 1;
+	_frustumMargin = pblock2->GetFloat(pb_frustum_margin, t);
+	_cameraMargin = pblock2->GetFloat(pb_camera_margin, t);
+
+	// vray
+	_scaleTransform = pblock2->GetFloat(pb_scale_transform, t);
+	_frameOffset = pblock2->GetInt(pb_frame_offset, t);
+	_objectIDBase = pblock2->GetInt(pb_object_id_base, t);
+	_primaryVisibility = pblock2->GetInt(pb_primary_visibility, t) == 1;
+	_castsShadows = pblock2->GetInt(pb_casts_shadows, t) == 1;
+	_visibleInReflections = pblock2->GetInt(pb_visible_in_reflections, t) == 1;
+	_visibleInRefractions = pblock2->GetInt(pb_visible_in_refractions, t) == 1;
+
+	const TCHAR *tempVrScene_wstr=pblock2->GetStr(pb_temp_vrscene_file_dir, t);
+	if (!tempVrScene_wstr) _tempVRSceneFileDir="TEMP";
+	else {
+		GET_MBCS(tempVrScene_wstr, tempVrScene_mbcs);
+		_tempVRSceneFileDir=tempVrScene_mbcs;
+	}
+}
+
+bool VRayGolaem::readCrowdVRScene(const VR::CharString& file) 
+{
+	// check file path
+	std::ifstream inputFileStream(file.ptr());
+	if (!inputFileStream.is_open()) return false;
+	
+	//pblock2->SetValue(pb_visible_in_reflections, 0, false);
+	//pblock2->SetValue(pb_frustum_margin, 0, 11.f);
+	return true;
+}
+
+bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file) 
+{
+	// check file path
+	std::stringstream outputStr;
+	std::ofstream outputFileStream(file.ptr());
+	if (!outputFileStream.is_open()) return false;
+
+	// correct the name of the shader to call. When exporting a scene from Maya with Vray, some shader name special characters are replaced with not parsable character (":" => "__")
+	// to be able to find the correct shader name to call, we need to apply the same conversion to the shader names contained in the cam file
+	VR::CharString correctedCacheName(_cacheName);
+	convertToValidVrsceneName(_cacheName, correctedCacheName);
+
+	// crowd material
+	outputStr << "CrowdCharacterShader " << correctedCacheName.ptr() << "CrowdMtl@material" << std::endl;
+	outputStr << "{" << std::endl;
+	outputStr << "}" << std::endl;
+	outputStr << std::endl;
+
+	// render stats
+	outputStr << "MtlRenderStats " << correctedCacheName.ptr() << "CrowdMtl@renderStats" << std::endl;
+	outputStr << "{" << std::endl;
+	outputStr << "\t" << "base_mtl=" << correctedCacheName.ptr() << "CrowdMtl@material;" << std::endl;
+	outputStr << "}" << std::endl;
+	outputStr << std::endl;
+
+	// node
+	outputStr << "Node " << correctedCacheName.ptr() << "Crowd@node" << std::endl;
+	outputStr << "{" << std::endl;
+	outputStr << "\t" << "transform=Transform(Matrix(Vector(1, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1)), Vector(0, 0, 0));" << std::endl;
+	outputStr << "\t" << "geometry=" << correctedCacheName.ptr() << "Crowd@mesh1;" << std::endl;
+	outputStr << "\t" << "material=" << correctedCacheName.ptr() << "CrowdMtl@renderStats;" << std::endl;
+	int nSamples = 1;
+	if (_mBlurEnable) nSamples = _mBlurSamples;
+	outputStr << "\t" << "nsamples=" << nSamples << ";" << std::endl;
+	outputStr << "\t" << "visible=1;" << std::endl;
+	outputStr << "}" << std::endl;
+	outputStr << std::endl;
+
+	outputStr << "GolaemCrowd " << correctedCacheName.ptr() << "Crowd@mesh1" << std::endl;
+	outputStr << "{" << std::endl;
+	outputStr << "\t" << "glmTransform=Transform(Matrix(Vector("<< _scaleTransform <<", 0, 0), Vector(0, "<< _scaleTransform <<", 0), Vector(0, 0, "<< _scaleTransform <<")), Vector(0, 0, 0));" << std::endl;
+	outputStr << "\t" << "glmFrameOffset="<< _frameOffset <<";" << std::endl;
+	outputStr << "\t" << "glmCrowdField=\"" << _crowdFields.ptr() << "\";" << std::endl;
+	outputStr << "\t" << "glmCacheName=\"" << _cacheName.ptr() << "\";" << std::endl;
+	outputStr << "\t" << "glmCacheFileDir=\"" << _cacheDir.ptr() << "\";" << std::endl;
+	outputStr << "\t" << "glmCharacterFiles=\"" << _characterFiles.ptr() << "\";" << std::endl;
+	outputStr << "\t" << "glmExcludedEntities=\"\";" << std::endl;
+	// moblur
+	outputStr << "\t" << "glmMBlurEnabled=" << _mBlurEnable << ";" << std::endl;
+	outputStr << "\t" << "glmMBlurStart=" << _mBlurStart << ";" << std::endl;
+	outputStr << "\t" << "glmMBlurWindowSize=" << _mBlurWindowSize << ";" << std::endl;
+	outputStr << "\t" << "glmMBlurSamples=" << _mBlurSamples << ";" << std::endl;
+	// frustum culling
+	outputStr << "\t" << "glmEnableFrustumCulling=" << _frustumEnable << ";" << std::endl;
+	outputStr << "\t" << "glmFrustumMargin=" << _frustumMargin << ";" << std::endl;
+	outputStr << "\t" << "glmCameraMargin=" << _cameraMargin << ";" << std::endl;
+	// vray
+	outputStr << "\t" << "glmObjectIDBase=" << _objectIDBase << ";" << std::endl;
+	outputStr << "\t" << "glmCameraVisibility=" << _primaryVisibility << ";" << std::endl;
+	outputStr << "\t" << "glmShadowsVisibility=" << _castsShadows << ";" << std::endl;
+	outputStr << "\t" << "glmReflectionsVisibility=" << _visibleInReflections << ";" << std::endl;
+	outputStr << "\t" << "glmRefractionsVisibility=" << _visibleInRefractions << ";" << std::endl;
+
+	outputStr << "\t" << "glmDccPackage=1;" << std::endl;
+
+	outputStr << "}" << std::endl;
+	outputStr << std::endl;
+
+	// write in file
+	outputFileStream << outputStr.str();
+	outputFileStream.close();
+	return true;
 }
 
 void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray) {
@@ -620,30 +936,57 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray) {
 		golaemPlugman->loadLibraryFromPathCollection(vrayPluginPath, "/vray_*.dll", NULL, vray->getSequenceData().progress);
 	}
 
-	// Load the .vrscene into the plugin manager
-	vrayScene=new VR::VRayScene(golaemPlugman);
-
-	if (vrsceneFile.empty()) {
-		sdata.progress->warning("VRayGolaem: No .vrscene file specified");
-	} else {
-		VR::ErrorCode errCode=vrayScene->readFile(vrsceneFile.ptr());
-		if (errCode.error()) {
-			VR::CharString errMsg=errCode.getErrorString();
-			sdata.progress->warning("VRayGolaem: Error loading .vrscene file \"%s\": %s", vrsceneFile.ptr(), errMsg.ptr());
-		} else {
-			sdata.progress->info("VRayGolaem: Scene file \"%s\" loaded successfully", vrsceneFile.ptr());
+	// Creates the crowd .vrscene file on the fly if required
+	VR::CharString vrSceneFileToLoad(_vrsceneFile);
+	if (_useNodeAttributes)
+	{
+		char* outputDir = getenv (_tempVRSceneFileDir.ptr());
+		if (outputDir!=NULL) 
+		{
+			std::stringstream outputPathStr;
+			outputPathStr << outputDir << "/test.vrscene";
+			
+			VR::CharString vrSceneExportPath(outputPathStr.str().c_str());
+			if (!writeCrowdVRScene(vrSceneExportPath)) 
+			{
+				sdata.progress->warning("VRayGolaem: Error writing .vrscene file \"%s\"", vrSceneExportPath.ptr());
+			}
+			else 
+			{
+				sdata.progress->info("VRayGolaem: Writing .vrscene file \"%s\"", vrSceneExportPath.ptr());
+				vrSceneFileToLoad = vrSceneExportPath;
+			}
+		}
+		else
+		{
+			sdata.progress->warning("VRayGolaem: Error finding environment variable for .vrscene output \"%s\"", _tempVRSceneFileDir.ptr());
 		}
 	}
 
-	if (shadersFile.empty()) {
-		sdata.progress->warning("VRayGolaem: No shaders .vrscene file specified");
+	// Load the .vrscene into the plugin manager
+	_vrayScene=new VR::VRayScene(golaemPlugman);
+
+	if (vrSceneFileToLoad.empty()) {
+		sdata.progress->warning("VRayGolaem: No .vrscene file specified");
 	} else {
-		VR::ErrorCode errCode=vrayScene->readFile(shadersFile.ptr());
+		VR::ErrorCode errCode=_vrayScene->readFile(vrSceneFileToLoad.ptr());
 		if (errCode.error()) {
 			VR::CharString errMsg=errCode.getErrorString();
-			sdata.progress->warning("VRayGolaem: Error loading shaders .vrscene file \"%s\": %s", shadersFile.ptr(), errMsg.ptr());
+			sdata.progress->warning("VRayGolaem: Error loading .vrscene file \"%s\": %s", vrSceneFileToLoad.ptr(), errMsg.ptr());
 		} else {
-			sdata.progress->info("VRayGolaem: Shaders file \"%s\" loaded successfully", shadersFile.ptr());
+			sdata.progress->info("VRayGolaem: Scene file \"%s\" loaded successfully", vrSceneFileToLoad.ptr());
+		}
+	}
+
+	if (_shadersFile.empty()) {
+		sdata.progress->warning("VRayGolaem: No shaders .vrscene file specified");
+	} else {
+		VR::ErrorCode errCode=_vrayScene->readFile(_shadersFile.ptr());
+		if (errCode.error()) {
+			VR::CharString errMsg=errCode.getErrorString();
+			sdata.progress->warning("VRayGolaem: Error loading shaders .vrscene file \"%s\": %s", _shadersFile.ptr(), errMsg.ptr());
+		} else {
+			sdata.progress->info("VRayGolaem: Shaders file \"%s\" loaded successfully", _shadersFile.ptr());
 		}
 	}
 
@@ -655,10 +998,10 @@ void VRayGolaem::renderEnd(VR::VRayCore *_vray) {
 	VRenderObject::renderEnd(vray);
 	
 	callRenderEnd(vray);
-	if (vrayScene) {
-		vrayScene->freeMem();
-		delete vrayScene;
-		vrayScene=NULL;
+	if (_vrayScene) {
+		_vrayScene->freeMem();
+		delete _vrayScene;
+		_vrayScene=NULL;
 	}
 }
 
@@ -766,4 +1109,55 @@ void VRayGolaem::clearGeometry(VR::VRayCore *vray) {
 PluginManager* VRayGolaem::getPluginManager(void) {
 	return golaemPlugman;
 }
+
+//************************************************************
+// Inline utility functions
+//************************************************************
+
+bool isCharInvalidVrscene(tchar c)
+{
+	if (c == '|' || c == '@') return false;
+	if (c >= 'a' && c <= 'z') return false;
+	if (c >= 'A' && c <= 'Z') return false;
+	if (c >= '0' && c <= '9') return false;
+	return true;
+}
+
+void convertToValidVrsceneName(const VR::CharString& strIn, VR::CharString& strOut)
+{
+	int strSize = int(strIn.length());
+	if (strSize == 0)
+	{
+		strOut.setLength(0);
+		return;
+	}
+	strOut.setLength(strSize * 2);
+
+	// If the first character is a digit, convert that to a letter
+	int pos(0), i(0);
+	strOut.write_ptr()[0] = strIn[0];
+	if (strIn[0] >= '0' && strIn[0] <= '9')
+	{
+		strOut.write_ptr()[0] = 'a' + (strIn[0] - '0');
+		pos++; 
+		i++;
+	}
+
+	while (i < strSize)
+	{
+		if (isCharInvalidVrscene(strIn[i]))
+		{
+			strOut.write_ptr()[pos++] = '_';
+			if (strIn[i] == ':')
+			{
+				strOut.write_ptr()[pos++] = '_';
+			}
+		}
+		else strOut.write_ptr()[pos++] = strIn[i];
+		i++;
+	}
+
+	strOut.setLength(pos);
+}
+
 

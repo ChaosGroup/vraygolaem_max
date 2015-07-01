@@ -1,5 +1,8 @@
-#ifndef __INFINITEPLANE_H__
-#define __INFINITEPLANE_H__
+#ifndef __VRAYGOLAEM_H__
+#define __VRAYGOLAEM_H__
+
+#pragma warning( push )
+#pragma warning( disable : 4100 4251 4275 )
 
 #include "max.h"
 #include <bmmlib.h>
@@ -37,6 +40,31 @@
 enum {
 	pb_file,
 	pb_shaders_file,
+	pb_use_node_attributes,
+	// cache
+	pb_crowd_fields,
+	pb_cache_name,
+	pb_cache_dir,
+	pb_character_files,
+	// motion blur
+	pb_motion_blur_enable,
+	pb_motion_blur_start,
+	pb_motion_blur_window_size,
+	pb_motion_blur_samples,
+	// culling
+	pb_frustum_enable,
+	pb_frustum_margin,
+	pb_camera_margin,
+	// vray 
+	pb_frame_offset,
+	pb_scale_transform,
+	pb_object_id_base,
+	pb_primary_visibility,
+	pb_casts_shadows,
+	pb_visible_in_reflections,
+	pb_visible_in_refractions,
+	// output
+	pb_temp_vrscene_file_dir,
 };
 
 //************************************************************
@@ -45,9 +73,39 @@ enum {
 
 class VRayGolaem: public GeomObject, public VR::VRenderObject, public VR::VRayPluginRendererInterface {
 	// An empty dummy mesh returned from GetRenderMesh()
-	Mesh mesh;
-	VR::VRayScene *vrayScene; // The loaded .vrscene file
-	VR::CharString vrsceneFile, shadersFile;
+	Mesh _mesh;
+	VR::VRayScene *_vrayScene; // The loaded .vrscene file
+	VR::CharString _vrsceneFile, _shadersFile;
+	bool _useNodeAttributes;  // if true, uses the attributes below to generate the vrscene, else use the loaded vrscene
+
+	// Cache attributes
+	VR::CharString _crowdFields;
+	VR::CharString _cacheName;
+	VR::CharString _cacheDir;
+	VR::CharString _characterFiles;
+
+	// MoBlur attributes
+	bool _mBlurEnable;
+	float _mBlurStart;
+	float _mBlurWindowSize;
+	int _mBlurSamples;
+
+	// Culling attributes
+	bool _frustumEnable;
+	float _frustumMargin;
+	float _cameraMargin;
+
+	// Vray attributes
+	int _frameOffset;
+	int _objectIDBase;
+	float _scaleTransform;
+	bool _primaryVisibility;
+	bool _castsShadows;
+	bool _visibleInReflections;
+	bool _visibleInRefractions;
+
+	// Output attributes
+	VR::CharString _tempVRSceneFileDir;
 
 	void callRenderBegin(VR::VRayCore *vray);
 	void callRenderEnd(VR::VRayCore *vray);
@@ -61,6 +119,12 @@ class VRayGolaem: public GeomObject, public VR::VRenderObject, public VR::VRayPl
 	void updateVRayParams(TimeValue t, VR::VRayCore *vray);
 
 	friend class VRayGolaemInstanceBase;
+	friend class VRayGolaemDlgProc;
+
+protected:
+	bool readCrowdVRScene(const VR::CharString& file);
+	bool writeCrowdVRScene(const VR::CharString& file);
+
 public:
 	IParamBlock2 *pblock2;
 	IParamMap2 *pmap;
@@ -146,6 +210,7 @@ public:
 
 	// Other methods
 	void draw(TimeValue t, INode *node, ViewExp *vpt);
+	void drawEntityPositions(GraphicsWindow *gw, TimeValue t);
 
 	// From VRayPluginRendererInterface
 	PluginManager* getPluginManager(void);
@@ -163,4 +228,7 @@ public:
 
 extern PluginManager *golaemPlugman; // We need this to store the instance of the Golaem plugin
 
-#endif
+bool isCharInvalidVrscene(tchar c);
+void convertToValidVrsceneName(const VR::CharString& strIn, VR::CharString& strOut);
+
+#endif // __VRAYGOLAEM_H__
