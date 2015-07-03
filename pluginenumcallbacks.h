@@ -1,3 +1,9 @@
+/***************************************************************************
+*                                                                          *
+*  Copyright (C) Chaos Group & Golaem S.A. - All Rights Reserved.          *
+*                                                                          *
+***************************************************************************/
+
 #ifndef __PLUGIN_ENUM_CALLBACKS_H__
 #define __PLUGIN_ENUM_CALLBACKS_H__
 

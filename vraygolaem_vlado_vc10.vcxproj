@@ -77,6 +77,10 @@
     <ClCompile Include="instance.cpp">
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='max 2014|x64'"> /Qwd1125,880,1420 /O3 /Qxi /Qprec_div   /Qwd1125,880,1420 /O3 /Qxi /Qprec_div </AdditionalOptions>
     </ClCompile>
+	<ClCompile Include="miniz.c">
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='max 2014|x64'"> /Qwd1125,880,1420 /O3 /Qxi /Qprec_div   /Qwd1125,880,1420 /O3 /Qxi /Qprec_div </AdditionalOptions>
+    </ClCompile>
+	</ClCompile>
     <ClCompile Include="vraygolaem.cpp">
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='max 2014|x64'"> /Qwd1125,880,1420 /O3 /Qxi /Qprec_div   /Qwd1125,880,1420 /O3 /Qxi /Qprec_div </AdditionalOptions>
     </ClCompile>
@@ -85,6 +89,8 @@
     <CustomBuild Include="plugin.def" />
   </ItemGroup>
   <ItemGroup>
+	<ClInclude Include="glm_crowd.h" />
+	<ClInclude Include="instance.h" />
     <ClInclude Include="pluginenumcallbacks.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="vraygolaem.h" />

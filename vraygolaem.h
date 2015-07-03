@@ -1,3 +1,9 @@
+/***************************************************************************
+*                                                                          *
+*  Copyright (C) Chaos Group & Golaem S.A. - All Rights Reserved.          *
+*                                                                          *
+***************************************************************************/
+
 #ifndef __VRAYGOLAEM_H__
 #define __VRAYGOLAEM_H__
 
@@ -28,12 +34,10 @@
 //************************************************************
 
 #define	PLUGIN_CLASSID Class_ID(0xece3ed9, 0x1256b63)
-
 #define STR_CLASSNAME _T("VRayGolaem")
 #define STR_INTERNALNAME _T("VRayGolaem")
 #define STR_LIBDESC _T("VRay-Golaem example")
 #define STR_DLGTITLE _T("VRayGolaem Parameters")
-
 #define REFNO_PBLOCK 0
 
 // Paramblock2 parameter list
@@ -41,6 +45,10 @@ enum {
 	pb_file,
 	pb_shaders_file,
 	pb_use_node_attributes,
+	// display
+	pb_enable_display,
+	pb_display_percent,
+	pb_display_entity_ids,
 	// cache
 	pb_crowd_fields,
 	pb_cache_name,
@@ -68,21 +76,58 @@ enum {
 };
 
 //************************************************************
+// FindPluginOfTypeCallback
+//************************************************************
+
+class FindPluginOfTypeCallback : public EnumPluginCallback
+{
+	public:
+	FindPluginOfTypeCallback(PluginID pluginType=0)
+		: _pluginType(pluginType)
+	{}
+	virtual ~FindPluginOfTypeCallback(){}
+
+	int process(::Plugin* plugin) VRAY_OVERRIDE
+	{
+		if (plugin->getPluginID() == _pluginType)
+			_foundPlugins.append((VR::VRayPlugin*)plugin);
+		return 1; // continue enumeration
+	}
+
+	PluginID _pluginType;
+	MaxSDK::Array<VR::VRayPlugin*> _foundPlugins;
+};
+
+//************************************************************
 // The VRayGolaem 3dsmax object
 //************************************************************
 
-class VRayGolaem: public GeomObject, public VR::VRenderObject, public VR::VRayPluginRendererInterface {
-	// An empty dummy mesh returned from GetRenderMesh()
-	Mesh _mesh;
-	VR::VRayScene *_vrayScene; // The loaded .vrscene file
-	VR::CharString _vrsceneFile, _shadersFile;
-	bool _useNodeAttributes;  // if true, uses the attributes below to generate the vrscene, else use the loaded vrscene
+// predeclaration
+struct GlmSimulationData_v0;
+typedef GlmSimulationData_v0 GlmSimulationData;
+struct GlmFrameData_v0;
+typedef GlmFrameData_v0 GlmFrameData;
+
+class VRayGolaem: public GeomObject, public VR::VRenderObject, public VR::VRayPluginRendererInterface 
+{
+	friend class VRayGolaemInstanceBase;
+	friend class VRayGolaemDlgProc;
+
+	//////////////////////////////////////////
+	// Data Members
+	//////////////////////////////////////////
+
+	Mesh _mesh;						//!< An empty dummy mesh returned from GetRenderMesh()
+	VR::VRayScene *_vrayScene;		//!< The loaded .vrscene file
+	VR::CharString _vrsceneFile;	//!< 
+	VR::CharString _shadersFile;	//!<
+	bool _useNodeAttributes;		// if true, uses the attributes below to generate the vrscene, else use the loaded vrscene
 
 	// Cache attributes
-	VR::CharString _crowdFields;
-	VR::CharString _cacheName;
-	VR::CharString _cacheDir;
-	VR::CharString _characterFiles;
+	CStr _crowdFields;
+	CStr _cacheName;
+	CStr _cacheDir;
+	CStr _characterFiles;
 
 	// MoBlur attributes
 	bool _mBlurEnable;
@@ -105,41 +150,28 @@ class VRayGolaem: public GeomObject, public VR::VRenderObject, public VR::VRayPl
 	bool _visibleInRefractions;
 
 	// Output attributes
-	VR::CharString _tempVRSceneFileDir;
+	CStr _tempVRSceneFileDir;
 
-	void callRenderBegin(VR::VRayCore *vray);
-	void callRenderEnd(VR::VRayCore *vray);
-
-	void callFrameBegin(VR::VRayCore *vray);
-	void callFrameEnd(VR::VRayCore *vray);
-
-	void compileGeometry(VR::VRayCore *vray);
-	void clearGeometry(VR::VRayCore *vray);
-
-	void updateVRayParams(TimeValue t, VR::VRayCore *vray);
-
-	friend class VRayGolaemInstanceBase;
-	friend class VRayGolaemDlgProc;
-
-protected:
-	bool readCrowdVRScene(const VR::CharString& file);
-	bool writeCrowdVRScene(const VR::CharString& file);
+	// Internal attributes
+	MaxSDK::Array<GlmSimulationData*> _simulationData;
+	MaxSDK::Array<GlmFrameData*> _frameData;
+	bool _updateCacheData;
+	Box3 _nodeBbox;					//!< Node bbox
 
 public:
 	IParamBlock2 *pblock2;
-	IParamMap2 *pmap;
-	static IObjParam *ip;
+	BOOL suspendSnap;				//!< Snap suspension flag (TRUE during creation only)
 
-	// Snap suspension flag (TRUE during creation only)
-	BOOL suspendSnap;
-				
-	float simple;
- 	int extDispFlags;
-
+public:
+	//////////////////////////////////////////
+	// Constructor / Destructor
+	//////////////////////////////////////////
 	VRayGolaem(void);
 	~VRayGolaem(void);
 	
+	//////////////////////////////////////////
 	// From BaseObject
+	//////////////////////////////////////////
 	int IsRenderable() { return true; }
 	int HitTest(TimeValue t, INode* inode, int type, int crossing, int flags, IPoint2 *p, ViewExp *vpt);
 	void Snap(TimeValue t, INode* inode, SnapInfo *snap, IPoint2 *p, ViewExp *vpt);
@@ -151,7 +183,9 @@ public:
 	void EndEditParams( IObjParam *ip, ULONG flags,Animatable *next);
 	void InvalidateUI();
 
+	//////////////////////////////////////////
 	// From Object
+	//////////////////////////////////////////
 	ObjectState Eval(TimeValue time);
 
 	void InitNodeName(TSTR& s) { s=STR_CLASSNAME; }
@@ -167,10 +201,14 @@ public:
 	void GetDeformBBox(TimeValue t, Box3 &b, Matrix3 *tm, BOOL useSel);
 	int DoOwnSelectHilite()	{ return 1; }
 
+	//////////////////////////////////////////
 	// From GeomObject
+	//////////////////////////////////////////
 	Mesh* GetRenderMesh(TimeValue t, INode *inode, View& view, BOOL& needDelete);
 
+	//////////////////////////////////////////
 	// Animatable methods
+	//////////////////////////////////////////
 	void DeleteThis() { delete this; }
 	Class_ID ClassID() { return PLUGIN_CLASSID; }
 	void GetClassName(TSTR& s) { s=_T("VRayGolaem"); }
@@ -178,7 +216,9 @@ public:
 	void* GetInterface(ULONG id);
 	void ReleaseInterface(ULONG id, void *ip);
 	
+	//////////////////////////////////////////
 	// Direct paramblock access
+	//////////////////////////////////////////
 	int	NumParamBlocks() { return 1; }	
 	IParamBlock2* GetParamBlock(int i) { return pblock2; }
 	IParamBlock2* GetParamBlockByID(BlockID id) { return (pblock2->ID() == id) ? pblock2 : NULL; }
@@ -187,7 +227,9 @@ public:
 	Animatable* SubAnim(int i);
 	TSTR SubAnimName(int i);
 
+	//////////////////////////////////////////
 	// From ref
+	//////////////////////////////////////////
  	int NumRefs() { return 1; }
 	RefTargetHandle GetReference(int i);
 	void SetReference(int i, RefTargetHandle rtarg);
@@ -199,7 +241,30 @@ public:
 #endif
 	RefResult NotifyRefChanged(NOTIFY_REF_CHANGED_ARGS);
 
+	//////////////////////////////////////////
+	// Draw
+	//////////////////////////////////////////
+	void readGolaemCache(TimeValue t);
+	void draw(TimeValue t, INode *node, ViewExp *vpt);
+	void drawEntities(GraphicsWindow *gw, TimeValue t);
+
+	//////////////////////////////////////////
+	// read/write vrscene
+	//////////////////////////////////////////
+protected:
+	bool readCrowdVRScene(const VR::CharString& file);
+	bool writeCrowdVRScene(const VR::CharString& file);
+
+public:
+	//////////////////////////////////////////
+	// From VRayPluginRendererInterface
+	//////////////////////////////////////////
+	PluginManager* getPluginManager(void);
+	PluginBase* getPlugin(void) { return NULL; }
+
+	//////////////////////////////////////////
 	// From VRenderObject
+	//////////////////////////////////////////
 	int init(const ObjectState &os, INode *node, VR::VRayCore *vray);
 	VR::VRenderInstance* newRenderInstance(INode *node, VR::VRayCore *vray, int renderID);
 	void deleteRenderInstance(VR::VRenderInstance *ri);
@@ -208,14 +273,20 @@ public:
 	void frameBegin(TimeValue t, VR::VRayCore *vray);
 	void frameEnd(VR::VRayCore *vray);
 
-	// Other methods
-	void draw(TimeValue t, INode *node, ViewExp *vpt);
-	void drawEntityPositions(GraphicsWindow *gw, TimeValue t);
+private:	
+	void callRenderBegin(VR::VRayCore *vray);
+	void callRenderEnd(VR::VRayCore *vray);
+	void callFrameBegin(VR::VRayCore *vray);
+	void callFrameEnd(VR::VRayCore *vray);
 
-	// From VRayPluginRendererInterface
-	PluginManager* getPluginManager(void);
-	PluginBase* getPlugin(void) { return NULL; }
+	void compileGeometry(VR::VRayCore *vray);
+	void clearGeometry(VR::VRayCore *vray);
+	void updateVRayParams(TimeValue t);
 };
+
+//************************************************************
+// VRayGolaemCreateCallBack
+//************************************************************
 
 class VRayGolaemCreateCallBack: public CreateMouseCallBack {
 	VRayGolaem *sphere;
@@ -228,7 +299,21 @@ public:
 
 extern PluginManager *golaemPlugman; // We need this to store the instance of the Golaem plugin
 
-bool isCharInvalidVrscene(tchar c);
-void convertToValidVrsceneName(const VR::CharString& strIn, VR::CharString& strOut);
+//************************************************************
+// Inline
+//************************************************************
+
+bool isCharInvalidVrscene(char c);
+void convertToValidVrsceneName(const CStr& strIn, CStr& strOut);
+void splitStr(const CStr& input, char delim, MaxSDK::Array<CStr> & result);
+
+void drawLine(GraphicsWindow *gw, const Point3 &p0, const Point3 &p1);
+void drawBBox(GraphicsWindow *gw, const Box3 &b);
+void drawSphere(GraphicsWindow *gw, const Point3 &pos, float radius, int nsegs);
+void drawText(GraphicsWindow *gw, const MCHAR*  text, const Point3& pos); 
+
+INode* FindNodeRef(ReferenceTarget *rt );
+INode* GetNodeRef(ReferenceMaker *rm);
+
 
 #endif // __VRAYGOLAEM_H__
