@@ -99,6 +99,10 @@ SOURCE=.\instance.cpp
 # End Source File
 # Begin Source File
 
+SOURCE=.\miniz.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\plugin.def
 # End Source File
 # Begin Source File
