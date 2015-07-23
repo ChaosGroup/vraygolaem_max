@@ -12,6 +12,7 @@
 #include "hash_map.h"
 #include "pluginenumcallbacks.h"
 #include "resource.h"
+#include "maxscript/maxscript.h"
 
 #include <fstream>	// std::ofstream
 #include <sstream>	// std::stringstream
@@ -1114,7 +1115,7 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 	VR::VRayScene* tmpVrayScene=new VR::VRayScene(tempPlugMan);
 	VR::ErrorCode errCode=tmpVrayScene->readFile(file.ptr());
 	if (!errCode.error())
-	{
+	{		
 		// find the nodes
 		FindPluginOfTypeCallback pluginCallback(CROWDVRAYPLUGINID);
 		tempPlugMan->enumPlugins(&pluginCallback);
@@ -1195,8 +1196,24 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			}
 			GET_WSTR(crowdFields, currentParamMbcs)
 			pblock2->SetValue(pb_crowd_fields, 0, currentParamMbcs, 0);
+
+			// ok, vray_glmCrowdVRayPlugin.dll is loaded and all params are filled
+			CStr logMessage = CStr("VRayGolaem: Success loading .vrscene file \"") + CStr(file.ptr()) + CStr("\" \n");
+			mprintf(logMessage.ToBSTR());
+		}
+		else
+		{
+			// CROWDVRAYPLUGINID not found = not loaded or env not configured
+			CStr vrayEnvVar = CStr(VRAYRT_PLUGINS) + CStr("_") + CStr(PROCESSOR_ARCHITECTURE);
+			CStr logMessage = CStr("VRayGolaem: Error loading .vrscene file \"") + CStr(file.ptr()) + CStr("\". vray_glmCrowdVRayPlugin.dll plugin was not found in environment variable \"") + vrayEnvVar + CStr("\" (")+ CStr(getVRayPluginPath()) + CStr(").\n");
+			mprintf(logMessage.ToBSTR());
 		}
 		
+	}
+	else
+	{
+		CStr logMessage = CStr("VRayGolaem: Success loading .vrscene file \"") + CStr(file.ptr()) + CStr("\". Vrscene file is invalid.\n");
+		mprintf(logMessage.ToBSTR());
 	}
 	
 	// delete the Vray context
