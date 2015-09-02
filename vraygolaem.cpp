@@ -249,11 +249,16 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	p_default, TRUE,
 	p_ui, TYPE_SINGLECHEKBOX, ED_VISIBLEINREFRACTIONS,
 	PB_END,
+
 	pb_temp_vrscene_file_dir, _T("temp_vrscene_file_dir"), TYPE_STRING, 0, 0,
-	p_default, _T("TEMP"),
-	p_ui, TYPE_EDITBOX, ED_TEMPVRSCENEFILEDIR,
+		p_default, _T("TEMP"),
+		p_ui, TYPE_EDITBOX, ED_TEMPVRSCENEFILEDIR,
 	PB_END,
 
+	pb_override_node_properties, _T("override_node_properties"), TYPE_BOOL, 0, 0,
+		p_default, FALSE,
+		p_ui, TYPE_SINGLECHEKBOX, CB_NODEPROPERTIES,
+	PB_END,
 PB_END
 );
 
@@ -778,6 +783,58 @@ const tchar* getVRayPluginPath()
 	return s;
 }
 
+// Find the node that references this Golaem object. If the Golaem object is instanced,
+// it is not defined which node is returned.
+INode *getNode(VRayGolaem *golaem) {
+	ULONG handle=0;
+	golaem->NotifyDependents(FOREVER, (PartID)&handle, REFMSG_GET_NODE_HANDLE);
+	INode *node=GetCOREInterface()->GetINodeByHandle(handle);
+	return node;
+}
+
+// The names of the node user properties that V-Ray uses for reflection/refraction visibility.
+// V-Ray doesn't publish the header with their definitions so I copy them here.
+#define PROP_GI_VISIBLETOREFL _T("VRay_GI_VisibleToReflections")
+#define PROP_GI_VISIBLETOREFR _T("VRay_GI_VisibleToRefractions")
+
+void VRayGolaem::getPropertiesFromNode(INode *node) {
+	if (!node) {
+		_objectIDBase=0;
+		_primaryVisibility=true;
+		_castsShadows=true;
+		_visibleInReflections=true;
+		_visibleInRefractions=true;
+	} else {
+		_objectIDBase=node->GetGBufID();
+		_primaryVisibility=node->GetPrimaryVisibility()!=0;
+		_castsShadows=node->CastShadows();
+
+		_visibleInReflections=true;
+		_visibleInRefractions=true;
+
+		// Get secondary visibility from the 3ds Max object properties
+		int nodeSecondaryVisibility=node->GetSecondaryVisibility();
+		if (0==nodeSecondaryVisibility) _visibleInReflections=false;
+		if (0==nodeSecondaryVisibility) _visibleInRefractions=false;
+
+		// Check secondary visibility in the V-Ray object properties
+		int vrayReflVisibility=true, vrayRefrVisibility=true;
+		node->GetUserPropBool(PROP_GI_VISIBLETOREFL, vrayReflVisibility);
+		node->GetUserPropBool(PROP_GI_VISIBLETOREFR, vrayRefrVisibility);
+
+		if (!vrayReflVisibility) _visibleInReflections=false;
+		if (!vrayRefrVisibility) _visibleInRefractions=false;
+	}
+}
+
+void VRayGolaem::getPropertiesFromPBlock(TimeValue t) {
+	_objectIDBase = pblock2->GetInt(pb_object_id_base, t);
+	_primaryVisibility = pblock2->GetInt(pb_primary_visibility, t) == 1;
+	_castsShadows = pblock2->GetInt(pb_casts_shadows, t) == 1;
+	_visibleInReflections = pblock2->GetInt(pb_visible_in_reflections, t) == 1;
+	_visibleInRefractions = pblock2->GetInt(pb_visible_in_refractions, t) == 1;
+}
+
 //------------------------------------------------------------
 // updateVRayParams
 //------------------------------------------------------------
@@ -842,11 +899,14 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 	// vray
 	_scaleTransform = pblock2->GetFloat(pb_scale_transform, t);
 	_frameOffset = pblock2->GetInt(pb_frame_offset, t);
-	_objectIDBase = pblock2->GetInt(pb_object_id_base, t);
-	_primaryVisibility = pblock2->GetInt(pb_primary_visibility, t) == 1;
-	_castsShadows = pblock2->GetInt(pb_casts_shadows, t) == 1;
-	_visibleInReflections = pblock2->GetInt(pb_visible_in_reflections, t) == 1;
-	_visibleInRefractions = pblock2->GetInt(pb_visible_in_refractions, t) == 1;
+
+	int usePBlockProperties=pblock2->GetInt(pb_override_node_properties, t);
+	if (usePBlockProperties) {
+		getPropertiesFromPBlock(t);
+	} else {
+		INode *node=getNode(this);
+		getPropertiesFromNode(node);
+	}
 
 	// output
 	const TCHAR *tempVrScene_wstr=pblock2->GetStr(pb_temp_vrscene_file_dir, t);
@@ -855,29 +915,6 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 		GET_MBCS(tempVrScene_wstr, tempVrScene_mbcs);
 		_tempVRSceneFileDir=tempVrScene_mbcs;
 	}
-}
-
-INode* FindNodeRef(ReferenceTarget *rt )
-{
-   DependentIterator di( rt );
-   ReferenceMaker *rm;
-   INode *nd = NULL;
-   rm = di.Next( );
-   while ( rm )
-   {   
-      nd = GetNodeRef( rm );
-      if (nd) return nd;
-	  rm = di.Next( );
-   }
-   return NULL;
-}  
-
-INode* GetNodeRef(ReferenceMaker *rm)
-{
-   if (rm->SuperClassID()==BASENODE_CLASS_ID)
-      return (INode *)rm;
-   else
-      return rm->IsRefTarget() ? FindNodeRef ( ( ReferenceTarget * ) rm) : NULL;
 }
 
 //------------------------------------------------------------

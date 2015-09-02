@@ -73,6 +73,8 @@ enum {
 	pb_visible_in_refractions,
 	// output
 	pb_temp_vrscene_file_dir,
+	// whether visibility and object IDs are taken from the node, or overridden locally
+	pb_override_node_properties,
 };
 
 //************************************************************
@@ -282,6 +284,14 @@ private:
 	void compileGeometry(VR::VRayCore *vray);
 	void clearGeometry(VR::VRayCore *vray);
 	void updateVRayParams(TimeValue t);
+
+	// Set up some properties (primary and secondary visibility, object ID etc)
+	// from a given node. If node is NULL, the properties are filled with default
+	// values.
+	void getPropertiesFromNode(INode *node);
+
+	// Set up properties from the parameter block.
+	void getPropertiesFromPBlock(TimeValue t);
 };
 
 //************************************************************
