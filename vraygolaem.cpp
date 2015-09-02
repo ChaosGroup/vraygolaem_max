@@ -343,6 +343,14 @@ RefResult VRayGolaem::NotifyRefChanged(NOTIFY_REF_CHANGED_ARGS) {
 		case REFMSG_CHANGE:
 			if (hTarget==pblock2) {
 				// if (pblock2->LastNotifyParamID()==VRayGolaem_fileName) readPreview();
+				ParamID paramID=pblock2->LastNotifyParamID();
+				switch (paramID) {
+					case pb_motion_blur_enable:
+					case pb_frustum_enable:
+					case pb_override_node_properties:
+						grayDlgControls();
+						break;
+				}
 				param_blk.InvalidateUI();
 			}
 			break;
@@ -484,6 +492,7 @@ INT_PTR VRayGolaemDlgProc::DlgProc(TimeValue t, IParamMap2 *map, HWND hWnd, UINT
 
 	switch (msg) {
 		case WM_INITDIALOG: {
+			if (vrayGolaem) vrayGolaem->grayDlgControls();
 			break;
 		}
 		case WM_DESTROY:
@@ -514,6 +523,43 @@ INT_PTR VRayGolaemDlgProc::DlgProc(TimeValue t, IParamMap2 *map, HWND hWnd, UINT
 
 	return FALSE;
 }
+
+void VRayGolaem::grayDlgControls(void) {
+	IParamMap2 *map=pblock2->GetMap();
+	if (!map)
+		return; // If no UI - nothing to do
+
+	HWND hWnd=map->GetHWnd();
+
+	// Motion blur
+	int moblur=pblock2->GetInt(pb_motion_blur_enable);
+	map->Enable(pb_motion_blur_start, moblur);
+	map->Enable(pb_motion_blur_window_size, moblur);
+	map->Enable(pb_motion_blur_samples, moblur);
+
+	EnableWindow(GetDlgItem(hWnd, ST_MBSTART), moblur);
+	EnableWindow(GetDlgItem(hWnd, ST_MBSIZE), moblur);
+	EnableWindow(GetDlgItem(hWnd, ST_MBSAMPLES), moblur);
+
+	// Frustum culling
+	int fcull=pblock2->GetInt(pb_frustum_enable);
+	map->Enable(pb_frustum_margin, fcull);
+	map->Enable(pb_camera_margin, fcull);
+
+	EnableWindow(GetDlgItem(hWnd, ST_CULLFRUSTUM), fcull);
+	EnableWindow(GetDlgItem(hWnd, ST_CULLCAMERA), fcull);
+
+	// Node properties override
+	int usePBlockProperties=pblock2->GetInt(pb_override_node_properties);
+	map->Enable(pb_object_id_base, usePBlockProperties);
+	map->Enable(pb_primary_visibility, usePBlockProperties);
+	map->Enable(pb_casts_shadows, usePBlockProperties);
+	map->Enable(pb_visible_in_reflections, usePBlockProperties);
+	map->Enable(pb_visible_in_refractions, usePBlockProperties);
+
+	EnableWindow(GetDlgItem(hWnd, ST_OBJECTID), usePBlockProperties);
+}
+
 
 //************************************************************
 // Browse

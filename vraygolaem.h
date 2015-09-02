@@ -292,6 +292,9 @@ private:
 
 	// Set up properties from the parameter block.
 	void getPropertiesFromPBlock(TimeValue t);
+
+	// Enable or disable some UI controls based on the settings.
+	void grayDlgControls(void);
 };
 
 //************************************************************
