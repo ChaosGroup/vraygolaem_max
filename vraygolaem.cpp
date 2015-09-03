@@ -68,6 +68,16 @@ public:
 TCHAR *iconText=_T("VRayGolaem");
 static VRayGolaemClassDesc vrayGolaemClassDesc;
 
+// The names of the node user properties that V-Ray uses for reflection/refraction visibility.
+// V-Ray doesn't publish the header with their definitions so I copy them here.
+#define PROP_GI_VISIBLETOREFL _T("VRay_GI_VisibleToReflections")
+#define PROP_GI_VISIBLETOREFR _T("VRay_GI_VisibleToRefractions")
+#define PROP_MOBLUR_USEDEFAULTGEOMSAMPLES _T("VRay_MoBlur_DefaultGeomSamples")
+#define PROP_MOBLUR_GEOMSAMPLES _T("VRay_MoBlur_GeomSamples")
+#define PROP_MOBLUR_OVERRIDEDURATION _T("VRay_MoBlur_Override")
+#define PROP_MOBLUR_DURATION _T("VRay_MoBlur_Override_Duration")
+
+
 //************************************************************
 // DLL stuff
 //************************************************************
@@ -228,37 +238,12 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	p_range, -BIGFLOAT, BIGFLOAT, 
 	p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_SCALETRANSFORM, ED_SCALETRANSFORMSPIN, 1.f,
 	PB_END,
-	pb_object_id_base, _T("object_id_base"), TYPE_INT, 0, 0,
-	p_default, 0,
-	p_range, 0, BIGINT, 
-	p_ui, TYPE_SPINNER,  EDITTYPE_POS_INT, ED_OBJECTIDBASE, ED_OBJECTIDBASESPIN, 1,
-	PB_END,
-	pb_primary_visibility, _T("primary_visibility"), TYPE_BOOL, 0, 0,
-	p_default, TRUE,
-	p_ui, TYPE_SINGLECHEKBOX, ED_PRIMARYVISIBILITY,
-	PB_END,
-	pb_casts_shadows, _T("casts_shadows"), TYPE_BOOL, 0, 0,
-	p_default, TRUE,
-	p_ui, TYPE_SINGLECHEKBOX, ED_CASTSSHADOWS,
-	PB_END,
-	pb_visible_in_reflections, _T("visible_in_reflections"), TYPE_BOOL, 0, 0,
-	p_default, TRUE,
-	p_ui, TYPE_SINGLECHEKBOX, ED_VISIBLEINREFLECTIONS,
-	PB_END,
-	pb_visible_in_refractions, _T("visible_in_refractions"), TYPE_BOOL, 0, 0,
-	p_default, TRUE,
-	p_ui, TYPE_SINGLECHEKBOX, ED_VISIBLEINREFRACTIONS,
-	PB_END,
-
+	
 	pb_temp_vrscene_file_dir, _T("temp_vrscene_file_dir"), TYPE_STRING, 0, 0,
 		p_default, _T("TEMP"),
 		p_ui, TYPE_EDITBOX, ED_TEMPVRSCENEFILEDIR,
 	PB_END,
 
-	pb_override_node_properties, _T("override_node_properties"), TYPE_BOOL, 0, 0,
-		p_default, FALSE,
-		p_ui, TYPE_SINGLECHEKBOX, CB_NODEPROPERTIES,
-	PB_END,
 PB_END
 );
 
@@ -347,7 +332,6 @@ RefResult VRayGolaem::NotifyRefChanged(NOTIFY_REF_CHANGED_ARGS) {
 				switch (paramID) {
 					case pb_motion_blur_enable:
 					case pb_frustum_enable:
-					case pb_override_node_properties:
 						grayDlgControls();
 						break;
 				}
@@ -548,16 +532,6 @@ void VRayGolaem::grayDlgControls(void) {
 
 	EnableWindow(GetDlgItem(hWnd, ST_CULLFRUSTUM), fcull);
 	EnableWindow(GetDlgItem(hWnd, ST_CULLCAMERA), fcull);
-
-	// Node properties override
-	int usePBlockProperties=pblock2->GetInt(pb_override_node_properties);
-	map->Enable(pb_object_id_base, usePBlockProperties);
-	map->Enable(pb_primary_visibility, usePBlockProperties);
-	map->Enable(pb_casts_shadows, usePBlockProperties);
-	map->Enable(pb_visible_in_reflections, usePBlockProperties);
-	map->Enable(pb_visible_in_refractions, usePBlockProperties);
-
-	EnableWindow(GetDlgItem(hWnd, ST_OBJECTID), usePBlockProperties);
 }
 
 
@@ -838,11 +812,7 @@ INode *getNode(VRayGolaem *golaem) {
 	return node;
 }
 
-// The names of the node user properties that V-Ray uses for reflection/refraction visibility.
-// V-Ray doesn't publish the header with their definitions so I copy them here.
-#define PROP_GI_VISIBLETOREFL _T("VRay_GI_VisibleToReflections")
-#define PROP_GI_VISIBLETOREFR _T("VRay_GI_VisibleToRefractions")
-
+// Get the properties of a 3dsmax Node
 void VRayGolaem::getPropertiesFromNode(INode *node) {
 	if (!node) {
 		_objectIDBase=0;
@@ -871,14 +841,6 @@ void VRayGolaem::getPropertiesFromNode(INode *node) {
 		if (!vrayReflVisibility) _visibleInReflections=false;
 		if (!vrayRefrVisibility) _visibleInRefractions=false;
 	}
-}
-
-void VRayGolaem::getPropertiesFromPBlock(TimeValue t) {
-	_objectIDBase = pblock2->GetInt(pb_object_id_base, t);
-	_primaryVisibility = pblock2->GetInt(pb_primary_visibility, t) == 1;
-	_castsShadows = pblock2->GetInt(pb_casts_shadows, t) == 1;
-	_visibleInReflections = pblock2->GetInt(pb_visible_in_reflections, t) == 1;
-	_visibleInRefractions = pblock2->GetInt(pb_visible_in_refractions, t) == 1;
 }
 
 //------------------------------------------------------------
@@ -946,13 +908,8 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 	_scaleTransform = pblock2->GetFloat(pb_scale_transform, t);
 	_frameOffset = pblock2->GetInt(pb_frame_offset, t);
 
-	int usePBlockProperties=pblock2->GetInt(pb_override_node_properties, t);
-	if (usePBlockProperties) {
-		getPropertiesFromPBlock(t);
-	} else {
-		INode *node=getNode(this);
-		getPropertiesFromNode(node);
-	}
+	INode *node=getNode(this);
+	getPropertiesFromNode(node);
 
 	// output
 	const TCHAR *tempVrScene_wstr=pblock2->GetStr(pb_temp_vrscene_file_dir, t);
@@ -1185,6 +1142,15 @@ PluginManager* VRayGolaem::getPluginManager(void) {
 //------------------------------------------------------------
 bool VRayGolaem::readCrowdVRScene(const VR::CharString& file) 
 {	
+	// check if this object is not an instance (then it has no max node to query)
+	INode* node=getNode(this);
+	if (node == NULL)
+	{
+		CStr logMessage = CStr("VRayGolaem: This object is an 3ds Max instance and is not supported. Please create a copy.");
+		mprintf(logMessage.ToBSTR());
+		return false;
+	}
+	
 	// create a Vray context
 	PluginManager* tempPlugMan(golaemPlugman);
 	bool deletePlugMan(false);
@@ -1198,7 +1164,7 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 	VR::VRayScene* tmpVrayScene=new VR::VRayScene(tempPlugMan);
 	VR::ErrorCode errCode=tmpVrayScene->readFile(file.ptr());
 	if (!errCode.error())
-	{		
+	{				
 		// find the nodes
 		FindPluginOfTypeCallback pluginCallback(CROWDVRAYPLUGINID);
 		tempPlugMan->enumPlugins(&pluginCallback);
@@ -1236,14 +1202,34 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			}
 
 			// motion blur
+			bool motionBlur(false);
+			float blurStart(-0.5f), blurSize(1.f);
+			int blurSamples(2);
 			currentParam = plugin->getParameter("glmMBlurEnabled");
-			if (currentParam) pblock2->SetValue(pb_motion_blur_enable, 0, currentParam->getBool());
+			if (currentParam) motionBlur = currentParam->getBool();
 			currentParam = plugin->getParameter("glmMBlurStart");
-			if (currentParam) pblock2->SetValue(pb_motion_blur_start, 0, (float)currentParam->getDouble());
+			if (currentParam) blurStart = (float)currentParam->getDouble();
 			currentParam = plugin->getParameter("glmMBlurWindowSize");
-			if (currentParam) pblock2->SetValue(pb_motion_blur_window_size, 0, (float)currentParam->getDouble());
+			if (currentParam) blurSize = (float)currentParam->getDouble();
 			currentParam = plugin->getParameter("glmMBlurSamples");
-			if (currentParam) pblock2->SetValue(pb_motion_blur_samples, 0, currentParam->getInt());
+			if (currentParam) blurSamples = currentParam->getInt();
+
+			pblock2->SetValue(pb_motion_blur_enable, 0, motionBlur);
+			pblock2->SetValue(pb_motion_blur_start, 0, blurStart);
+			pblock2->SetValue(pb_motion_blur_window_size, 0, blurSize);
+			pblock2->SetValue(pb_motion_blur_samples, 0, blurSamples);
+
+			if (node)
+			{
+				node->SetMotBlur(motionBlur);
+				if (motionBlur)
+				{
+					node->SetUserPropBool(PROP_MOBLUR_USEDEFAULTGEOMSAMPLES, false);
+					node->SetUserPropBool(PROP_MOBLUR_OVERRIDEDURATION, true);
+					node->SetUserPropInt(PROP_MOBLUR_GEOMSAMPLES, blurSamples);
+					node->SetUserPropFloat(PROP_MOBLUR_DURATION, blurSize);
+				}
+			}
 
 			// frustum culling
 			currentParam = plugin->getParameter("glmEnableFrustumCulling");
@@ -1258,16 +1244,32 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			if (currentParam) pblock2->SetValue(pb_frame_offset, 0, currentParam->getInt());
 			currentParam = plugin->getParameter("glmTransform");
 			if (currentParam) pblock2->SetValue(pb_scale_transform, 0, (float)currentParam->getTransform().m[0].length());
+
+			// properties (copy them in the max node as well if it exists)
+			int objectIDBase(0);
+			bool primaryVisibility(true), castShadows(true), inReflections(true), inRefractions(true);
 			currentParam = plugin->getParameter("glmObjectIDBase");
-			if (currentParam) pblock2->SetValue(pb_object_id_base, 0, currentParam->getInt());
+			if (currentParam) objectIDBase = currentParam->getInt(); 
 			currentParam = plugin->getParameter("glmCameraVisibility");
-			if (currentParam) pblock2->SetValue(pb_primary_visibility, 0, currentParam->getBool());
+			if (currentParam) primaryVisibility = currentParam->getBool();
 			currentParam = plugin->getParameter("glmShadowsVisibility");
-			if (currentParam) pblock2->SetValue(pb_casts_shadows, 0, currentParam->getBool());
+			if (currentParam) castShadows = currentParam->getBool();
 			currentParam = plugin->getParameter("glmReflectionsVisibility");
-			if (currentParam) pblock2->SetValue(pb_visible_in_reflections, 0, currentParam->getBool());
+			if (currentParam) inReflections = currentParam->getBool();
 			currentParam = plugin->getParameter("glmRefractionsVisibility");
-			if (currentParam) pblock2->SetValue(pb_visible_in_refractions, 0, currentParam->getBool());
+			if (currentParam) inRefractions = currentParam->getBool();
+
+			if (node)
+			{
+				node->SetGBufID(objectIDBase);
+				node->SetPrimaryVisibility(primaryVisibility);
+				node->SetCastShadows(castShadows);
+				node->SetSecondaryVisibility(inReflections && inRefractions);
+
+				int visibleInRefl((int) inReflections), visibleInRefr((int) inRefractions);
+				node->SetUserPropBool(PROP_GI_VISIBLETOREFL, visibleInRefl);
+				node->SetUserPropBool(PROP_GI_VISIBLETOREFR, visibleInRefr);
+			}
 
 			// other crowdFields?
 			for (size_t iPlugin=1; iPlugin<pluginCallback._foundPlugins.length(); ++iPlugin)

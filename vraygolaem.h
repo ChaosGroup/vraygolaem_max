@@ -66,15 +66,8 @@ enum {
 	// vray 
 	pb_frame_offset,
 	pb_scale_transform,
-	pb_object_id_base,
-	pb_primary_visibility,
-	pb_casts_shadows,
-	pb_visible_in_reflections,
-	pb_visible_in_refractions,
 	// output
 	pb_temp_vrscene_file_dir,
-	// whether visibility and object IDs are taken from the node, or overridden locally
-	pb_override_node_properties,
 };
 
 //************************************************************
@@ -289,9 +282,6 @@ private:
 	// from a given node. If node is NULL, the properties are filled with default
 	// values.
 	void getPropertiesFromNode(INode *node);
-
-	// Set up properties from the parameter block.
-	void getPropertiesFromPBlock(TimeValue t);
 
 	// Enable or disable some UI controls based on the settings.
 	void grayDlgControls(void);
