@@ -54,11 +54,7 @@ enum {
 	pb_cache_name,
 	pb_cache_dir,
 	pb_character_files,
-	// motion blur
-	pb_motion_blur_enable,
-	pb_motion_blur_start,
-	pb_motion_blur_window_size,
-	pb_motion_blur_samples,
+	pb_excluded_entities,
 	// culling
 	pb_frustum_enable,
 	pb_frustum_margin,
@@ -123,11 +119,13 @@ class VRayGolaem: public GeomObject, public VR::VRenderObject, public VR::VRayPl
 	CStr _cacheName;
 	CStr _cacheDir;
 	CStr _characterFiles;
+	CStr _excludedEntities;
 
 	// MoBlur attributes
 	bool _mBlurEnable;
-	float _mBlurStart;
+	bool _overMBlurWindowSize;
 	float _mBlurWindowSize;
+	bool _overMBlurSamples;
 	int _mBlurSamples;
 
 	// Culling attributes
@@ -277,11 +275,6 @@ private:
 	void compileGeometry(VR::VRayCore *vray);
 	void clearGeometry(VR::VRayCore *vray);
 	void updateVRayParams(TimeValue t);
-
-	// Set up some properties (primary and secondary visibility, object ID etc)
-	// from a given node. If node is NULL, the properties are filled with default
-	// values.
-	void getPropertiesFromNode(INode *node);
 
 	// Enable or disable some UI controls based on the settings.
 	void grayDlgControls(void);

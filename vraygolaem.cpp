@@ -189,26 +189,8 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	pb_character_files, _T("character_files"), TYPE_STRING, 0, 0,
 	p_ui, TYPE_EDITBOX, ED_CHARACTERFILES,
 	PB_END,
-
-	// motion blur attributes
-	pb_motion_blur_enable, _T("motion_blur_enable"), TYPE_BOOL, 0, 0,
-	p_default, FALSE,
-	p_ui, TYPE_SINGLECHEKBOX, ED_MBLURENABLE,
-	PB_END,
-	pb_motion_blur_start, _T("motion_blur_start"), TYPE_FLOAT, 0, 0,
-	p_default, -0.5f,
-	p_range, -BIGFLOAT, BIGFLOAT, 
-	p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_MBLURSTART, ED_MBLURSTARTSPIN, 0.50f,
-	PB_END,
-	pb_motion_blur_window_size, _T("motion_blur_window_size"), TYPE_FLOAT, 0, 0,
-	p_default, 1.f,
-	p_range, 0.f, BIGFLOAT, 
-	p_ui, TYPE_SPINNER, EDITTYPE_POS_FLOAT, ED_MBLURWINDOWSIZE, ED_MBLURWINDOWSIZESPIN, 0.50f,
-	PB_END,
-	pb_motion_blur_samples, _T("motion_blur_samples"), TYPE_INT, 0, 0,
-	p_default, 1,
-	p_range, 0, BIGINT, 
-	p_ui, TYPE_SPINNER,  EDITTYPE_POS_INT, ED_MBLURSAMPLES, ED_MBLURSAMPLESSPIN, 1,
+	pb_excluded_entities, _T("excluded_entities"), TYPE_STRING, 0, 0,
+	p_ui, TYPE_EDITBOX, ED_EXCLUDEDENTITIES,
 	PB_END,
 
 	// culling attributes
@@ -330,7 +312,6 @@ RefResult VRayGolaem::NotifyRefChanged(NOTIFY_REF_CHANGED_ARGS) {
 				// if (pblock2->LastNotifyParamID()==VRayGolaem_fileName) readPreview();
 				ParamID paramID=pblock2->LastNotifyParamID();
 				switch (paramID) {
-					case pb_motion_blur_enable:
 					case pb_frustum_enable:
 						grayDlgControls();
 						break;
@@ -514,16 +495,6 @@ void VRayGolaem::grayDlgControls(void) {
 		return; // If no UI - nothing to do
 
 	HWND hWnd=map->GetHWnd();
-
-	// Motion blur
-	int moblur=pblock2->GetInt(pb_motion_blur_enable);
-	map->Enable(pb_motion_blur_start, moblur);
-	map->Enable(pb_motion_blur_window_size, moblur);
-	map->Enable(pb_motion_blur_samples, moblur);
-
-	EnableWindow(GetDlgItem(hWnd, ST_MBSTART), moblur);
-	EnableWindow(GetDlgItem(hWnd, ST_MBSIZE), moblur);
-	EnableWindow(GetDlgItem(hWnd, ST_MBSAMPLES), moblur);
 
 	// Frustum culling
 	int fcull=pblock2->GetInt(pb_frustum_enable);
@@ -812,42 +783,20 @@ INode *getNode(VRayGolaem *golaem) {
 	return node;
 }
 
-// Get the properties of a 3dsmax Node
-void VRayGolaem::getPropertiesFromNode(INode *node) {
-	if (!node) {
-		_objectIDBase=0;
-		_primaryVisibility=true;
-		_castsShadows=true;
-		_visibleInReflections=true;
-		_visibleInRefractions=true;
-	} else {
-		_objectIDBase=node->GetGBufID();
-		_primaryVisibility=node->GetPrimaryVisibility()!=0;
-		_castsShadows=node->CastShadows();
-
-		_visibleInReflections=true;
-		_visibleInRefractions=true;
-
-		// Get secondary visibility from the 3ds Max object properties
-		int nodeSecondaryVisibility=node->GetSecondaryVisibility();
-		if (0==nodeSecondaryVisibility) _visibleInReflections=false;
-		if (0==nodeSecondaryVisibility) _visibleInRefractions=false;
-
-		// Check secondary visibility in the V-Ray object properties
-		int vrayReflVisibility=true, vrayRefrVisibility=true;
-		node->GetUserPropBool(PROP_GI_VISIBLETOREFL, vrayReflVisibility);
-		node->GetUserPropBool(PROP_GI_VISIBLETOREFR, vrayRefrVisibility);
-
-		if (!vrayReflVisibility) _visibleInReflections=false;
-		if (!vrayRefrVisibility) _visibleInRefractions=false;
-	}
-}
-
 //------------------------------------------------------------
 // updateVRayParams
 //------------------------------------------------------------
 void VRayGolaem::updateVRayParams(TimeValue t) 
 {
+	// check if this object is not an instance (then it has no max node to query)
+	INode* node=getNode(this);
+	if (node == NULL)
+	{
+		CStr logMessage = CStr("VRayGolaem: This object is an 3ds Max instance and is not supported. Please create a copy.");
+		mprintf(logMessage.ToBSTR());
+		return;
+	}
+	
 	// vrscene attributes
 	const TCHAR *fname_wstr=pblock2->GetStr(pb_file, t);
 	if (!fname_wstr) _vrsceneFile="";
@@ -893,11 +842,22 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 		_characterFiles=characterFiles_mbcs;
 	}
 
+	const TCHAR *excludedEntities_wstr=pblock2->GetStr(pb_excluded_entities, t);
+	if (!excludedEntities_wstr) _excludedEntities="";
+	else {
+		GET_MBCS(excludedEntities_wstr, excludedEntities_mbcs);
+		_excludedEntities=excludedEntities_mbcs;
+	}
+
 	// motion blur attributes
-	_mBlurEnable = pblock2->GetInt(pb_motion_blur_enable, t) == 1;
-	_mBlurStart = pblock2->GetFloat(pb_motion_blur_start, t);
-	_mBlurWindowSize = pblock2->GetFloat(pb_motion_blur_window_size, t);
-	_mBlurSamples = pblock2->GetInt(pb_motion_blur_samples, t);
+	BOOL overrideValue;
+	_mBlurEnable = node->GetMotBlurOnOff(t) == 1;
+	node->GetUserPropBool(PROP_MOBLUR_OVERRIDEDURATION, overrideValue);
+	_overMBlurWindowSize = overrideValue == 1;
+	node->GetUserPropFloat(PROP_MOBLUR_DURATION, _mBlurWindowSize);
+	node->GetUserPropBool(PROP_MOBLUR_USEDEFAULTGEOMSAMPLES, overrideValue);
+	_overMBlurSamples = overrideValue == 0;
+	node->GetUserPropInt(PROP_MOBLUR_GEOMSAMPLES, _mBlurSamples);
 
 	// culling attributes
 	_frustumEnable = pblock2->GetInt(pb_frustum_enable, t) == 1;
@@ -907,9 +867,26 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 	// vray
 	_scaleTransform = pblock2->GetFloat(pb_scale_transform, t);
 	_frameOffset = pblock2->GetInt(pb_frame_offset, t);
+	
+	// object properties
+	_objectIDBase=node->GetGBufID();
+	_primaryVisibility=node->GetPrimaryVisibility()!=0;
+	_castsShadows=node->CastShadows();
 
-	INode *node=getNode(this);
-	getPropertiesFromNode(node);
+	// Get secondary visibility from the 3ds Max object properties
+	_visibleInReflections=true;
+	_visibleInRefractions=true;
+	int nodeSecondaryVisibility=node->GetSecondaryVisibility();
+	if (0==nodeSecondaryVisibility) _visibleInReflections=false;
+	if (0==nodeSecondaryVisibility) _visibleInRefractions=false;
+
+	// Check secondary visibility in the V-Ray object properties
+	int vrayReflVisibility=true, vrayRefrVisibility=true;
+	node->GetUserPropBool(PROP_GI_VISIBLETOREFL, vrayReflVisibility);
+	node->GetUserPropBool(PROP_GI_VISIBLETOREFR, vrayRefrVisibility);
+
+	if (!vrayReflVisibility) _visibleInReflections=false;
+	if (!vrayRefrVisibility) _visibleInRefractions=false;
 
 	// output
 	const TCHAR *tempVrScene_wstr=pblock2->GetStr(pb_temp_vrscene_file_dir, t);
@@ -1200,37 +1177,29 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 				GET_WSTR(currentParam->getString(), currentParamMbcs)
 				pblock2->SetValue(pb_character_files, 0, currentParamMbcs, 0);
 			}
-
-			// motion blur
-			bool motionBlur(false);
-			float blurStart(-0.5f), blurSize(1.f);
-			int blurSamples(2);
-			currentParam = plugin->getParameter("glmMBlurEnabled");
-			if (currentParam) motionBlur = currentParam->getBool();
-			currentParam = plugin->getParameter("glmMBlurStart");
-			if (currentParam) blurStart = (float)currentParam->getDouble();
-			currentParam = plugin->getParameter("glmMBlurWindowSize");
-			if (currentParam) blurSize = (float)currentParam->getDouble();
-			currentParam = plugin->getParameter("glmMBlurSamples");
-			if (currentParam) blurSamples = currentParam->getInt();
-
-			pblock2->SetValue(pb_motion_blur_enable, 0, motionBlur);
-			pblock2->SetValue(pb_motion_blur_start, 0, blurStart);
-			pblock2->SetValue(pb_motion_blur_window_size, 0, blurSize);
-			pblock2->SetValue(pb_motion_blur_samples, 0, blurSamples);
-
-			if (node)
+			currentParam = plugin->getParameter("glmExcludedEntities");
+			if (currentParam)
 			{
-				node->SetMotBlur(motionBlur);
-				if (motionBlur)
-				{
-					node->SetUserPropBool(PROP_MOBLUR_USEDEFAULTGEOMSAMPLES, false);
-					node->SetUserPropBool(PROP_MOBLUR_OVERRIDEDURATION, true);
-					node->SetUserPropInt(PROP_MOBLUR_GEOMSAMPLES, blurSamples);
-					node->SetUserPropFloat(PROP_MOBLUR_DURATION, blurSize);
-				}
+				GET_WSTR(currentParam->getString(), currentParamMbcs)
+				pblock2->SetValue(pb_excluded_entities, 0, currentParamMbcs, 0);
 			}
 
+			// motion blur
+			currentParam = plugin->getParameter("glmMBlurEnabled");
+			if (currentParam) node->SetMotBlurOnOff(0, currentParam->getBool());
+			currentParam = plugin->getParameter("glmMBlurWindowSize");
+			if (currentParam) 
+			{
+				node->SetUserPropBool(PROP_MOBLUR_OVERRIDEDURATION, true);
+				node->SetUserPropFloat(PROP_MOBLUR_DURATION, currentParam->getFloat());
+			}
+			currentParam = plugin->getParameter("glmMBlurSamples");
+			if (currentParam) 
+			{
+				node->SetUserPropBool(PROP_MOBLUR_USEDEFAULTGEOMSAMPLES, false);
+				node->SetUserPropInt(PROP_MOBLUR_GEOMSAMPLES, currentParam->getInt());
+			}
+		
 			// frustum culling
 			currentParam = plugin->getParameter("glmEnableFrustumCulling");
 			if (currentParam) pblock2->SetValue(pb_frustum_enable, 0, currentParam->getBool());
@@ -1259,18 +1228,15 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			currentParam = plugin->getParameter("glmRefractionsVisibility");
 			if (currentParam) inRefractions = currentParam->getBool();
 
-			if (node)
-			{
-				node->SetGBufID(objectIDBase);
-				node->SetPrimaryVisibility(primaryVisibility);
-				node->SetCastShadows(castShadows);
-				node->SetSecondaryVisibility(inReflections && inRefractions);
+			node->SetGBufID(objectIDBase);
+			node->SetPrimaryVisibility(primaryVisibility);
+			node->SetCastShadows(castShadows);
+			node->SetSecondaryVisibility(inReflections && inRefractions);
 
-				int visibleInRefl((int) inReflections), visibleInRefr((int) inRefractions);
-				node->SetUserPropBool(PROP_GI_VISIBLETOREFL, visibleInRefl);
-				node->SetUserPropBool(PROP_GI_VISIBLETOREFR, visibleInRefr);
-			}
-
+			int visibleInRefl((int) inReflections), visibleInRefr((int) inRefractions);
+			node->SetUserPropBool(PROP_GI_VISIBLETOREFL, visibleInRefl);
+			node->SetUserPropBool(PROP_GI_VISIBLETOREFR, visibleInRefr);
+			
 			// other crowdFields?
 			for (size_t iPlugin=1; iPlugin<pluginCallback._foundPlugins.length(); ++iPlugin)
 			{
@@ -1354,9 +1320,6 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 		outputStr << "\t" << "transform=Transform(Matrix(Vector(1, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1)), Vector(0, 0, 0));" << std::endl;
 		outputStr << "\t" << "geometry=" << correctedCacheName << crowdFields[iCf] << "@mesh1;" << std::endl;
 		outputStr << "\t" << "material=" << correctedCacheName << crowdFields[iCf] << "Mtl@renderStats;" << std::endl;
-		int nSamples = 1;
-		if (_mBlurEnable) nSamples = _mBlurSamples;
-		outputStr << "\t" << "nsamples=" << nSamples << ";" << std::endl;
 		outputStr << "\t" << "visible=1;" << std::endl;
 		outputStr << "}" << std::endl;
 		outputStr << std::endl;
@@ -1369,12 +1332,11 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 		outputStr << "\t" << "glmCacheName=\"" << _cacheName << "\";" << std::endl;
 		outputStr << "\t" << "glmCacheFileDir=\"" << _cacheDir << "\";" << std::endl;
 		outputStr << "\t" << "glmCharacterFiles=\"" << _characterFiles << "\";" << std::endl;
-		outputStr << "\t" << "glmExcludedEntities=\"\";" << std::endl;
+		outputStr << "\t" << "glmExcludedEntities=\"" << _excludedEntities << "\";" << std::endl;
 		// moblur
 		outputStr << "\t" << "glmMBlurEnabled=" << _mBlurEnable << ";" << std::endl;
-		outputStr << "\t" << "glmMBlurStart=" << _mBlurStart << ";" << std::endl;
-		outputStr << "\t" << "glmMBlurWindowSize=" << _mBlurWindowSize << ";" << std::endl;
-		outputStr << "\t" << "glmMBlurSamples=" << _mBlurSamples << ";" << std::endl;
+		if (_overMBlurWindowSize) outputStr << "\t" << "glmMBlurWindowSize=" << _mBlurWindowSize << ";" << std::endl;
+		if (_overMBlurSamples) outputStr << "\t" << "glmMBlurSamples=" << _mBlurSamples << ";" << std::endl;
 		// frustum culling
 		outputStr << "\t" << "glmEnableFrustumCulling=" << _frustumEnable << ";" << std::endl;
 		outputStr << "\t" << "glmFrustumMargin=" << _frustumMargin << ";" << std::endl;
