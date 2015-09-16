@@ -62,7 +62,7 @@ public:
 
 #define BIGFLOAT	float(999999) // from bendmod sample
 #define BIGINT		int(999999)
-#define ICON_RADIUS 10
+#define ICON_RADIUS 2
 #define CROWDVRAYPLUGINID PluginID(LARGE_CONST(2011070866)) // from glmCrowdVRayPlugin.h
 
 TCHAR *iconText=_T("VRayGolaem");
@@ -216,7 +216,7 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	p_ui, TYPE_SPINNER,  EDITTYPE_INT, ED_FRAMEOFFSET, ED_FRAMEOFFSETSPIN, 1,
 	PB_END,
 	pb_scale_transform, _T("scale_transform"), TYPE_FLOAT, 0, 0,
-	p_default, 10.f,
+	p_default, 1.f,
 	p_range, -BIGFLOAT, BIGFLOAT, 
 	p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_SCALETRANSFORM, ED_SCALETRANSFORMSPIN, 1.f,
 	PB_END,
@@ -370,7 +370,7 @@ void VRayGolaem::SetExtendedDisplay(int flags) {
 
 void VRayGolaem::GetLocalBoundBox(TimeValue t, INode* inode, ViewExp* vpt, Box3& box) 
 {
-	float radius=ICON_RADIUS; 
+	float radius=ICON_RADIUS*_scaleTransform; 
 	_nodeBbox+=Point3(-radius, -radius, -radius);
 	_nodeBbox+=Point3(radius, radius, radius);
 	box = _nodeBbox;
@@ -697,7 +697,7 @@ void VRayGolaem::draw(TimeValue t, INode *node, ViewExp *vpt)
 	gw->setColor(LINE_COLOR, color);
 
 	// locator
-	drawSphere(gw, Point3::Origin, ICON_RADIUS, 30);
+	drawSphere(gw, Point3::Origin, ICON_RADIUS*_scaleTransform, 30);
 
 	// entities	
 	drawEntities(gw, t);
@@ -851,13 +851,13 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 
 	// motion blur attributes
 	BOOL overrideValue;
-	_mBlurEnable = node->GetMotBlurOnOff(t) == 1;
 	node->GetUserPropBool(PROP_MOBLUR_OVERRIDEDURATION, overrideValue);
 	_overMBlurWindowSize = overrideValue == 1;
 	node->GetUserPropFloat(PROP_MOBLUR_DURATION, _mBlurWindowSize);
 	node->GetUserPropBool(PROP_MOBLUR_USEDEFAULTGEOMSAMPLES, overrideValue);
 	_overMBlurSamples = overrideValue == 0;
 	node->GetUserPropInt(PROP_MOBLUR_GEOMSAMPLES, _mBlurSamples);
+	_mBlurEnable = !(_overMBlurSamples && _mBlurSamples == 1); // moblur is disabled if the object geo samples == 1
 
 	// culling attributes
 	_frustumEnable = pblock2->GetInt(pb_frustum_enable, t) == 1;
@@ -1185,8 +1185,6 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			}
 
 			// motion blur
-			currentParam = plugin->getParameter("glmMBlurEnabled");
-			if (currentParam) node->SetMotBlurOnOff(0, currentParam->getBool());
 			currentParam = plugin->getParameter("glmMBlurWindowSize");
 			if (currentParam) 
 			{
@@ -1198,6 +1196,16 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			{
 				node->SetUserPropBool(PROP_MOBLUR_USEDEFAULTGEOMSAMPLES, false);
 				node->SetUserPropInt(PROP_MOBLUR_GEOMSAMPLES, currentParam->getInt());
+			}
+			// if motion blur is off, override geometry samples value with 1
+			currentParam = plugin->getParameter("glmMBlurEnabled");
+			if (currentParam)
+			{
+				if (currentParam->getInt() == 0)
+				{
+					node->SetUserPropBool(PROP_MOBLUR_USEDEFAULTGEOMSAMPLES, false);
+					node->SetUserPropInt(PROP_MOBLUR_GEOMSAMPLES, 1);
+				}
 			}
 		
 			// frustum culling
@@ -1211,8 +1219,8 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			// vray
 			currentParam = plugin->getParameter("glmFrameOffset");
 			if (currentParam) pblock2->SetValue(pb_frame_offset, 0, currentParam->getInt());
-			currentParam = plugin->getParameter("glmTransform");
-			if (currentParam) pblock2->SetValue(pb_scale_transform, 0, (float)currentParam->getTransform().m[0].length());
+			double scaleRatio (1. / GetMasterScale (UNITS_CENTIMETERS));
+			pblock2->SetValue(pb_scale_transform, 0, (float)scaleRatio);
 
 			// properties (copy them in the max node as well if it exists)
 			int objectIDBase(0);
