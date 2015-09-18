@@ -62,6 +62,7 @@ enum {
 	// vray 
 	pb_frame_offset,
 	pb_scale_transform,
+	pb_objectId_mode,
 	// output
 	pb_temp_vrscene_file_dir,
 };
@@ -136,7 +137,7 @@ class VRayGolaem: public GeomObject, public VR::VRenderObject, public VR::VRayPl
 	// Vray attributes
 	int _frameOffset;
 	int _objectIDBase;
-	float _scaleTransform;
+	short _objectIDMode;
 	bool _primaryVisibility;
 	bool _castsShadows;
 	bool _visibleInReflections;
@@ -239,7 +240,7 @@ public:
 	//////////////////////////////////////////
 	void readGolaemCache(TimeValue t);
 	void draw(TimeValue t, INode *node, ViewExp *vpt);
-	void drawEntities(GraphicsWindow *gw, TimeValue t);
+	void drawEntities(GraphicsWindow *gw, const Matrix3& transform, TimeValue t);
 
 	//////////////////////////////////////////
 	// read/write vrscene
@@ -306,7 +307,10 @@ void splitStr(const CStr& input, char delim, MaxSDK::Array<CStr> & result);
 void drawLine(GraphicsWindow *gw, const Point3 &p0, const Point3 &p1);
 void drawBBox(GraphicsWindow *gw, const Box3 &b);
 void drawSphere(GraphicsWindow *gw, const Point3 &pos, float radius, int nsegs);
-void drawText(GraphicsWindow *gw, const MCHAR*  text, const Point3& pos); 
+void drawText(GraphicsWindow *gw, const MCHAR*  text, const Point3& pos);
+
+Matrix3 golaemToMax();
+Matrix3 maxToGolaem();
 
 INode* FindNodeRef(ReferenceTarget *rt );
 INode* GetNodeRef(ReferenceMaker *rm);

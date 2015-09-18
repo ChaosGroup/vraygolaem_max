@@ -144,86 +144,85 @@ enum { params, };
 static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc, P_AUTO_CONSTRUCT+P_AUTO_UI, REFNO_PBLOCK,
 	IDD_VRAYGOLAEM, IDS_VRAYGOLAEM_PARAMS, 0, 0, &vrayGolaemDlgProc,
 	// Params
-	pb_file, _T("cache_file"), TYPE_FILENAME, 0, 0,
+	pb_file, _T("cache_file"), TYPE_FILENAME, P_RESET_DEFAULT, 0,
 		p_ui, TYPE_EDITBOX, ED_GOLAEMVRSCENE,
 #if GET_MAX_RELEASE(VERSION_3DSMAX) >= 11900
 		p_assetTypeID, MaxSDK::AssetManagement::AssetType::kExternalLink,
 #endif
 	PB_END,
-	pb_shaders_file, _T("shaders_file"), TYPE_FILENAME, 0, 0,
+	pb_shaders_file, _T("shaders_file"), TYPE_FILENAME, P_RESET_DEFAULT, 0,
 		p_ui, TYPE_EDITBOX, ED_SHADERSVRSCENE,
 #if GET_MAX_RELEASE(VERSION_3DSMAX) >= 11900
 		p_assetTypeID, MaxSDK::AssetManagement::AssetType::kExternalLink,
 #endif
 	PB_END,
-	pb_use_node_attributes, _T("use_node_attributes"), TYPE_BOOL, 0, 0,
+	pb_use_node_attributes, _T("use_node_attributes"), TYPE_BOOL, P_RESET_DEFAULT, 0,
 	p_default, TRUE,
 	p_ui, TYPE_SINGLECHEKBOX, ED_USERNODEATTRIBUTES,
 	PB_END,
 
 	// display attributes
-	pb_enable_display, _T("enable_display"), TYPE_BOOL, 0, 0,
+	pb_enable_display, _T("enable_display"), TYPE_BOOL, P_RESET_DEFAULT, 0,
 	p_default, TRUE,
 	p_ui, TYPE_SINGLECHEKBOX, ED_DISPLAYENABLE,
 	PB_END,
-	pb_display_percent, _T("display_percent"), TYPE_INT, 0, 0,
+	pb_display_percent, _T("display_percent"), TYPE_INT, P_RESET_DEFAULT, 0,
 	p_default, 100,
 	p_range, 0, 100, 
 	p_ui, TYPE_SPINNER,  EDITTYPE_POS_INT, ED_DISPLAYPERCENT, ED_DISPLAYPERCENTSPIN, 1,
 	PB_END,
-	pb_display_entity_ids, _T("display_entity_ids"), TYPE_BOOL, 0, 0,
+	pb_display_entity_ids, _T("display_entity_ids"), TYPE_BOOL, P_RESET_DEFAULT, 0,
 	p_default, TRUE,
 	p_ui, TYPE_SINGLECHEKBOX, ED_DISPLAYENTITYIDS,
 	PB_END,
 
 	// cache attributes
-	pb_crowd_fields, _T("crowd_fields"), TYPE_STRING, 0, 0,
+	pb_crowd_fields, _T("crowd_fields"), TYPE_STRING, P_RESET_DEFAULT, 0,
 	p_ui, TYPE_EDITBOX, ED_CROWDFIELDS,
 	PB_END,
-	pb_cache_name, _T("cache_name"), TYPE_STRING, 0, 0,
+	pb_cache_name, _T("cache_name"), TYPE_STRING, P_RESET_DEFAULT, 0,
 	p_ui, TYPE_EDITBOX, ED_CACHENAME,
 	PB_END,
-	pb_cache_dir, _T("cache_dir"), TYPE_STRING, 0, 0,
+	pb_cache_dir, _T("cache_dir"), TYPE_STRING, P_RESET_DEFAULT, 0,
 	p_ui, TYPE_EDITBOX, ED_CACHEDIR,
 	PB_END,
-	pb_character_files, _T("character_files"), TYPE_STRING, 0, 0,
+	pb_character_files, _T("character_files"), TYPE_STRING, P_RESET_DEFAULT, 0,
 	p_ui, TYPE_EDITBOX, ED_CHARACTERFILES,
 	PB_END,
-	pb_excluded_entities, _T("excluded_entities"), TYPE_STRING, 0, 0,
+	pb_excluded_entities, _T("excluded_entities"), TYPE_STRING, P_RESET_DEFAULT, 0,
 	p_ui, TYPE_EDITBOX, ED_EXCLUDEDENTITIES,
 	PB_END,
 
 	// culling attributes
-	pb_frustum_enable, _T("frustum_enable"), TYPE_BOOL, 0, 0,
+	pb_frustum_enable, _T("frustum_enable"), TYPE_BOOL, P_RESET_DEFAULT, 0,
 	p_default, FALSE,
 	p_ui, TYPE_SINGLECHEKBOX, ED_FRUSTUMENABLE,
 	PB_END,
-	pb_frustum_margin, _T("frustum_margin"), TYPE_FLOAT, 0, 0,
+	pb_frustum_margin, _T("frustum_margin"), TYPE_FLOAT, P_RESET_DEFAULT, 0,
 	p_default, 10.f,
 	p_range, -BIGFLOAT, BIGFLOAT, 
 	p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_FRUSTUMMARGIN, ED_FRUSTUMMARGINSPIN, 1.f,
 	PB_END,
-	pb_camera_margin, _T("camera_margin"), TYPE_FLOAT, 0, 0,
+	pb_camera_margin, _T("camera_margin"), TYPE_FLOAT, P_RESET_DEFAULT, 0,
 	p_default, 10.f,
 	p_range, -BIGFLOAT, BIGFLOAT, 
 	p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_CAMERAMARGIN, ED_CAMERAMARGINSPIN, 1.f,
 	PB_END,
 
 	// vray attributes
-	pb_frame_offset, _T("frame_offset"), TYPE_INT, 0, 0,
+	pb_frame_offset, _T("frame_offset"), TYPE_INT, P_RESET_DEFAULT, 0,
 	p_default, 0,
 	p_range, -BIGINT, BIGINT, 
 	p_ui, TYPE_SPINNER,  EDITTYPE_INT, ED_FRAMEOFFSET, ED_FRAMEOFFSETSPIN, 1,
 	PB_END,
-	pb_scale_transform, _T("scale_transform"), TYPE_FLOAT, 0, 0,
-	p_default, 1.f,
-	p_range, -BIGFLOAT, BIGFLOAT, 
-	p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_SCALETRANSFORM, ED_SCALETRANSFORMSPIN, 1.f,
-	PB_END,
-	
-	pb_temp_vrscene_file_dir, _T("temp_vrscene_file_dir"), TYPE_STRING, 0, 0,
-		p_default, _T("TEMP"),
-		p_ui, TYPE_EDITBOX, ED_TEMPVRSCENEFILEDIR,
+	pb_objectId_mode, _T("objectId_mode"), TYPE_INT, P_RESET_DEFAULT, 0,
+    p_ui, TYPE_INT_COMBOBOX, CB_OBJECTIDMODE, 4, CB_OBJECTIDMODE_ITEM1, CB_OBJECTIDMODE_ITEM2, CB_OBJECTIDMODE_ITEM3, CB_OBJECTIDMODE_ITEM4, 
+	p_vals, 0, 1, 2, 3,
+	p_default, 0,
+	PB_END,	
+	pb_temp_vrscene_file_dir, _T("temp_vrscene_file_dir"), TYPE_STRING, P_RESET_DEFAULT, 0,
+	p_default, _T("TEMP"),
+	p_ui, TYPE_EDITBOX, ED_TEMPVRSCENEFILEDIR,
 	PB_END,
 
 PB_END
@@ -370,7 +369,7 @@ void VRayGolaem::SetExtendedDisplay(int flags) {
 
 void VRayGolaem::GetLocalBoundBox(TimeValue t, INode* inode, ViewExp* vpt, Box3& box) 
 {
-	float radius=ICON_RADIUS*_scaleTransform; 
+	float radius=ICON_RADIUS; 
 	_nodeBbox+=Point3(-radius, -radius, -radius);
 	_nodeBbox+=Point3(radius, radius, radius);
 	box = _nodeBbox;
@@ -633,7 +632,7 @@ void VRayGolaem::readGolaemCache(TimeValue t)
 //------------------------------------------------------------
 // drawEntities
 //------------------------------------------------------------
-void VRayGolaem::drawEntities(GraphicsWindow *gw, TimeValue t)
+void VRayGolaem::drawEntities(GraphicsWindow *gw, const Matrix3& transform, TimeValue t)
 {
 	// get display attributes
 	bool displayEnable = pblock2->GetInt(pb_enable_display, t) == 1;
@@ -648,26 +647,23 @@ void VRayGolaem::drawEntities(GraphicsWindow *gw, TimeValue t)
 	// draw
 	_nodeBbox.Init();
 	
+	float transformScale(transform.GetRow(0).Length());
 	for (size_t iData=0, nbData=_simulationData.length(); iData<nbData; ++iData)
 	{
 		int maxDisplayedEntity = _simulationData[iData]->_entityCount * displayPercent / 100;
 		for (size_t iEntity=0, entityCount = maxDisplayedEntity; iEntity<entityCount; ++iEntity)
 		{
 			unsigned int entityType = _simulationData[iData]->_entityTypes[iEntity];
-			float entityRadius = _simulationData[iData]->_entityRadius[iEntity];
-			float entityHeight = _simulationData[iData]->_entityHeight[iEntity];
+			float entityRadius = _simulationData[iData]->_entityRadius[iEntity] * transformScale;
+			float entityHeight = _simulationData[iData]->_entityHeight[iEntity] * transformScale;
 			if(_simulationData[iData]->_boneCount[entityType])
 			{
 				// draw bbox
 				unsigned int iBoneIndex = _simulationData[iData]->_iBoneOffsetPerEntityType[entityType] + _simulationData[iData]->_indexInEntityType[iEntity] * _simulationData[iData]->_boneCount[entityType];
 				Point3 entityPosition(_frameData[iData]->_bonePositions[iBoneIndex][0], _frameData[iData]->_bonePositions[iBoneIndex][1], _frameData[iData]->_bonePositions[iBoneIndex][2]);
 				// axis transformation for max
-				Matrix3 axisTranform = RotateXMatrix(pi/2);
-				entityPosition = axisTranform * entityPosition;
+				entityPosition = entityPosition * transform;
 				Box3 entityBbox(Point3(entityPosition[0]-entityRadius, entityPosition[1]-entityRadius, entityPosition[2]), Point3(entityPosition[0]+entityRadius, entityPosition[1]+entityRadius, entityPosition[2]+entityHeight));
-				entityPosition *= _scaleTransform;
-				entityBbox.pmin *= _scaleTransform;
-				entityBbox.pmax *= _scaleTransform;
 				drawBBox(gw, entityBbox); // update node bbox
 				_nodeBbox += entityBbox;
 
@@ -697,10 +693,10 @@ void VRayGolaem::draw(TimeValue t, INode *node, ViewExp *vpt)
 	gw->setColor(LINE_COLOR, color);
 
 	// locator
-	drawSphere(gw, Point3::Origin, ICON_RADIUS*_scaleTransform, 30);
+	drawSphere(gw, Point3::Origin, ICON_RADIUS, 30);
 
 	// entities	
-	drawEntities(gw, t);
+	drawEntities(gw, tm, t);
 
 	// text
 	tm.NoScale();
@@ -865,11 +861,11 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 	_cameraMargin = pblock2->GetFloat(pb_camera_margin, t);
 
 	// vray
-	_scaleTransform = pblock2->GetFloat(pb_scale_transform, t);
 	_frameOffset = pblock2->GetInt(pb_frame_offset, t);
 	
 	// object properties
 	_objectIDBase=node->GetGBufID();
+	_objectIDMode = pblock2->GetInt(pb_objectId_mode, t);
 	_primaryVisibility=node->GetPrimaryVisibility()!=0;
 	_castsShadows=node->CastShadows();
 
@@ -1153,6 +1149,21 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			VR::VRayPluginParameter* currentParam = NULL;
 			CStr crowdFields;
 			
+			// transform
+			currentParam = plugin->getParameter("glmTransform");
+			if (currentParam)
+			{
+				VR::Transform t = currentParam->getTransform();
+				Matrix3 transform(Point3(1, 0, 0), Point3(0, 1, 0), Point3(0, 0, 1), Point3(t.offs[0], t.offs[1], t.offs[2]));
+				transform = transform * golaemToMax();
+
+				// scale according to scene unit
+				double scaleRatio (1. / GetMasterScale (UNITS_CENTIMETERS));
+				transform.Scale(Point3(scaleRatio, scaleRatio, scaleRatio), true);
+
+				node->SetNodeTM(0, transform);
+			}
+
 			// cache attributes
 			currentParam = plugin->getParameter("glmCrowdField");
 			if (currentParam)
@@ -1219,14 +1230,14 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			// vray
 			currentParam = plugin->getParameter("glmFrameOffset");
 			if (currentParam) pblock2->SetValue(pb_frame_offset, 0, currentParam->getInt());
-			double scaleRatio (1. / GetMasterScale (UNITS_CENTIMETERS));
-			pblock2->SetValue(pb_scale_transform, 0, (float)scaleRatio);
-
+			
 			// properties (copy them in the max node as well if it exists)
 			int objectIDBase(0);
 			bool primaryVisibility(true), castShadows(true), inReflections(true), inRefractions(true);
 			currentParam = plugin->getParameter("glmObjectIDBase");
 			if (currentParam) objectIDBase = currentParam->getInt(); 
+			currentParam = plugin->getParameter("glmObjectIDMode");
+			if (currentParam) pblock2->SetValue(pb_objectId_mode, 0, currentParam->getInt());
 			currentParam = plugin->getParameter("glmCameraVisibility");
 			if (currentParam) primaryVisibility = currentParam->getBool();
 			currentParam = plugin->getParameter("glmShadowsVisibility");
@@ -1294,6 +1305,16 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 //------------------------------------------------------------
 bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file) 
 {
+	// check if this object is not an instance (then it has no max node to query)
+	INode* node=getNode(this);
+	if (node == NULL)
+	{
+		CStr logMessage = CStr("VRayGolaem: This object is an 3ds Max instance and is not supported. Please create a copy.");
+		mprintf(logMessage.ToBSTR());
+		return false;
+	}
+	Matrix3 transform = node->GetObjectTM(0) * maxToGolaem();
+	
 	// check file path
 	std::stringstream outputStr;
 	std::ofstream outputFileStream(file.ptr());
@@ -1334,7 +1355,10 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 
 		outputStr << "GolaemCrowd " << correctedCacheName << crowdFields[iCf] << "@mesh1" << std::endl;
 		outputStr << "{" << std::endl;
-		outputStr << "\t" << "glmTransform=Transform(Matrix(Vector("<< _scaleTransform <<", 0, 0), Vector(0, "<< _scaleTransform <<", 0), Vector(0, 0, "<< _scaleTransform <<")), Vector(0, 0, 0));" << std::endl;
+		outputStr << "\t" << "glmTransform=Transform(Matrix(Vector("<< transform.GetRow(0)[0] <<", "<< transform.GetRow(0)[1] <<", "<< transform.GetRow(0)[2] <<")," << 
+														   "Vector("<< transform.GetRow(1)[0] <<", "<< transform.GetRow(1)[1] <<", "<< transform.GetRow(1)[2] <<")," <<
+														   "Vector("<< transform.GetRow(2)[0] <<", "<< transform.GetRow(2)[1] <<", "<< transform.GetRow(2)[2] <<"))," << 
+														   "Vector("<< transform.GetRow(3)[0] <<", "<< transform.GetRow(3)[1] <<", "<< transform.GetRow(3)[2] <<"));" << std::endl;
 		outputStr << "\t" << "glmFrameOffset="<< _frameOffset <<";" << std::endl;
 		outputStr << "\t" << "glmCrowdField=\"" << crowdFields[iCf] << "\";" << std::endl;
 		outputStr << "\t" << "glmCacheName=\"" << _cacheName << "\";" << std::endl;
@@ -1351,6 +1375,7 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 		outputStr << "\t" << "glmCameraMargin=" << _cameraMargin << ";" << std::endl;
 		// vray
 		outputStr << "\t" << "glmObjectIDBase=" << _objectIDBase << ";" << std::endl;
+		outputStr << "\t" << "glmObjectIDMode=" << _objectIDMode << ";" << std::endl;
 		outputStr << "\t" << "glmCameraVisibility=" << _primaryVisibility << ";" << std::endl;
 		outputStr << "\t" << "glmShadowsVisibility=" << _castsShadows << ";" << std::endl;
 		outputStr << "\t" << "glmReflectionsVisibility=" << _visibleInReflections << ";" << std::endl;
@@ -1539,6 +1564,17 @@ inline void drawText(GraphicsWindow *gw, const MCHAR* text, const Point3& pos)
 	gw->setColor(TEXT_COLOR, 1.0f, 1.0f, 1.0f);
 	gw->wText(&ipt, text);
 }
+
+inline Matrix3 golaemToMax()
+{
+	return RotateXMatrix(pi/2);
+}
+
+inline Matrix3 maxToGolaem()
+{
+	return RotateXMatrix(-pi/2);
+}
+
 
 
 
