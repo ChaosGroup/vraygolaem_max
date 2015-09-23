@@ -653,6 +653,9 @@ void VRayGolaem::drawEntities(GraphicsWindow *gw, const Matrix3& transform, Time
 		int maxDisplayedEntity = _simulationData[iData]->_entityCount * displayPercent / 100;
 		for (size_t iEntity=0, entityCount = maxDisplayedEntity; iEntity<entityCount; ++iEntity)
 		{
+			int entityId = _simulationData[iData]->_entityIds[iEntity];
+			if (entityId == -1) continue;
+
 			unsigned int entityType = _simulationData[iData]->_entityTypes[iEntity];
 			float entityRadius = _simulationData[iData]->_entityRadius[iEntity] * transformScale;
 			float entityHeight = _simulationData[iData]->_entityHeight[iEntity] * transformScale;
@@ -670,7 +673,7 @@ void VRayGolaem::drawEntities(GraphicsWindow *gw, const Matrix3& transform, Time
 				// draw EntityID
 				if (displayEntityIds)
 				{
-					CStr entityIdStrs; entityIdStrs.printf("%i", _simulationData[iData]->_entityIds[iEntity]);
+					CStr entityIdStrs; entityIdStrs.printf("%i", entityId);
 					drawText(gw, entityIdStrs.ToMCHAR(), entityPosition);
 				}
 			}
