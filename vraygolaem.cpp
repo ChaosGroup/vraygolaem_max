@@ -653,25 +653,29 @@ void VRayGolaem::drawEntities(GraphicsWindow *gw, const Matrix3& transform, Time
 		int maxDisplayedEntity = _simulationData[iData]->_entityCount * displayPercent / 100;
 		for (size_t iEntity=0, entityCount = maxDisplayedEntity; iEntity<entityCount; ++iEntity)
 		{
-			unsigned int entityType = _simulationData[iData]->_entityTypes[iEntity];
-			float entityRadius = _simulationData[iData]->_entityRadius[iEntity] * transformScale;
-			float entityHeight = _simulationData[iData]->_entityHeight[iEntity] * transformScale;
-			if(_simulationData[iData]->_boneCount[entityType])
+			int entityId = _simulationData[iData]->_entityIds[iEntity];
+			if (entityId != -1)
 			{
-				// draw bbox
-				unsigned int iBoneIndex = _simulationData[iData]->_iBoneOffsetPerEntityType[entityType] + _simulationData[iData]->_indexInEntityType[iEntity] * _simulationData[iData]->_boneCount[entityType];
-				Point3 entityPosition(_frameData[iData]->_bonePositions[iBoneIndex][0], _frameData[iData]->_bonePositions[iBoneIndex][1], _frameData[iData]->_bonePositions[iBoneIndex][2]);
-				// axis transformation for max
-				entityPosition = entityPosition * transform;
-				Box3 entityBbox(Point3(entityPosition[0]-entityRadius, entityPosition[1]-entityRadius, entityPosition[2]), Point3(entityPosition[0]+entityRadius, entityPosition[1]+entityRadius, entityPosition[2]+entityHeight));
-				drawBBox(gw, entityBbox); // update node bbox
-				_nodeBbox += entityBbox;
-
-				// draw EntityID
-				if (displayEntityIds)
+				unsigned int entityType = _simulationData[iData]->_entityTypes[iEntity];
+				float entityRadius = _simulationData[iData]->_entityRadius[iEntity] * transformScale;
+				float entityHeight = _simulationData[iData]->_entityHeight[iEntity] * transformScale;
+				if(_simulationData[iData]->_boneCount[entityType])
 				{
-					CStr entityIdStrs; entityIdStrs.printf("%i", _simulationData[iData]->_entityIds[iEntity]);
-					drawText(gw, entityIdStrs.ToMCHAR(), entityPosition);
+					// draw bbox
+					unsigned int iBoneIndex = _simulationData[iData]->_iBoneOffsetPerEntityType[entityType] + _simulationData[iData]->_indexInEntityType[iEntity] * _simulationData[iData]->_boneCount[entityType];
+					Point3 entityPosition(_frameData[iData]->_bonePositions[iBoneIndex][0], _frameData[iData]->_bonePositions[iBoneIndex][1], _frameData[iData]->_bonePositions[iBoneIndex][2]);
+					// axis transformation for max
+					entityPosition = entityPosition * transform;
+					Box3 entityBbox(Point3(entityPosition[0]-entityRadius, entityPosition[1]-entityRadius, entityPosition[2]), Point3(entityPosition[0]+entityRadius, entityPosition[1]+entityRadius, entityPosition[2]+entityHeight));
+					drawBBox(gw, entityBbox); // update node bbox
+					_nodeBbox += entityBbox;
+
+					// draw EntityID
+					if (displayEntityIds)
+					{
+						CStr entityIdStrs; entityIdStrs.printf("%i", entityId);
+						drawText(gw, entityIdStrs.ToMCHAR(), entityPosition);
+					}
 				}
 			}
 		}
