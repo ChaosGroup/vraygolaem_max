@@ -54,17 +54,28 @@ enum {
 	pb_cache_name,
 	pb_cache_dir,
 	pb_character_files,
-	pb_excluded_entities,
+	// motion blur				
+	pb_motion_blur_enable,		// Not used anymore but kept for retrocomp
+	pb_motion_blur_start,		// Not used anymore but kept for retrocomp
+	pb_motion_blur_window_size,	// Not used anymore but kept for retrocomp
+	pb_motion_blur_samples,		// Not used anymore but kept for retrocomp
 	// culling
 	pb_frustum_enable,
 	pb_frustum_margin,
 	pb_camera_margin,
 	// vray 
 	pb_frame_offset,
-	pb_scale_transform,
-	pb_objectId_mode,
+	pb_scale_transform,			// Not used anymore but kept for retrocomp
+	pb_object_id_base,			// Not used anymore but kept for retrocomp
+	pb_primary_visibility,		// Not used anymore but kept for retrocomp
+	pb_casts_shadows,			// Not used anymore but kept for retrocomp
+	pb_visible_in_reflections,	// Not used anymore but kept for retrocomp
+	pb_visible_in_refractions,	// Not used anymore but kept for retrocomp
 	// output
 	pb_temp_vrscene_file_dir,
+	pb_override_node_properties,// Not used anymore but kept for retrocomp
+	pb_excluded_entities,
+	pb_object_id_mode,
 };
 
 //************************************************************

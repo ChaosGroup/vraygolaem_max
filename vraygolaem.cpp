@@ -215,7 +215,7 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	p_range, -BIGINT, BIGINT, 
 	p_ui, TYPE_SPINNER,  EDITTYPE_INT, ED_FRAMEOFFSET, ED_FRAMEOFFSETSPIN, 1,
 	PB_END,
-	pb_objectId_mode, _T("objectId_mode"), TYPE_INT, P_RESET_DEFAULT, 0,
+	pb_object_id_mode, _T("objectId_mode"), TYPE_INT, P_RESET_DEFAULT, 0,
     p_ui, TYPE_INT_COMBOBOX, CB_OBJECTIDMODE, 4, CB_OBJECTIDMODE_ITEM1, CB_OBJECTIDMODE_ITEM2, CB_OBJECTIDMODE_ITEM3, CB_OBJECTIDMODE_ITEM4, 
 	p_vals, 0, 1, 2, 3,
 	p_default, 0,
@@ -224,6 +224,19 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	p_default, _T("TEMP"),
 	p_ui, TYPE_EDITBOX, ED_TEMPVRSCENEFILEDIR,
 	PB_END,
+
+	// not used anymore but kept for retrocomp
+	pb_motion_blur_enable, _T(""), TYPE_BOOL, 0, 0, PB_END,
+	pb_motion_blur_start, _T(""), TYPE_FLOAT, 0, 0, PB_END,
+	pb_motion_blur_window_size, _T(""), TYPE_FLOAT, 0, 0, PB_END,
+	pb_motion_blur_samples, _T(""), TYPE_INT, 0, 0, PB_END,
+	pb_scale_transform, _T(""), TYPE_FLOAT, 0, 0, PB_END,
+	pb_object_id_base, _T(""), TYPE_INT, 0, 0, PB_END,
+	pb_primary_visibility, _T(""), TYPE_BOOL, 0, 0, PB_END,
+	pb_casts_shadows, _T(""), TYPE_BOOL, 0, 0, PB_END,
+	pb_visible_in_reflections, _T(""), TYPE_BOOL, 0, 0, PB_END,
+	pb_visible_in_refractions, _T(""), TYPE_BOOL, 0, 0, PB_END,
+	pb_override_node_properties, _T(""), TYPE_BOOL, 0, 0, PB_END,
 
 PB_END
 );
@@ -868,9 +881,9 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 	
 	// object properties
 	_objectIDBase=node->GetGBufID();
-	_objectIDMode = pblock2->GetInt(pb_objectId_mode, t);
-	_primaryVisibility=node->GetPrimaryVisibility()!=0;
-	_castsShadows=node->CastShadows();
+	_objectIDMode = pblock2->GetInt(pb_object_id_mode, t);
+	_primaryVisibility=node->GetPrimaryVisibility()==1;
+	_castsShadows=node->CastShadows()==1;
 
 	// Get secondary visibility from the 3ds Max object properties
 	_visibleInReflections=true;
@@ -1224,7 +1237,7 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 		
 			// frustum culling
 			currentParam = plugin->getParameter("glmEnableFrustumCulling");
-			if (currentParam) pblock2->SetValue(pb_frustum_enable, 0, currentParam->getBool());
+			if (currentParam) pblock2->SetValue(pb_frustum_enable, 0, currentParam->getBool() == 1);
 			currentParam = plugin->getParameter("glmFrustumMargin");
 			if (currentParam) pblock2->SetValue(pb_frustum_margin, 0, (float)currentParam->getDouble());
 			currentParam = plugin->getParameter("glmCameraMargin");
@@ -1240,15 +1253,15 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			currentParam = plugin->getParameter("glmObjectIDBase");
 			if (currentParam) objectIDBase = currentParam->getInt(); 
 			currentParam = plugin->getParameter("glmObjectIDMode");
-			if (currentParam) pblock2->SetValue(pb_objectId_mode, 0, currentParam->getInt());
+			if (currentParam) pblock2->SetValue(pb_object_id_mode, 0, currentParam->getInt());
 			currentParam = plugin->getParameter("glmCameraVisibility");
-			if (currentParam) primaryVisibility = currentParam->getBool();
+			if (currentParam) primaryVisibility = currentParam->getBool() == 1;
 			currentParam = plugin->getParameter("glmShadowsVisibility");
-			if (currentParam) castShadows = currentParam->getBool();
+			if (currentParam) castShadows = currentParam->getBool() == 1;
 			currentParam = plugin->getParameter("glmReflectionsVisibility");
-			if (currentParam) inReflections = currentParam->getBool();
+			if (currentParam) inReflections = currentParam->getBool() == 1;
 			currentParam = plugin->getParameter("glmRefractionsVisibility");
-			if (currentParam) inRefractions = currentParam->getBool();
+			if (currentParam) inRefractions = currentParam->getBool() == 1;
 
 			node->SetGBufID(objectIDBase);
 			node->SetPrimaryVisibility(primaryVisibility);
