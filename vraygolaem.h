@@ -101,6 +101,45 @@ class FindPluginOfTypeCallback : public EnumPluginCallback
 	MaxSDK::Array<VR::VRayPlugin*> _foundPlugins;
 };
 
+class VRayGolaem;
+
+// A wrapper for a 3ds Max material; this is needed because the geometry created by Golaem
+// is implemented in V-Ray Standalone plugins, which cannot work with 3ds Max materials. This is
+// why we create one wrapper material for each 3ds Max material in the scene. This also allows
+// the Golaem plugin to find the materials automatically if they have the correct name in the
+// 3ds Max scene.
+class BRDFWrapper: public Plugin, public VR::MaterialInterface, public VR::BSDFInterface {
+	VR::VRenderMtl *vrayMtl;
+	Mtl *maxMtl;
+	ULONG maxMtlFlags;
+	int mtlID;
+	VRayGolaem *golaemInstance;
+public:
+	BRDFWrapper(void);
+
+	// From PluginBase
+	PluginInterface* newInterface(InterfaceID id) VRAY_OVERRIDE {
+		if (id==EXT_MATERIAL) return static_cast<MaterialInterface*>(this);
+		else if (id==EXT_BSDF) return static_cast<BSDFInterface*>(this);
+		else return PluginBase::newInterface(id);
+	}
+
+	// From PluginInterface
+	PluginBase* getPlugin(void) VRAY_OVERRIDE { return static_cast<PluginBase*>(this); }
+
+	// From MaterialInterface
+	void shade(VR::VRayContext &rc) VRAY_OVERRIDE;
+	int getMaterialRenderID(const VR::VRayContext &rc) VRAY_OVERRIDE;
+	int isOpaque(void) VRAY_OVERRIDE;
+
+	// From BSDFInterface
+	VR::BSDFSampler *newBSDF(const VR::VRayContext &rc, VR::BSDFFlags flags) VRAY_OVERRIDE;
+	void deleteBSDF(const VR::VRayContext &rc, VR::BSDFSampler *bsdf) VRAY_OVERRIDE;
+
+	// Other stuff
+	void setMaxMtl(Mtl *maxMtl, VR::VRenderMtl *vrayMtl, VRayGolaem *golaem);
+};
+
 //************************************************************
 // The VRayGolaem 3dsmax object
 //************************************************************
@@ -278,6 +317,8 @@ public:
 	void frameBegin(TimeValue t, VR::VRayCore *vray);
 	void frameEnd(VR::VRayCore *vray);
 
+	int getObjectID(void) const { return _objectIDBase; }
+
 private:	
 	void callRenderBegin(VR::VRayCore *vray);
 	void callRenderEnd(VR::VRayCore *vray);
@@ -290,6 +331,17 @@ private:
 
 	// Enable or disable some UI controls based on the settings.
 	void grayDlgControls(void);
+
+	// Create V-Ray plugins for the materials in the 3ds Max scene.
+	void createMaterials(void);
+
+	// Enumerate the specified Max material library and create wrapper V-Ray plugins
+	// for it.
+	void enumMtlLib(MtlBaseLib *mtlLib);
+
+	// Create a wrapper material in the plugin manager for this 3ds Max material.
+	// Only V-Ray compatible materials are supported.
+	void wrapMaterial(Mtl *mtl);
 };
 
 //************************************************************
