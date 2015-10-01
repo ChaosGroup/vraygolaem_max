@@ -17,3 +17,5 @@ To use VRayGolaem:
 *) Make sure that the environment variables needed for V-Ray RT are set up correctly (i.e. VRAY30_RT_FOR_3DSMAX2014_PLUGINS etc).
 
 *) The VRayGolaem plugin in 3ds Max can be created from the "Create" tab of the Command planel, "VRay" category. Click on the VRayGolaem button, then click and drag in a viewport to create it. Then click on the "cache_file" button to specify a .vrscene file containing the GolaemCrowd plugin. The .vrscene file MUST NOT contain any SettingsXXXXX plugins - they will mess up the rendering. Use the "shader_file" button to specify a .vrscene file with the shaders that will be used for rendering. You can control the texture search paths using the VRAY_ASSETS_PATH environment variable if needed.
+
+Official help page: http://golaem.com/content/doc/golaem-crowd-documentation/rendering-v-ray

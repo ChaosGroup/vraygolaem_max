@@ -62,11 +62,21 @@ public:
 
 #define BIGFLOAT	float(999999) // from bendmod sample
 #define BIGINT		int(999999)
-#define ICON_RADIUS 10
+#define ICON_RADIUS 2
 #define CROWDVRAYPLUGINID PluginID(LARGE_CONST(2011070866)) // from glmCrowdVRayPlugin.h
 
 TCHAR *iconText=_T("VRayGolaem");
 static VRayGolaemClassDesc vrayGolaemClassDesc;
+
+// The names of the node user properties that V-Ray uses for reflection/refraction visibility.
+// V-Ray doesn't publish the header with their definitions so I copy them here.
+#define PROP_GI_VISIBLETOREFL _T("VRay_GI_VisibleToReflections")
+#define PROP_GI_VISIBLETOREFR _T("VRay_GI_VisibleToRefractions")
+#define PROP_MOBLUR_USEDEFAULTGEOMSAMPLES _T("VRay_MoBlur_DefaultGeomSamples")
+#define PROP_MOBLUR_GEOMSAMPLES _T("VRay_MoBlur_GeomSamples")
+#define PROP_MOBLUR_OVERRIDEDURATION _T("VRay_MoBlur_Override")
+#define PROP_MOBLUR_DURATION _T("VRay_MoBlur_Override_Duration")
+
 
 //************************************************************
 // DLL stuff
@@ -134,131 +144,100 @@ enum { params, };
 static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc, P_AUTO_CONSTRUCT+P_AUTO_UI, REFNO_PBLOCK,
 	IDD_VRAYGOLAEM, IDS_VRAYGOLAEM_PARAMS, 0, 0, &vrayGolaemDlgProc,
 	// Params
-	pb_file, _T("cache_file"), TYPE_FILENAME, 0, 0,
+	pb_file, _T("cache_file"), TYPE_FILENAME, P_RESET_DEFAULT, 0,
 		p_ui, TYPE_EDITBOX, ED_GOLAEMVRSCENE,
 #if GET_MAX_RELEASE(VERSION_3DSMAX) >= 11900
 		p_assetTypeID, MaxSDK::AssetManagement::AssetType::kExternalLink,
 #endif
 	PB_END,
-	pb_shaders_file, _T("shaders_file"), TYPE_FILENAME, 0, 0,
+	pb_shaders_file, _T("shaders_file"), TYPE_FILENAME, P_RESET_DEFAULT, 0,
 		p_ui, TYPE_EDITBOX, ED_SHADERSVRSCENE,
 #if GET_MAX_RELEASE(VERSION_3DSMAX) >= 11900
 		p_assetTypeID, MaxSDK::AssetManagement::AssetType::kExternalLink,
 #endif
 	PB_END,
-	pb_use_node_attributes, _T("use_node_attributes"), TYPE_BOOL, 0, 0,
+	pb_use_node_attributes, _T("use_node_attributes"), TYPE_BOOL, P_RESET_DEFAULT, 0,
 	p_default, TRUE,
 	p_ui, TYPE_SINGLECHEKBOX, ED_USERNODEATTRIBUTES,
 	PB_END,
 
 	// display attributes
-	pb_enable_display, _T("enable_display"), TYPE_BOOL, 0, 0,
+	pb_enable_display, _T("enable_display"), TYPE_BOOL, P_RESET_DEFAULT, 0,
 	p_default, TRUE,
 	p_ui, TYPE_SINGLECHEKBOX, ED_DISPLAYENABLE,
 	PB_END,
-	pb_display_percent, _T("display_percent"), TYPE_INT, 0, 0,
+	pb_display_percent, _T("display_percent"), TYPE_INT, P_RESET_DEFAULT, 0,
 	p_default, 100,
 	p_range, 0, 100, 
 	p_ui, TYPE_SPINNER,  EDITTYPE_POS_INT, ED_DISPLAYPERCENT, ED_DISPLAYPERCENTSPIN, 1,
 	PB_END,
-	pb_display_entity_ids, _T("display_entity_ids"), TYPE_BOOL, 0, 0,
+	pb_display_entity_ids, _T("display_entity_ids"), TYPE_BOOL, P_RESET_DEFAULT, 0,
 	p_default, TRUE,
 	p_ui, TYPE_SINGLECHEKBOX, ED_DISPLAYENTITYIDS,
 	PB_END,
 
 	// cache attributes
-	pb_crowd_fields, _T("crowd_fields"), TYPE_STRING, 0, 0,
+	pb_crowd_fields, _T("crowd_fields"), TYPE_STRING, P_RESET_DEFAULT, 0,
 	p_ui, TYPE_EDITBOX, ED_CROWDFIELDS,
 	PB_END,
-	pb_cache_name, _T("cache_name"), TYPE_STRING, 0, 0,
+	pb_cache_name, _T("cache_name"), TYPE_STRING, P_RESET_DEFAULT, 0,
 	p_ui, TYPE_EDITBOX, ED_CACHENAME,
 	PB_END,
-	pb_cache_dir, _T("cache_dir"), TYPE_STRING, 0, 0,
+	pb_cache_dir, _T("cache_dir"), TYPE_STRING, P_RESET_DEFAULT, 0,
 	p_ui, TYPE_EDITBOX, ED_CACHEDIR,
 	PB_END,
-	pb_character_files, _T("character_files"), TYPE_STRING, 0, 0,
+	pb_character_files, _T("character_files"), TYPE_STRING, P_RESET_DEFAULT, 0,
 	p_ui, TYPE_EDITBOX, ED_CHARACTERFILES,
 	PB_END,
-
-	// motion blur attributes
-	pb_motion_blur_enable, _T("motion_blur_enable"), TYPE_BOOL, 0, 0,
-	p_default, FALSE,
-	p_ui, TYPE_SINGLECHEKBOX, ED_MBLURENABLE,
-	PB_END,
-	pb_motion_blur_start, _T("motion_blur_start"), TYPE_FLOAT, 0, 0,
-	p_default, -0.5f,
-	p_range, -BIGFLOAT, BIGFLOAT, 
-	p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_MBLURSTART, ED_MBLURSTARTSPIN, 0.50f,
-	PB_END,
-	pb_motion_blur_window_size, _T("motion_blur_window_size"), TYPE_FLOAT, 0, 0,
-	p_default, 1.f,
-	p_range, 0.f, BIGFLOAT, 
-	p_ui, TYPE_SPINNER, EDITTYPE_POS_FLOAT, ED_MBLURWINDOWSIZE, ED_MBLURWINDOWSIZESPIN, 0.50f,
-	PB_END,
-	pb_motion_blur_samples, _T("motion_blur_samples"), TYPE_INT, 0, 0,
-	p_default, 1,
-	p_range, 0, BIGINT, 
-	p_ui, TYPE_SPINNER,  EDITTYPE_POS_INT, ED_MBLURSAMPLES, ED_MBLURSAMPLESSPIN, 1,
+	pb_excluded_entities, _T("excluded_entities"), TYPE_STRING, P_RESET_DEFAULT, 0,
+	p_ui, TYPE_EDITBOX, ED_EXCLUDEDENTITIES,
 	PB_END,
 
 	// culling attributes
-	pb_frustum_enable, _T("frustum_enable"), TYPE_BOOL, 0, 0,
+	pb_frustum_enable, _T("frustum_enable"), TYPE_BOOL, P_RESET_DEFAULT, 0,
 	p_default, FALSE,
 	p_ui, TYPE_SINGLECHEKBOX, ED_FRUSTUMENABLE,
 	PB_END,
-	pb_frustum_margin, _T("frustum_margin"), TYPE_FLOAT, 0, 0,
+	pb_frustum_margin, _T("frustum_margin"), TYPE_FLOAT, P_RESET_DEFAULT, 0,
 	p_default, 10.f,
 	p_range, -BIGFLOAT, BIGFLOAT, 
 	p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_FRUSTUMMARGIN, ED_FRUSTUMMARGINSPIN, 1.f,
 	PB_END,
-	pb_camera_margin, _T("camera_margin"), TYPE_FLOAT, 0, 0,
+	pb_camera_margin, _T("camera_margin"), TYPE_FLOAT, P_RESET_DEFAULT, 0,
 	p_default, 10.f,
 	p_range, -BIGFLOAT, BIGFLOAT, 
 	p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_CAMERAMARGIN, ED_CAMERAMARGINSPIN, 1.f,
 	PB_END,
 
 	// vray attributes
-	pb_frame_offset, _T("frame_offset"), TYPE_INT, 0, 0,
+	pb_frame_offset, _T("frame_offset"), TYPE_INT, P_RESET_DEFAULT, 0,
 	p_default, 0,
 	p_range, -BIGINT, BIGINT, 
 	p_ui, TYPE_SPINNER,  EDITTYPE_INT, ED_FRAMEOFFSET, ED_FRAMEOFFSETSPIN, 1,
 	PB_END,
-	pb_scale_transform, _T("scale_transform"), TYPE_FLOAT, 0, 0,
-	p_default, 10.f,
-	p_range, -BIGFLOAT, BIGFLOAT, 
-	p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_SCALETRANSFORM, ED_SCALETRANSFORMSPIN, 1.f,
-	PB_END,
-	pb_object_id_base, _T("object_id_base"), TYPE_INT, 0, 0,
+	pb_object_id_mode, _T("objectId_mode"), TYPE_INT, P_RESET_DEFAULT, 0,
+    p_ui, TYPE_INT_COMBOBOX, CB_OBJECTIDMODE, 4, CB_OBJECTIDMODE_ITEM1, CB_OBJECTIDMODE_ITEM2, CB_OBJECTIDMODE_ITEM3, CB_OBJECTIDMODE_ITEM4, 
+	p_vals, 0, 1, 2, 3,
 	p_default, 0,
-	p_range, 0, BIGINT, 
-	p_ui, TYPE_SPINNER,  EDITTYPE_POS_INT, ED_OBJECTIDBASE, ED_OBJECTIDBASESPIN, 1,
-	PB_END,
-	pb_primary_visibility, _T("primary_visibility"), TYPE_BOOL, 0, 0,
-	p_default, TRUE,
-	p_ui, TYPE_SINGLECHEKBOX, ED_PRIMARYVISIBILITY,
-	PB_END,
-	pb_casts_shadows, _T("casts_shadows"), TYPE_BOOL, 0, 0,
-	p_default, TRUE,
-	p_ui, TYPE_SINGLECHEKBOX, ED_CASTSSHADOWS,
-	PB_END,
-	pb_visible_in_reflections, _T("visible_in_reflections"), TYPE_BOOL, 0, 0,
-	p_default, TRUE,
-	p_ui, TYPE_SINGLECHEKBOX, ED_VISIBLEINREFLECTIONS,
-	PB_END,
-	pb_visible_in_refractions, _T("visible_in_refractions"), TYPE_BOOL, 0, 0,
-	p_default, TRUE,
-	p_ui, TYPE_SINGLECHEKBOX, ED_VISIBLEINREFRACTIONS,
+	PB_END,	
+	pb_temp_vrscene_file_dir, _T("temp_vrscene_file_dir"), TYPE_STRING, P_RESET_DEFAULT, 0,
+	p_default, _T("TEMP"),
+	p_ui, TYPE_EDITBOX, ED_TEMPVRSCENEFILEDIR,
 	PB_END,
 
-	pb_temp_vrscene_file_dir, _T("temp_vrscene_file_dir"), TYPE_STRING, 0, 0,
-		p_default, _T("TEMP"),
-		p_ui, TYPE_EDITBOX, ED_TEMPVRSCENEFILEDIR,
-	PB_END,
+	// not used anymore but kept for retrocomp
+	pb_motion_blur_enable, _T(""), TYPE_BOOL, 0, 0, PB_END,
+	pb_motion_blur_start, _T(""), TYPE_FLOAT, 0, 0, PB_END,
+	pb_motion_blur_window_size, _T(""), TYPE_FLOAT, 0, 0, PB_END,
+	pb_motion_blur_samples, _T(""), TYPE_INT, 0, 0, PB_END,
+	pb_scale_transform, _T(""), TYPE_FLOAT, 0, 0, PB_END,
+	pb_object_id_base, _T(""), TYPE_INT, 0, 0, PB_END,
+	pb_primary_visibility, _T(""), TYPE_BOOL, 0, 0, PB_END,
+	pb_casts_shadows, _T(""), TYPE_BOOL, 0, 0, PB_END,
+	pb_visible_in_reflections, _T(""), TYPE_BOOL, 0, 0, PB_END,
+	pb_visible_in_refractions, _T(""), TYPE_BOOL, 0, 0, PB_END,
+	pb_override_node_properties, _T(""), TYPE_BOOL, 0, 0, PB_END,
 
-	pb_override_node_properties, _T("override_node_properties"), TYPE_BOOL, 0, 0,
-		p_default, FALSE,
-		p_ui, TYPE_SINGLECHEKBOX, CB_NODEPROPERTIES,
-	PB_END,
 PB_END
 );
 
@@ -345,9 +324,7 @@ RefResult VRayGolaem::NotifyRefChanged(NOTIFY_REF_CHANGED_ARGS) {
 				// if (pblock2->LastNotifyParamID()==VRayGolaem_fileName) readPreview();
 				ParamID paramID=pblock2->LastNotifyParamID();
 				switch (paramID) {
-					case pb_motion_blur_enable:
 					case pb_frustum_enable:
-					case pb_override_node_properties:
 						grayDlgControls();
 						break;
 				}
@@ -531,16 +508,6 @@ void VRayGolaem::grayDlgControls(void) {
 
 	HWND hWnd=map->GetHWnd();
 
-	// Motion blur
-	int moblur=pblock2->GetInt(pb_motion_blur_enable);
-	map->Enable(pb_motion_blur_start, moblur);
-	map->Enable(pb_motion_blur_window_size, moblur);
-	map->Enable(pb_motion_blur_samples, moblur);
-
-	EnableWindow(GetDlgItem(hWnd, ST_MBSTART), moblur);
-	EnableWindow(GetDlgItem(hWnd, ST_MBSIZE), moblur);
-	EnableWindow(GetDlgItem(hWnd, ST_MBSAMPLES), moblur);
-
 	// Frustum culling
 	int fcull=pblock2->GetInt(pb_frustum_enable);
 	map->Enable(pb_frustum_margin, fcull);
@@ -548,16 +515,6 @@ void VRayGolaem::grayDlgControls(void) {
 
 	EnableWindow(GetDlgItem(hWnd, ST_CULLFRUSTUM), fcull);
 	EnableWindow(GetDlgItem(hWnd, ST_CULLCAMERA), fcull);
-
-	// Node properties override
-	int usePBlockProperties=pblock2->GetInt(pb_override_node_properties);
-	map->Enable(pb_object_id_base, usePBlockProperties);
-	map->Enable(pb_primary_visibility, usePBlockProperties);
-	map->Enable(pb_casts_shadows, usePBlockProperties);
-	map->Enable(pb_visible_in_reflections, usePBlockProperties);
-	map->Enable(pb_visible_in_refractions, usePBlockProperties);
-
-	EnableWindow(GetDlgItem(hWnd, ST_OBJECTID), usePBlockProperties);
 }
 
 
@@ -688,7 +645,7 @@ void VRayGolaem::readGolaemCache(TimeValue t)
 //------------------------------------------------------------
 // drawEntities
 //------------------------------------------------------------
-void VRayGolaem::drawEntities(GraphicsWindow *gw, TimeValue t)
+void VRayGolaem::drawEntities(GraphicsWindow *gw, const Matrix3& transform, TimeValue t)
 {
 	// get display attributes
 	bool displayEnable = pblock2->GetInt(pb_enable_display, t) == 1;
@@ -703,33 +660,33 @@ void VRayGolaem::drawEntities(GraphicsWindow *gw, TimeValue t)
 	// draw
 	_nodeBbox.Init();
 	
+	float transformScale(transform.GetRow(0).Length());
 	for (size_t iData=0, nbData=_simulationData.length(); iData<nbData; ++iData)
 	{
 		int maxDisplayedEntity = _simulationData[iData]->_entityCount * displayPercent / 100;
 		for (size_t iEntity=0, entityCount = maxDisplayedEntity; iEntity<entityCount; ++iEntity)
 		{
+			int entityId = _simulationData[iData]->_entityIds[iEntity];
+			if (entityId == -1) continue;
+
 			unsigned int entityType = _simulationData[iData]->_entityTypes[iEntity];
-			float entityRadius = _simulationData[iData]->_entityRadius[iEntity];
-			float entityHeight = _simulationData[iData]->_entityHeight[iEntity];
+			float entityRadius = _simulationData[iData]->_entityRadius[iEntity] * transformScale;
+			float entityHeight = _simulationData[iData]->_entityHeight[iEntity] * transformScale;
 			if(_simulationData[iData]->_boneCount[entityType])
 			{
 				// draw bbox
 				unsigned int iBoneIndex = _simulationData[iData]->_iBoneOffsetPerEntityType[entityType] + _simulationData[iData]->_indexInEntityType[iEntity] * _simulationData[iData]->_boneCount[entityType];
 				Point3 entityPosition(_frameData[iData]->_bonePositions[iBoneIndex][0], _frameData[iData]->_bonePositions[iBoneIndex][1], _frameData[iData]->_bonePositions[iBoneIndex][2]);
 				// axis transformation for max
-				Matrix3 axisTranform = RotateXMatrix(pi/2);
-				entityPosition = axisTranform * entityPosition;
+				entityPosition = entityPosition * transform;
 				Box3 entityBbox(Point3(entityPosition[0]-entityRadius, entityPosition[1]-entityRadius, entityPosition[2]), Point3(entityPosition[0]+entityRadius, entityPosition[1]+entityRadius, entityPosition[2]+entityHeight));
-				entityPosition *= _scaleTransform;
-				entityBbox.pmin *= _scaleTransform;
-				entityBbox.pmax *= _scaleTransform;
 				drawBBox(gw, entityBbox); // update node bbox
 				_nodeBbox += entityBbox;
 
 				// draw EntityID
 				if (displayEntityIds)
 				{
-					CStr entityIdStrs; entityIdStrs.printf("%i", _simulationData[iData]->_entityIds[iEntity]);
+					CStr entityIdStrs; entityIdStrs.printf("%i", entityId);
 					drawText(gw, entityIdStrs.ToMCHAR(), entityPosition);
 				}
 			}
@@ -755,7 +712,7 @@ void VRayGolaem::draw(TimeValue t, INode *node, ViewExp *vpt)
 	drawSphere(gw, Point3::Origin, ICON_RADIUS, 30);
 
 	// entities	
-	drawEntities(gw, t);
+	drawEntities(gw, tm, t);
 
 	// text
 	tm.NoScale();
@@ -838,54 +795,20 @@ INode *getNode(VRayGolaem *golaem) {
 	return node;
 }
 
-// The names of the node user properties that V-Ray uses for reflection/refraction visibility.
-// V-Ray doesn't publish the header with their definitions so I copy them here.
-#define PROP_GI_VISIBLETOREFL _T("VRay_GI_VisibleToReflections")
-#define PROP_GI_VISIBLETOREFR _T("VRay_GI_VisibleToRefractions")
-
-void VRayGolaem::getPropertiesFromNode(INode *node) {
-	if (!node) {
-		_objectIDBase=0;
-		_primaryVisibility=true;
-		_castsShadows=true;
-		_visibleInReflections=true;
-		_visibleInRefractions=true;
-	} else {
-		_objectIDBase=node->GetGBufID();
-		_primaryVisibility=node->GetPrimaryVisibility()!=0;
-		_castsShadows=node->CastShadows();
-
-		_visibleInReflections=true;
-		_visibleInRefractions=true;
-
-		// Get secondary visibility from the 3ds Max object properties
-		int nodeSecondaryVisibility=node->GetSecondaryVisibility();
-		if (0==nodeSecondaryVisibility) _visibleInReflections=false;
-		if (0==nodeSecondaryVisibility) _visibleInRefractions=false;
-
-		// Check secondary visibility in the V-Ray object properties
-		int vrayReflVisibility=true, vrayRefrVisibility=true;
-		node->GetUserPropBool(PROP_GI_VISIBLETOREFL, vrayReflVisibility);
-		node->GetUserPropBool(PROP_GI_VISIBLETOREFR, vrayRefrVisibility);
-
-		if (!vrayReflVisibility) _visibleInReflections=false;
-		if (!vrayRefrVisibility) _visibleInRefractions=false;
-	}
-}
-
-void VRayGolaem::getPropertiesFromPBlock(TimeValue t) {
-	_objectIDBase = pblock2->GetInt(pb_object_id_base, t);
-	_primaryVisibility = pblock2->GetInt(pb_primary_visibility, t) == 1;
-	_castsShadows = pblock2->GetInt(pb_casts_shadows, t) == 1;
-	_visibleInReflections = pblock2->GetInt(pb_visible_in_reflections, t) == 1;
-	_visibleInRefractions = pblock2->GetInt(pb_visible_in_refractions, t) == 1;
-}
-
 //------------------------------------------------------------
 // updateVRayParams
 //------------------------------------------------------------
 void VRayGolaem::updateVRayParams(TimeValue t) 
 {
+	// check if this object is not an instance (then it has no max node to query)
+	INode* node=getNode(this);
+	if (node == NULL)
+	{
+		CStr logMessage = CStr("VRayGolaem: This object is an 3ds Max instance and is not supported. Please create a copy.");
+		mprintf(logMessage.ToBSTR());
+		return;
+	}
+	
 	// vrscene attributes
 	const TCHAR *fname_wstr=pblock2->GetStr(pb_file, t);
 	if (!fname_wstr) _vrsceneFile="";
@@ -931,11 +854,22 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 		_characterFiles=characterFiles_mbcs;
 	}
 
+	const TCHAR *excludedEntities_wstr=pblock2->GetStr(pb_excluded_entities, t);
+	if (!excludedEntities_wstr) _excludedEntities="";
+	else {
+		GET_MBCS(excludedEntities_wstr, excludedEntities_mbcs);
+		_excludedEntities=excludedEntities_mbcs;
+	}
+
 	// motion blur attributes
-	_mBlurEnable = pblock2->GetInt(pb_motion_blur_enable, t) == 1;
-	_mBlurStart = pblock2->GetFloat(pb_motion_blur_start, t);
-	_mBlurWindowSize = pblock2->GetFloat(pb_motion_blur_window_size, t);
-	_mBlurSamples = pblock2->GetInt(pb_motion_blur_samples, t);
+	BOOL overrideValue;
+	node->GetUserPropBool(PROP_MOBLUR_OVERRIDEDURATION, overrideValue);
+	_overMBlurWindowSize = overrideValue == 1;
+	node->GetUserPropFloat(PROP_MOBLUR_DURATION, _mBlurWindowSize);
+	node->GetUserPropBool(PROP_MOBLUR_USEDEFAULTGEOMSAMPLES, overrideValue);
+	_overMBlurSamples = overrideValue == 0;
+	node->GetUserPropInt(PROP_MOBLUR_GEOMSAMPLES, _mBlurSamples);
+	_mBlurEnable = !(_overMBlurSamples && _mBlurSamples == 1); // moblur is disabled if the object geo samples == 1
 
 	// culling attributes
 	_frustumEnable = pblock2->GetInt(pb_frustum_enable, t) == 1;
@@ -943,16 +877,28 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 	_cameraMargin = pblock2->GetFloat(pb_camera_margin, t);
 
 	// vray
-	_scaleTransform = pblock2->GetFloat(pb_scale_transform, t);
 	_frameOffset = pblock2->GetInt(pb_frame_offset, t);
+	
+	// object properties
+	_objectIDBase=node->GetGBufID();
+	_objectIDMode = pblock2->GetInt(pb_object_id_mode, t);
+	_primaryVisibility=node->GetPrimaryVisibility()==1;
+	_castsShadows=node->CastShadows()==1;
 
-	int usePBlockProperties=pblock2->GetInt(pb_override_node_properties, t);
-	if (usePBlockProperties) {
-		getPropertiesFromPBlock(t);
-	} else {
-		INode *node=getNode(this);
-		getPropertiesFromNode(node);
-	}
+	// Get secondary visibility from the 3ds Max object properties
+	_visibleInReflections=true;
+	_visibleInRefractions=true;
+	int nodeSecondaryVisibility=node->GetSecondaryVisibility();
+	if (0==nodeSecondaryVisibility) _visibleInReflections=false;
+	if (0==nodeSecondaryVisibility) _visibleInRefractions=false;
+
+	// Check secondary visibility in the V-Ray object properties
+	int vrayReflVisibility=true, vrayRefrVisibility=true;
+	node->GetUserPropBool(PROP_GI_VISIBLETOREFL, vrayReflVisibility);
+	node->GetUserPropBool(PROP_GI_VISIBLETOREFR, vrayRefrVisibility);
+
+	if (!vrayReflVisibility) _visibleInReflections=false;
+	if (!vrayRefrVisibility) _visibleInRefractions=false;
 
 	// output
 	const TCHAR *tempVrScene_wstr=pblock2->GetStr(pb_temp_vrscene_file_dir, t);
@@ -1185,6 +1131,15 @@ PluginManager* VRayGolaem::getPluginManager(void) {
 //------------------------------------------------------------
 bool VRayGolaem::readCrowdVRScene(const VR::CharString& file) 
 {	
+	// check if this object is not an instance (then it has no max node to query)
+	INode* node=getNode(this);
+	if (node == NULL)
+	{
+		CStr logMessage = CStr("VRayGolaem: This object is an 3ds Max instance and is not supported. Please create a copy.");
+		mprintf(logMessage.ToBSTR());
+		return false;
+	}
+	
 	// create a Vray context
 	PluginManager* tempPlugMan(golaemPlugman);
 	bool deletePlugMan(false);
@@ -1198,7 +1153,7 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 	VR::VRayScene* tmpVrayScene=new VR::VRayScene(tempPlugMan);
 	VR::ErrorCode errCode=tmpVrayScene->readFile(file.ptr());
 	if (!errCode.error())
-	{		
+	{				
 		// find the nodes
 		FindPluginOfTypeCallback pluginCallback(CROWDVRAYPLUGINID);
 		tempPlugMan->enumPlugins(&pluginCallback);
@@ -1210,6 +1165,21 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			VR::VRayPluginParameter* currentParam = NULL;
 			CStr crowdFields;
 			
+			// transform
+			currentParam = plugin->getParameter("glmTransform");
+			if (currentParam)
+			{
+				VR::Transform t = currentParam->getTransform();
+				Matrix3 transform(Point3(1, 0, 0), Point3(0, 1, 0), Point3(0, 0, 1), Point3(t.offs[0], t.offs[1], t.offs[2]));
+				transform = transform * golaemToMax();
+
+				// scale according to scene unit
+				double scaleRatio (1. / GetMasterScale (UNITS_CENTIMETERS));
+				transform.Scale(Point3(scaleRatio, scaleRatio, scaleRatio), true);
+
+				node->SetNodeTM(0, transform);
+			}
+
 			// cache attributes
 			currentParam = plugin->getParameter("glmCrowdField");
 			if (currentParam)
@@ -1234,20 +1204,40 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 				GET_WSTR(currentParam->getString(), currentParamMbcs)
 				pblock2->SetValue(pb_character_files, 0, currentParamMbcs, 0);
 			}
+			currentParam = plugin->getParameter("glmExcludedEntities");
+			if (currentParam)
+			{
+				GET_WSTR(currentParam->getString(), currentParamMbcs)
+				pblock2->SetValue(pb_excluded_entities, 0, currentParamMbcs, 0);
+			}
 
 			// motion blur
-			currentParam = plugin->getParameter("glmMBlurEnabled");
-			if (currentParam) pblock2->SetValue(pb_motion_blur_enable, 0, currentParam->getBool());
-			currentParam = plugin->getParameter("glmMBlurStart");
-			if (currentParam) pblock2->SetValue(pb_motion_blur_start, 0, (float)currentParam->getDouble());
 			currentParam = plugin->getParameter("glmMBlurWindowSize");
-			if (currentParam) pblock2->SetValue(pb_motion_blur_window_size, 0, (float)currentParam->getDouble());
+			if (currentParam) 
+			{
+				node->SetUserPropBool(PROP_MOBLUR_OVERRIDEDURATION, true);
+				node->SetUserPropFloat(PROP_MOBLUR_DURATION, currentParam->getFloat());
+			}
 			currentParam = plugin->getParameter("glmMBlurSamples");
-			if (currentParam) pblock2->SetValue(pb_motion_blur_samples, 0, currentParam->getInt());
-
+			if (currentParam) 
+			{
+				node->SetUserPropBool(PROP_MOBLUR_USEDEFAULTGEOMSAMPLES, false);
+				node->SetUserPropInt(PROP_MOBLUR_GEOMSAMPLES, currentParam->getInt());
+			}
+			// if motion blur is off, override geometry samples value with 1
+			currentParam = plugin->getParameter("glmMBlurEnabled");
+			if (currentParam)
+			{
+				if (currentParam->getInt() == 0)
+				{
+					node->SetUserPropBool(PROP_MOBLUR_USEDEFAULTGEOMSAMPLES, false);
+					node->SetUserPropInt(PROP_MOBLUR_GEOMSAMPLES, 1);
+				}
+			}
+		
 			// frustum culling
 			currentParam = plugin->getParameter("glmEnableFrustumCulling");
-			if (currentParam) pblock2->SetValue(pb_frustum_enable, 0, currentParam->getBool());
+			if (currentParam) pblock2->SetValue(pb_frustum_enable, 0, currentParam->getBool() == 1);
 			currentParam = plugin->getParameter("glmFrustumMargin");
 			if (currentParam) pblock2->SetValue(pb_frustum_margin, 0, (float)currentParam->getDouble());
 			currentParam = plugin->getParameter("glmCameraMargin");
@@ -1256,19 +1246,32 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			// vray
 			currentParam = plugin->getParameter("glmFrameOffset");
 			if (currentParam) pblock2->SetValue(pb_frame_offset, 0, currentParam->getInt());
-			currentParam = plugin->getParameter("glmTransform");
-			if (currentParam) pblock2->SetValue(pb_scale_transform, 0, (float)currentParam->getTransform().m[0].length());
+			
+			// properties (copy them in the max node as well if it exists)
+			int objectIDBase(0);
+			bool primaryVisibility(true), castShadows(true), inReflections(true), inRefractions(true);
 			currentParam = plugin->getParameter("glmObjectIDBase");
-			if (currentParam) pblock2->SetValue(pb_object_id_base, 0, currentParam->getInt());
+			if (currentParam) objectIDBase = currentParam->getInt(); 
+			currentParam = plugin->getParameter("glmObjectIDMode");
+			if (currentParam) pblock2->SetValue(pb_object_id_mode, 0, currentParam->getInt());
 			currentParam = plugin->getParameter("glmCameraVisibility");
-			if (currentParam) pblock2->SetValue(pb_primary_visibility, 0, currentParam->getBool());
+			if (currentParam) primaryVisibility = currentParam->getBool() == 1;
 			currentParam = plugin->getParameter("glmShadowsVisibility");
-			if (currentParam) pblock2->SetValue(pb_casts_shadows, 0, currentParam->getBool());
+			if (currentParam) castShadows = currentParam->getBool() == 1;
 			currentParam = plugin->getParameter("glmReflectionsVisibility");
-			if (currentParam) pblock2->SetValue(pb_visible_in_reflections, 0, currentParam->getBool());
+			if (currentParam) inReflections = currentParam->getBool() == 1;
 			currentParam = plugin->getParameter("glmRefractionsVisibility");
-			if (currentParam) pblock2->SetValue(pb_visible_in_refractions, 0, currentParam->getBool());
+			if (currentParam) inRefractions = currentParam->getBool() == 1;
 
+			node->SetGBufID(objectIDBase);
+			node->SetPrimaryVisibility(primaryVisibility);
+			node->SetCastShadows(castShadows);
+			node->SetSecondaryVisibility(inReflections && inRefractions);
+
+			int visibleInRefl((int) inReflections), visibleInRefr((int) inRefractions);
+			node->SetUserPropBool(PROP_GI_VISIBLETOREFL, visibleInRefl);
+			node->SetUserPropBool(PROP_GI_VISIBLETOREFR, visibleInRefr);
+			
 			// other crowdFields?
 			for (size_t iPlugin=1; iPlugin<pluginCallback._foundPlugins.length(); ++iPlugin)
 			{
@@ -1318,6 +1321,16 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 //------------------------------------------------------------
 bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file) 
 {
+	// check if this object is not an instance (then it has no max node to query)
+	INode* node=getNode(this);
+	if (node == NULL)
+	{
+		CStr logMessage = CStr("VRayGolaem: This object is an 3ds Max instance and is not supported. Please create a copy.");
+		mprintf(logMessage.ToBSTR());
+		return false;
+	}
+	Matrix3 transform = node->GetObjectTM(0) * maxToGolaem();
+	
 	// check file path
 	std::stringstream outputStr;
 	std::ofstream outputFileStream(file.ptr());
@@ -1352,33 +1365,33 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 		outputStr << "\t" << "transform=Transform(Matrix(Vector(1, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1)), Vector(0, 0, 0));" << std::endl;
 		outputStr << "\t" << "geometry=" << correctedCacheName << crowdFields[iCf] << "@mesh1;" << std::endl;
 		outputStr << "\t" << "material=" << correctedCacheName << crowdFields[iCf] << "Mtl@renderStats;" << std::endl;
-		int nSamples = 1;
-		if (_mBlurEnable) nSamples = _mBlurSamples;
-		outputStr << "\t" << "nsamples=" << nSamples << ";" << std::endl;
 		outputStr << "\t" << "visible=1;" << std::endl;
 		outputStr << "}" << std::endl;
 		outputStr << std::endl;
 
 		outputStr << "GolaemCrowd " << correctedCacheName << crowdFields[iCf] << "@mesh1" << std::endl;
 		outputStr << "{" << std::endl;
-		outputStr << "\t" << "glmTransform=Transform(Matrix(Vector("<< _scaleTransform <<", 0, 0), Vector(0, "<< _scaleTransform <<", 0), Vector(0, 0, "<< _scaleTransform <<")), Vector(0, 0, 0));" << std::endl;
+		outputStr << "\t" << "glmTransform=Transform(Matrix(Vector("<< transform.GetRow(0)[0] <<", "<< transform.GetRow(0)[1] <<", "<< transform.GetRow(0)[2] <<")," << 
+														   "Vector("<< transform.GetRow(1)[0] <<", "<< transform.GetRow(1)[1] <<", "<< transform.GetRow(1)[2] <<")," <<
+														   "Vector("<< transform.GetRow(2)[0] <<", "<< transform.GetRow(2)[1] <<", "<< transform.GetRow(2)[2] <<"))," << 
+														   "Vector("<< transform.GetRow(3)[0] <<", "<< transform.GetRow(3)[1] <<", "<< transform.GetRow(3)[2] <<"));" << std::endl;
 		outputStr << "\t" << "glmFrameOffset="<< _frameOffset <<";" << std::endl;
 		outputStr << "\t" << "glmCrowdField=\"" << crowdFields[iCf] << "\";" << std::endl;
 		outputStr << "\t" << "glmCacheName=\"" << _cacheName << "\";" << std::endl;
 		outputStr << "\t" << "glmCacheFileDir=\"" << _cacheDir << "\";" << std::endl;
 		outputStr << "\t" << "glmCharacterFiles=\"" << _characterFiles << "\";" << std::endl;
-		outputStr << "\t" << "glmExcludedEntities=\"\";" << std::endl;
+		outputStr << "\t" << "glmExcludedEntities=\"" << _excludedEntities << "\";" << std::endl;
 		// moblur
 		outputStr << "\t" << "glmMBlurEnabled=" << _mBlurEnable << ";" << std::endl;
-		outputStr << "\t" << "glmMBlurStart=" << _mBlurStart << ";" << std::endl;
-		outputStr << "\t" << "glmMBlurWindowSize=" << _mBlurWindowSize << ";" << std::endl;
-		outputStr << "\t" << "glmMBlurSamples=" << _mBlurSamples << ";" << std::endl;
+		if (_overMBlurWindowSize) outputStr << "\t" << "glmMBlurWindowSize=" << _mBlurWindowSize << ";" << std::endl;
+		if (_overMBlurSamples) outputStr << "\t" << "glmMBlurSamples=" << _mBlurSamples << ";" << std::endl;
 		// frustum culling
 		outputStr << "\t" << "glmEnableFrustumCulling=" << _frustumEnable << ";" << std::endl;
 		outputStr << "\t" << "glmFrustumMargin=" << _frustumMargin << ";" << std::endl;
 		outputStr << "\t" << "glmCameraMargin=" << _cameraMargin << ";" << std::endl;
 		// vray
 		outputStr << "\t" << "glmObjectIDBase=" << _objectIDBase << ";" << std::endl;
+		outputStr << "\t" << "glmObjectIDMode=" << _objectIDMode << ";" << std::endl;
 		outputStr << "\t" << "glmCameraVisibility=" << _primaryVisibility << ";" << std::endl;
 		outputStr << "\t" << "glmShadowsVisibility=" << _castsShadows << ";" << std::endl;
 		outputStr << "\t" << "glmReflectionsVisibility=" << _visibleInReflections << ";" << std::endl;
@@ -1567,6 +1580,17 @@ inline void drawText(GraphicsWindow *gw, const MCHAR* text, const Point3& pos)
 	gw->setColor(TEXT_COLOR, 1.0f, 1.0f, 1.0f);
 	gw->wText(&ipt, text);
 }
+
+inline Matrix3 golaemToMax()
+{
+	return RotateXMatrix(pi/2);
+}
+
+inline Matrix3 maxToGolaem()
+{
+	return RotateXMatrix(-pi/2);
+}
+
 
 
 

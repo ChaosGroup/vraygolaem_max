@@ -54,27 +54,28 @@ enum {
 	pb_cache_name,
 	pb_cache_dir,
 	pb_character_files,
-	// motion blur
-	pb_motion_blur_enable,
-	pb_motion_blur_start,
-	pb_motion_blur_window_size,
-	pb_motion_blur_samples,
+	// motion blur				
+	pb_motion_blur_enable,		// Not used anymore but kept for retrocomp
+	pb_motion_blur_start,		// Not used anymore but kept for retrocomp
+	pb_motion_blur_window_size,	// Not used anymore but kept for retrocomp
+	pb_motion_blur_samples,		// Not used anymore but kept for retrocomp
 	// culling
 	pb_frustum_enable,
 	pb_frustum_margin,
 	pb_camera_margin,
 	// vray 
 	pb_frame_offset,
-	pb_scale_transform,
-	pb_object_id_base,
-	pb_primary_visibility,
-	pb_casts_shadows,
-	pb_visible_in_reflections,
-	pb_visible_in_refractions,
+	pb_scale_transform,			// Not used anymore but kept for retrocomp
+	pb_object_id_base,			// Not used anymore but kept for retrocomp
+	pb_primary_visibility,		// Not used anymore but kept for retrocomp
+	pb_casts_shadows,			// Not used anymore but kept for retrocomp
+	pb_visible_in_reflections,	// Not used anymore but kept for retrocomp
+	pb_visible_in_refractions,	// Not used anymore but kept for retrocomp
 	// output
 	pb_temp_vrscene_file_dir,
-	// whether visibility and object IDs are taken from the node, or overridden locally
-	pb_override_node_properties,
+	pb_override_node_properties,// Not used anymore but kept for retrocomp
+	pb_excluded_entities,
+	pb_object_id_mode,
 };
 
 //************************************************************
@@ -130,11 +131,13 @@ class VRayGolaem: public GeomObject, public VR::VRenderObject, public VR::VRayPl
 	CStr _cacheName;
 	CStr _cacheDir;
 	CStr _characterFiles;
+	CStr _excludedEntities;
 
 	// MoBlur attributes
 	bool _mBlurEnable;
-	float _mBlurStart;
+	bool _overMBlurWindowSize;
 	float _mBlurWindowSize;
+	bool _overMBlurSamples;
 	int _mBlurSamples;
 
 	// Culling attributes
@@ -145,7 +148,7 @@ class VRayGolaem: public GeomObject, public VR::VRenderObject, public VR::VRayPl
 	// Vray attributes
 	int _frameOffset;
 	int _objectIDBase;
-	float _scaleTransform;
+	short _objectIDMode;
 	bool _primaryVisibility;
 	bool _castsShadows;
 	bool _visibleInReflections;
@@ -248,7 +251,7 @@ public:
 	//////////////////////////////////////////
 	void readGolaemCache(TimeValue t);
 	void draw(TimeValue t, INode *node, ViewExp *vpt);
-	void drawEntities(GraphicsWindow *gw, TimeValue t);
+	void drawEntities(GraphicsWindow *gw, const Matrix3& transform, TimeValue t);
 
 	//////////////////////////////////////////
 	// read/write vrscene
@@ -285,14 +288,6 @@ private:
 	void clearGeometry(VR::VRayCore *vray);
 	void updateVRayParams(TimeValue t);
 
-	// Set up some properties (primary and secondary visibility, object ID etc)
-	// from a given node. If node is NULL, the properties are filled with default
-	// values.
-	void getPropertiesFromNode(INode *node);
-
-	// Set up properties from the parameter block.
-	void getPropertiesFromPBlock(TimeValue t);
-
 	// Enable or disable some UI controls based on the settings.
 	void grayDlgControls(void);
 };
@@ -323,7 +318,10 @@ void splitStr(const CStr& input, char delim, MaxSDK::Array<CStr> & result);
 void drawLine(GraphicsWindow *gw, const Point3 &p0, const Point3 &p1);
 void drawBBox(GraphicsWindow *gw, const Box3 &b);
 void drawSphere(GraphicsWindow *gw, const Point3 &pos, float radius, int nsegs);
-void drawText(GraphicsWindow *gw, const MCHAR*  text, const Point3& pos); 
+void drawText(GraphicsWindow *gw, const MCHAR*  text, const Point3& pos);
+
+Matrix3 golaemToMax();
+Matrix3 maxToGolaem();
 
 INode* FindNodeRef(ReferenceTarget *rt );
 INode* GetNodeRef(ReferenceMaker *rm);
