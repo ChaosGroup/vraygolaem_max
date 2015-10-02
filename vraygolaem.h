@@ -332,12 +332,13 @@ private:
 	// Enable or disable some UI controls based on the settings.
 	void grayDlgControls(void);
 
-	// Create V-Ray plugins for the materials in the 3ds Max scene.
-	void createMaterials(void);
+	// Create V-Ray plugins for the materials attached to the node that
+	// references the VRayGolaem object.
+	void createMaterials(VR::VRayCore *vray);
 
-	// Enumerate the specified Max material library and create wrapper V-Ray plugins
-	// for it.
-	void enumMtlLib(MtlBaseLib *mtlLib);
+	// Enumerate the sub-materials for the given 3ds Max materials and create
+	// wrappers for it.
+	void enumMaterials(Mtl *mtl);
 
 	// Create a wrapper material in the plugin manager for this 3ds Max material.
 	// Only V-Ray compatible materials are supported.

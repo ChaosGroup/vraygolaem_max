@@ -924,22 +924,33 @@ void VRayGolaem::wrapMaterial(Mtl *mtl) {
 	wrapper->setMaxMtl(mtl, vrenderMtl, this);
 }
 
-void VRayGolaem::enumMtlLib(MtlBaseLib *mtlLib) {
-	if (!mtlLib)
+void VRayGolaem::enumMaterials(Mtl *mtl) {
+	if (!mtl || mtl->SuperClassID()!=MATERIAL_CLASS_ID)
 		return;
 
-	int numMtls=mtlLib->Count();
+	wrapMaterial(mtl);
+	int numMtls=mtl->NumSubMtls();
 	for (int i=0; i<numMtls; i++) {
-		MtlBase *mtl=(*mtlLib)[i];
-		if (mtl && mtl->SuperClassID()==MATERIAL_CLASS_ID) {
-			wrapMaterial(static_cast<Mtl*>(mtl));
+		Mtl *sub=mtl->GetSubMtl(i);
+		if (sub && sub->SuperClassID()==MATERIAL_CLASS_ID) {
+			wrapMaterial(sub);
 		}
 	}
 }
 
-void VRayGolaem::createMaterials(void) {
-	enumMtlLib(&GetCOREInterface()->GetMaterialLibrary());
-	enumMtlLib(GetCOREInterface()->GetSceneMtls());
+void VRayGolaem::createMaterials(VR::VRayCore *vray) {
+	INode* node=getNode(this);
+	if (NULL==node) {
+		const VR::VRaySequenceData &sdata=vray->getSequenceData();
+		if (sdata.progress) {
+			const TCHAR *name_wstr=GetObjectName();
+			GET_MBCS(name_wstr, name_mbcs);
+			sdata.progress->warning("No node found for Golaem object \"%s\"; can't create materials", name_mbcs? name_mbcs : "<unknown>");
+		}
+		return;
+	}
+
+	enumMaterials(node->GetMtl());
 }
 
 class BRDFMaterialDesc: public PluginDesc {
@@ -1054,7 +1065,7 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 	}
 
 	// Create wrapper plugins for all 3ds Max materials in the scene, so that the Golaem plugin can use them, if needed
-	createMaterials();
+	createMaterials(vray);
 
 	callRenderBegin(vray);
 }
