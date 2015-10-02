@@ -1468,6 +1468,7 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 		outputStr << "\t" << "glmFrustumMargin=" << _frustumMargin << ";" << std::endl;
 		outputStr << "\t" << "glmCameraMargin=" << _cameraMargin << ";" << std::endl;
 		// vray
+		outputStr << "\t" << "glmDefaultMaterial=\"crowdProxyDefaultShader\";" << std::endl;
 		outputStr << "\t" << "glmObjectIDBase=" << _objectIDBase << ";" << std::endl;
 		outputStr << "\t" << "glmObjectIDMode=" << _objectIDMode << ";" << std::endl;
 		outputStr << "\t" << "glmCameraVisibility=" << _primaryVisibility << ";" << std::endl;
