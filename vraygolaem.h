@@ -76,6 +76,7 @@ enum {
 	pb_override_node_properties,// Not used anymore but kept for retrocomp
 	pb_excluded_entities,
 	pb_object_id_mode,
+	pb_default_material,
 };
 
 //************************************************************
@@ -192,6 +193,7 @@ class VRayGolaem: public GeomObject, public VR::VRenderObject, public VR::VRayPl
 	bool _castsShadows;
 	bool _visibleInReflections;
 	bool _visibleInRefractions;
+	CStr _defaultMaterial;
 
 	// Output attributes
 	CStr _tempVRSceneFileDir;
