@@ -44,7 +44,7 @@
 enum {
 	pb_file,
 	pb_shaders_file,
-	pb_use_node_attributes,
+	pb_use_node_attributes,		// Not used anymore but kept for retrocomp
 	// display
 	pb_enable_display,
 	pb_display_percent,
@@ -164,7 +164,6 @@ class VRayGolaem: public GeomObject, public VR::VRenderObject, public VR::VRayPl
 	VR::VRayScene *_vrayScene;		//!< The loaded .vrscene file
 	VR::CharString _vrsceneFile;	//!< 
 	VR::CharString _shadersFile;	//!<
-	bool _useNodeAttributes;		// if true, uses the attributes below to generate the vrscene, else use the loaded vrscene
 
 	// Cache attributes
 	CStr _crowdFields;
