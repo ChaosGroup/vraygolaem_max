@@ -888,7 +888,7 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 	// vray
 	_frameOffset = pblock2->GetInt(pb_frame_offset, t);
 	const TCHAR *defaultMat_wstr=pblock2->GetStr(pb_default_material, t);
-	if (!defaultMat_wstr) _vrsceneFile="";
+	if (!defaultMat_wstr) _defaultMaterial="";
 	else {
 		GET_MBCS(defaultMat_wstr, defaultMat_mbcs);
 		_defaultMaterial=defaultMat_mbcs;
