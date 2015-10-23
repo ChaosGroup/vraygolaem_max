@@ -221,6 +221,9 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	p_vals, 0, 1, 2, 3,
 	p_default, 0,
 	PB_END,	
+	pb_default_material, _T("default_material"), TYPE_STRING, P_RESET_DEFAULT, 0,
+	p_ui, TYPE_EDITBOX, ED_DEFAULTMATERIAL,
+	PB_END,
 	pb_temp_vrscene_file_dir, _T("temp_vrscene_file_dir"), TYPE_STRING, P_RESET_DEFAULT, 0,
 	p_default, _T("TEMP"),
 	p_ui, TYPE_EDITBOX, ED_TEMPVRSCENEFILEDIR,
@@ -884,6 +887,12 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 
 	// vray
 	_frameOffset = pblock2->GetInt(pb_frame_offset, t);
+	const TCHAR *defaultMat_wstr=pblock2->GetStr(pb_default_material, t);
+	if (!defaultMat_wstr) _defaultMaterial="";
+	else {
+		GET_MBCS(defaultMat_wstr, defaultMat_mbcs);
+		_defaultMaterial=defaultMat_mbcs;
+	}
 	
 	// object properties
 	_objectIDBase=node->GetGBufID();
@@ -1330,6 +1339,12 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			// vray
 			currentParam = plugin->getParameter("glmFrameOffset");
 			if (currentParam) pblock2->SetValue(pb_frame_offset, 0, currentParam->getInt());
+			currentParam = plugin->getParameter("glmDefaultMaterial");
+			if (currentParam)
+			{
+				GET_WSTR(currentParam->getString(), currentParamMbcs)
+				pblock2->SetValue(pb_default_material, 0, currentParamMbcs, 0);
+			}
 			
 			// properties (copy them in the max node as well if it exists)
 			int objectIDBase(0);
@@ -1474,6 +1489,7 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 		outputStr << "\t" << "glmFrustumMargin=" << _frustumMargin << ";" << std::endl;
 		outputStr << "\t" << "glmCameraMargin=" << _cameraMargin << ";" << std::endl;
 		// vray
+		outputStr << "\t" << "glmDefaultMaterial=\""<< _defaultMaterial <<"\";" << std::endl;
 		outputStr << "\t" << "glmObjectIDBase=" << _objectIDBase << ";" << std::endl;
 		outputStr << "\t" << "glmObjectIDMode=" << _objectIDMode << ";" << std::endl;
 		outputStr << "\t" << "glmCameraVisibility=" << _primaryVisibility << ";" << std::endl;
