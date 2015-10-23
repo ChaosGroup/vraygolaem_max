@@ -935,7 +935,7 @@ void VRayGolaem::wrapMaterial(Mtl *mtl) {
 	if (!vrenderMtl)
 		return; // Material is not V-Ray compatible, can't do anything.
 
-	BRDFWrapper *wrapper=static_cast<BRDFWrapper*>(_vrayScene->newPlugin(MTL_WRAPPER_VRAY_ID, NULL));
+	BRDFWrapper *wrapper=static_cast<BRDFWrapper*>(_vrayScene->newPluginWithoutParams(MTL_WRAPPER_VRAY_ID, NULL));
 	if (!wrapper)
 		return;
 
