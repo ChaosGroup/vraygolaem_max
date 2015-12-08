@@ -30,6 +30,9 @@
 #define GLMC_NOT_INCLUDE_MINIZ
 #include "glm_crowd.h"	// golaem cache reader
 
+// V-Ray plugin ID for the 3ds Max material wrapper
+#define MTL_WRAPPER_VRAY_ID LARGE_CONST(0x2015011056)
+
 // no param block script access for VRay free
 #ifdef _FREE_
 #define _FT(X) _T("")
@@ -900,7 +903,7 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 	// vray
 	_frameOffset = pblock2->GetInt(pb_frame_offset, t);
 	const TCHAR *defaultMat_wstr=pblock2->GetStr(pb_default_material, t);
-	if (!defaultMat_wstr) _vrsceneFile="";
+	if (!defaultMat_wstr) _defaultMaterial="";
 	else {
 		GET_MBCS(defaultMat_wstr, defaultMat_mbcs);
 		_defaultMaterial=defaultMat_mbcs;
@@ -944,7 +947,7 @@ void VRayGolaem::wrapMaterial(Mtl *mtl) {
 	if (!vrenderMtl)
 		return; // Material is not V-Ray compatible, can't do anything.
 
-	BRDFWrapper *wrapper=static_cast<BRDFWrapper*>(golaemPlugman->newPlugin("MtlMaxWrapper", NULL));
+	BRDFWrapper *wrapper=static_cast<BRDFWrapper*>(_vrayScene->newPluginWithoutParams(MTL_WRAPPER_VRAY_ID, NULL));
 	if (!wrapper)
 		return;
 
@@ -983,7 +986,7 @@ void VRayGolaem::createMaterials(VR::VRayCore *vray) {
 class BRDFMaterialDesc: public PluginDesc {
 public:
 	PluginID getPluginID(void) VRAY_OVERRIDE {
-		return LARGE_CONST(0x2015011056);
+		return MTL_WRAPPER_VRAY_ID;
 	}
 
 	Plugin* newPlugin(PluginHost *host) VRAY_OVERRIDE {
