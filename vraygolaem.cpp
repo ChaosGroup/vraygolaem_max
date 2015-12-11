@@ -694,7 +694,7 @@ void VRayGolaem::drawEntities(GraphicsWindow *gw, const Matrix3& transform, Time
 		int maxDisplayedEntity = _simulationData[iData]->_entityCount * displayPercent / 100;
 		for (size_t iEntity=0, entityCount = maxDisplayedEntity; iEntity<entityCount; ++iEntity)
 		{
-			int entityId = _simulationData[iData]->_entityIds[iEntity];
+			int64_t entityId = _simulationData[iData]->_entityIds[iEntity];
 			if (entityId == -1) continue;
 
 			unsigned int entityType = _simulationData[iData]->_entityTypes[iEntity];
@@ -1650,7 +1650,7 @@ inline void drawSphere(GraphicsWindow *gw, const Point3 &pos, float radius, int 
 	gw->startSegments();
 	for (int i=0; i<nsegs; i++) 
 	{
-		float a=2.0f*pi*float(i+1)/float(nsegs);
+		float a=2.0f*(float)pi*float(i+1)/float(nsegs);
 		float u1=radius*cosf(a);
 		float v1=radius*sinf(a);
 
@@ -1696,12 +1696,12 @@ inline void drawText(GraphicsWindow *gw, const MCHAR* text, const Point3& pos)
 
 inline Matrix3 golaemToMax()
 {
-	return RotateXMatrix(pi/2);
+	return RotateXMatrix((float)pi/2);
 }
 
 inline Matrix3 maxToGolaem()
 {
-	return RotateXMatrix(-pi/2);
+	return RotateXMatrix(-(float)pi/2);
 }
 
 // V-Ray materials expect rc.rayresult.sd to derive from VR::ShadeData, but this is not true for
