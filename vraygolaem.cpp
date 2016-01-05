@@ -138,6 +138,15 @@ public:
 
 static VRayGolaemDlgProc vrayGolaemDlgProc;
 
+// Find the node that references this Golaem object. If the Golaem object is instanced,
+// it is not defined which node is returned.
+INode *getNode(VRayGolaem *golaem) {
+	ULONG handle=0;
+	golaem->NotifyDependents(FOREVER, (PartID)&handle, REFMSG_GET_NODE_HANDLE);
+	INode *node=GetCOREInterface()->GetINodeByHandle(handle);
+	return node;
+}
+
 //************************************************************
 // Parameter block
 //************************************************************
@@ -159,10 +168,6 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 #if GET_MAX_RELEASE(VERSION_3DSMAX) >= 11900
 		p_assetTypeID, MaxSDK::AssetManagement::AssetType::kExternalLink,
 #endif
-	PB_END,
-	pb_use_node_attributes, _T("use_node_attributes"), TYPE_BOOL, P_RESET_DEFAULT, 0,
-	p_default, TRUE,
-	p_ui, TYPE_SINGLECHEKBOX, ED_USERNODEATTRIBUTES,
 	PB_END,
 
 	// display attributes
@@ -233,6 +238,7 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	PB_END,
 
 	// not used anymore but kept for retrocomp
+	pb_use_node_attributes, _T(""), TYPE_BOOL, 0, 0, PB_END,
 	pb_motion_blur_enable, _T(""), TYPE_BOOL, 0, 0, PB_END,
 	pb_motion_blur_start, _T(""), TYPE_FLOAT, 0, 0, PB_END,
 	pb_motion_blur_window_size, _T(""), TYPE_FLOAT, 0, 0, PB_END,
@@ -499,6 +505,22 @@ INT_PTR VRayGolaemDlgProc::DlgProc(TimeValue t, IParamMap2 *map, HWND hWnd, UINT
 				if (ctrlID==BN_SHADERSBROWSE && vrayGolaem) {
 					chooseFileName(pblock, pb_shaders_file, _T("Choose shaders .vrscene file"));
 				}
+				if (ctrlID==BN_MATERIALSCREATE && vrayGolaem) {
+					// call post creation python script
+					INode* node=getNode(vrayGolaem);
+					if (node == NULL)
+					{
+						CStr logMessage = CStr("VRayGolaem: This object is an 3ds Max instance and is not supported. Please create a copy.");
+						mprintf(logMessage.ToBSTR());
+						return FALSE;
+					}
+
+					GET_MBCS(node->GetName(), nodeName);
+					CStr sourceCmd = CStr("python.ExecuteFile \"vraygolaem.py\"");
+					ExecuteMAXScriptScript(sourceCmd.ToBSTR());
+					CStr callbackCmd = CStr("python.Execute \"glmVRayGolaemPostCreationCallback('") + CStr(nodeName) + CStr("')\"");
+					ExecuteMAXScriptScript(callbackCmd.ToBSTR());
+				}
 			}
 			break;
 		}
@@ -672,7 +694,7 @@ void VRayGolaem::drawEntities(GraphicsWindow *gw, const Matrix3& transform, Time
 		int maxDisplayedEntity = _simulationData[iData]->_entityCount * displayPercent / 100;
 		for (size_t iEntity=0, entityCount = maxDisplayedEntity; iEntity<entityCount; ++iEntity)
 		{
-			int entityId = _simulationData[iData]->_entityIds[iEntity];
+			int64_t entityId = _simulationData[iData]->_entityIds[iEntity];
 			if (entityId == -1) continue;
 
 			unsigned int entityType = _simulationData[iData]->_entityTypes[iEntity];
@@ -798,15 +820,6 @@ const tchar* getVRayPluginPath()
 	return s;
 }
 
-// Find the node that references this Golaem object. If the Golaem object is instanced,
-// it is not defined which node is returned.
-INode *getNode(VRayGolaem *golaem) {
-	ULONG handle=0;
-	golaem->NotifyDependents(FOREVER, (PartID)&handle, REFMSG_GET_NODE_HANDLE);
-	INode *node=GetCOREInterface()->GetINodeByHandle(handle);
-	return node;
-}
-
 //------------------------------------------------------------
 // updateVRayParams
 //------------------------------------------------------------
@@ -835,8 +848,7 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 		GET_MBCS(shadersName_wstr, shadersName_mbcs);
 		_shadersFile=shadersName_mbcs;
 	}
-	_useNodeAttributes = pblock2->GetInt(pb_use_node_attributes, t) == 1;
-
+	
 	// cache attributes
 	const TCHAR *crowdFields_wstr=pblock2->GetStr(pb_crowd_fields, t);
 	if (!crowdFields_wstr) _crowdFields="";
@@ -1023,40 +1035,40 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 
 	// Creates the crowd .vrscene file on the fly if required
 	VR::CharString vrSceneFileToLoad(_vrsceneFile);
-	if (_useNodeAttributes)
+	CStr outputDir(getenv (_tempVRSceneFileDir));
+	if (outputDir!=NULL) 
 	{
-		CStr outputDir(getenv (_tempVRSceneFileDir));
-		if (outputDir!=NULL) 
+		MaxSDK::Array<CStr> crowdFields;
+		splitStr(_crowdFields, ';', crowdFields);
+		if (outputDir.Length() != 0 && _cacheName.Length() != 0 && crowdFields.length() != 0)
 		{
-			MaxSDK::Array<CStr> crowdFields;
-			splitStr(_crowdFields, ';', crowdFields);
-			if (outputDir.Length() != 0 && _cacheName.Length() != 0 && crowdFields.length() != 0)
+			CStr outputPathStr(outputDir + "/" + _cacheName + "." + crowdFields[0] + ".vrscene");
+			VR::CharString vrSceneExportPath(outputPathStr); // TODO
+			if (!writeCrowdVRScene(vrSceneExportPath)) 
 			{
-				CStr outputPathStr(outputDir + "/" + _cacheName + "." + crowdFields[0] + ".vrscene");
-				VR::CharString vrSceneExportPath(outputPathStr); // TODO
-				if (!writeCrowdVRScene(vrSceneExportPath)) 
-				{
-					sdata.progress->warning("VRayGolaem: Error writing .vrscene file \"%s\"", vrSceneExportPath.ptr());
-				}
-				else 
-				{
-					sdata.progress->info("VRayGolaem: Writing .vrscene file \"%s\"", vrSceneExportPath.ptr());
-					vrSceneFileToLoad = vrSceneExportPath;
-				}
+				sdata.progress->warning("VRayGolaem: Error writing .vrscene file \"%s\"", vrSceneExportPath.ptr());
 			}
-			else
+			else 
 			{
-				sdata.progress->warning("VRayGolaem: Node attributes invalid (CrowdFields, Cache Name or Cache Dir is empty)");
+				sdata.progress->info("VRayGolaem: Writing .vrscene file \"%s\"", vrSceneExportPath.ptr());
+				vrSceneFileToLoad = vrSceneExportPath;
 			}
 		}
 		else
 		{
-			sdata.progress->warning("VRayGolaem: Error finding environment variable for .vrscene output \"%s\"", _tempVRSceneFileDir);
+			sdata.progress->warning("VRayGolaem: Node attributes invalid (CrowdFields, Cache Name or Cache Dir is empty)");
 		}
+	}
+	else
+	{
+		sdata.progress->warning("VRayGolaem: Error finding environment variable for .vrscene output \"%s\"", _tempVRSceneFileDir);
 	}
 
 	// Load the .vrscene into the plugin manager
 	_vrayScene=new VR::VRayScene(golaemPlugman);
+
+	// Create wrapper plugins for all 3ds Max materials in the scene, so that the Golaem plugin can use them, if needed
+	createMaterials(vray);
 
 	if (vrSceneFileToLoad.empty()) {
 		sdata.progress->warning("VRayGolaem: No .vrscene file specified");
@@ -1081,9 +1093,6 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 			sdata.progress->info("VRayGolaem: Shaders file \"%s\" loaded successfully", _shadersFile.ptr());
 		}
 	}
-
-	// Create wrapper plugins for all 3ds Max materials in the scene, so that the Golaem plugin can use them, if needed
-	createMaterials(vray);
 
 	callRenderBegin(vray);
 }
@@ -1640,7 +1649,7 @@ inline void drawSphere(GraphicsWindow *gw, const Point3 &pos, float radius, int 
 	gw->startSegments();
 	for (int i=0; i<nsegs; i++) 
 	{
-		float a=2.0f*pi*float(i+1)/float(nsegs);
+		float a=2.0f*(float)pi*float(i+1)/float(nsegs);
 		float u1=radius*cosf(a);
 		float v1=radius*sinf(a);
 
@@ -1686,12 +1695,12 @@ inline void drawText(GraphicsWindow *gw, const MCHAR* text, const Point3& pos)
 
 inline Matrix3 golaemToMax()
 {
-	return RotateXMatrix(pi/2);
+	return RotateXMatrix((float)pi/2);
 }
 
 inline Matrix3 maxToGolaem()
 {
-	return RotateXMatrix(-pi/2);
+	return RotateXMatrix(-(float)pi/2);
 }
 
 // V-Ray materials expect rc.rayresult.sd to derive from VR::ShadeData, but this is not true for
