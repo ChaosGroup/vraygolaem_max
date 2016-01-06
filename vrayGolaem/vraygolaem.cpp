@@ -1064,12 +1064,11 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 		sdata.progress->warning("VRayGolaem: Error finding environment variable for .vrscene output \"%s\"", _tempVRSceneFileDir);
 	}
 
+	// Load the .vrscene into the plugin manager
+	_vrayScene=new VR::VRayScene(golaemPlugman);
 
 	// Create wrapper plugins for all 3ds Max materials in the scene, so that the Golaem plugin can use them, if needed
 	createMaterials(vray);
-
-	// Load the .vrscene into the plugin manager
-	_vrayScene=new VR::VRayScene(golaemPlugman);
 
 	if (vrSceneFileToLoad.empty()) {
 		sdata.progress->warning("VRayGolaem: No .vrscene file specified");

@@ -131,7 +131,7 @@ public:
 	// From MaterialInterface
 	void shade(VR::VRayContext &rc) VRAY_OVERRIDE;
 	int getMaterialRenderID(const VR::VRayContext &rc) VRAY_OVERRIDE;
-	int isOpaque(void) ;
+	int isOpaque(void) VRAY_OVERRIDE;
 
 	// From BSDFInterface
 	VR::BSDFSampler *newBSDF(const VR::VRayContext &rc, VR::BSDFFlags flags) VRAY_OVERRIDE;
