@@ -81,7 +81,7 @@ BSC32=bscmake.exe
 # ADD BSC32 /nologo
 LINK32=xilink6.exe
 # ADD BASE LINK32 vray60.lib bmm.lib gfx.lib mesh.lib maxutil.lib maxscrpt.lib paramblk2.lib core.lib geom.lib comctl32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /dll /machine:I386 /out:"..\..\plugins\vraygolaem60.dlo" /libpath:"\SDK\MaxSDK60\Lib" /libpath:"..\..\lib"
-# ADD LINK32 vrender60.lib vray60.lib bmm.lib gfx.lib mesh.lib maxutil.lib maxscrpt.lib paramblk2.lib core.lib geom.lib comctl32.lib uuid.lib odbc32.lib odbccp32.lib plugman_s.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib putils_s.lib vutils_s.lib /subsystem:windows /dll /pdb:"o:\vray\1.0\currentbuild\3dsmax\x86\adv\vraygolaem60.pdb" /debug /machine:I386 /def:".\plugin.def" /out:"o:\vray\1.0\currentbuild\3dsmax\x86\adv\vraygolaem60.dlo" /libpath:"k:\3dsmax\maxsdk60\Lib\x86" /libpath:"..\..\..\lib\x86" /libpath:"..\..\..\lib\x86\vc6"
+# ADD LINK32 vrender60.lib vray60.lib bmm.lib gfx.lib mesh.lib maxutil.lib maxscrpt.lib paramblk2.lib core.lib geom.lib comctl32.lib uuid.lib odbc32.lib odbccp32.lib plugman_s.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib putils_s.lib vutils_s.lib /subsystem:windows /dll /pdb:"o:\vray\1.0\currentbuild\3dsmax\x86\adv\vraygolaem60.pdb" /debug /machine:I386 /def:".\vrayGolaem.def" /out:"o:\vray\1.0\currentbuild\3dsmax\x86\adv\vraygolaem60.dlo" /libpath:"k:\3dsmax\maxsdk60\Lib\x86" /libpath:"..\..\..\lib\x86" /libpath:"..\..\..\lib\x86\vc6"
 # SUBTRACT LINK32 /nologo /pdb:none
 
 !ENDIF 
@@ -103,7 +103,7 @@ SOURCE=.\miniz.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\plugin.def
+SOURCE=.\vrayGolaem.def
 # End Source File
 # Begin Source File
 
