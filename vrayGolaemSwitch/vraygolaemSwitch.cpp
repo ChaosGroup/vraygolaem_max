@@ -26,9 +26,9 @@
 
 #include "resource.h"
 
-#include "vraydirt_impl.h"
+#include "vraygolaemSwitch_impl.h"
 //Class_ID and paramblock enum moved to that file ... 
-#include "vraydirt.h"
+#include "vraygolaemSwitch.h"
 
 
 #if MAX_RELEASE<13900
