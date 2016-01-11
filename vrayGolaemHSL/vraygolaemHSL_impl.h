@@ -4,7 +4,6 @@
 *                                                                          *
 ***************************************************************************/
 
-
 inline int intCompare(const void *a, const void *b) {
 	const int &ia=*(const int*) a;
 	const int &ib=*(const int*) b;
@@ -55,7 +54,7 @@ public:
 
 
 // The occlusion sampler.
-struct VrayGolaemSwitchSampler: VR::AdaptiveColorSampler 
+struct VRayGolaemHSLSampler: VR::AdaptiveColorSampler 
 {
 private:
 	float radius, distribution, falloff;
@@ -80,12 +79,12 @@ private:
 	stExcludeIDList &affectresultIDs;
 	int affectInclusive;
 public:
-	VrayGolaemSwitchSampler(stExcludeIDList &exclList, stExcludeIDList &affectList, int affectListInclusive = 0): 
+	VRayGolaemHSLSampler(stExcludeIDList &exclList, stExcludeIDList &affectList, int affectListInclusive = 0): 
 		renderIDs(exclList), affectresultIDs(affectList), affectInclusive(affectListInclusive) {
 		if (affectresultIDs.Empty())
 			affectInclusive = 0;
 	}
-	~VrayGolaemSwitchSampler(){}
+	~VRayGolaemHSLSampler(){}
 
 	void init(const VR::VRayContext &rc, VR::Vector &normal, float rad, float distr, int sameOnly, float fall, float csm, 
 		int workWithTransparency, const VR::Vector &p, const VR::Color &_occludedColor, const VR::Color &_unoccludedColor,

@@ -4,8 +4,8 @@
 *                                                                          *
 ***************************************************************************/
 
-#ifndef __VRAYGOLAEMSWITCH_H__
-#define __VRAYGOLAEMSWITCH_H__
+#ifndef __VRAYGOLAEMHSL_H__
+#define __VRAYGOLAEMHSL_H__
 
 #pragma warning( push )
 #pragma warning( disable : 4100 4251 4273 4275 4996 )
@@ -17,43 +17,26 @@
 // #defines
 //************************************************************
 
-namespace VRayGolaemSwitch 
+namespace VRayGolaemHSL
 {
-#define	VRAYGOLAEMSWITCH_CLASS_ID Class_ID(0x3ae8c64c, 0xe585959)
-#define STR_CLASSNAME _T("VRayGolaemSwitch")
-#define STR_LIBDESC _T("VRayGolaemSwitch plugin")
-#define STR_SELECTORNAME _T("Selector")
-#define STR_DEFAULTNAME _T("Default")
-#define STR_SHADER0NAME _T("Shader0")
-#define STR_SHADER1NAME _T("Shader1")
-#define STR_SHADER2NAME _T("Shader2")
-#define STR_SHADER3NAME _T("Shader3")
-#define STR_SHADER4NAME _T("Shader4")
-#define STR_SHADER5NAME _T("Shader5")
-#define STR_SHADER6NAME _T("Shader6")
-#define STR_SHADER7NAME _T("Shader7")
-#define STR_SHADER8NAME _T("Shader8")
-#define STR_SHADER9NAME _T("Shader9")
-#define STR_DLGTITLE _T("VRayGolaemSwitch Parameters")
+#define	VRAYGOLAEMHSL_CLASS_ID Class_ID(0x5ac3205c, 0x5f3c5801)
+#define STR_CLASSNAME _T("VRayGolaemHSL")
+#define STR_LIBDESC _T("VRayGolaemHSL plugin")
+#define STR_INPNAME _T("Input")
+#define STR_HUENAME _T("Hue")
+#define STR_SATNAME _T("Saturation")
+#define STR_LITNAME _T("Lightness")
+#define STR_DLGTITLE _T("VRayGolaemHSL Parameters")
 
 	// Paramblock2 name
 	enum { tex_params, }; 
 
 	// Paramblock2 parameter list
 	enum {
-		pb_map_selector,
-		pb_start_offset,	
-		pb_map_default,
-		pb_map_shader0,
-		pb_map_shader1,
-		pb_map_shader2,
-		pb_map_shader3,
-		pb_map_shader4,
-		pb_map_shader5,
-		pb_map_shader6,
-		pb_map_shader7,
-		pb_map_shader8,
-		pb_map_shader9
+		pb_map_input,
+		pb_map_h,	
+		pb_map_s,
+		pb_map_l
 	};
 }
 
@@ -73,19 +56,10 @@ public:
 	Interval _ivalid;
 
 	// Various variables
-	Texmap *_texmapSelector;
-	int _startOffset;
-	Texmap *_texmapDefault;
-	Texmap *_texmapShader0;
-	Texmap *_texmapShader1;
-	Texmap *_texmapShader2;
-	Texmap *_texmapShader3;
-	Texmap *_texmapShader4;
-	Texmap *_texmapShader5;
-	Texmap *_texmapShader6;
-	Texmap *_texmapShader7;
-	Texmap *_texmapShader8;
-	Texmap *_texmapShader9;
+	Texmap *_texmapInput;
+	Texmap *_texmapH;
+	Texmap *_texmapS;
+	Texmap *_texmapL;
 
 	int _cacheInit;
 	CRITICAL_SECTION _csect;
@@ -119,7 +93,7 @@ public:
 	void SetSubTexmap(int i, Texmap *m);
 	TSTR GetSubTexmapSlotName(int i);
 
-	Class_ID ClassID() { return VRAYGOLAEMSWITCH_CLASS_ID; }
+	Class_ID ClassID() { return VRAYGOLAEMHSL_CLASS_ID; }
 	SClass_ID SuperClassID() { return TEXMAP_CLASS_ID; }
 	void GetClassName(TSTR& s) { s=STR_CLASSNAME; }  
 	void DeleteThis() { delete this; }	
@@ -176,7 +150,7 @@ public:
 	
 	SkelTexParamDlg(SkeletonTexmap *m, HWND hWnd, IMtlParams *i);
 	
-	Class_ID ClassID(void) { return VRAYGOLAEMSWITCH_CLASS_ID; }
+	Class_ID ClassID(void) { return VRAYGOLAEMHSL_CLASS_ID; }
 	void SetThing(ReferenceTarget *m) { texmap=(SkeletonTexmap*) m; pmap->SetParamBlock(texmap->pblock); }
 	ReferenceTarget* GetThing(void) { return texmap; }
 	void SetTime(TimeValue t) {}

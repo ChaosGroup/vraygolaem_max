@@ -99,6 +99,7 @@ list(APPEND VRAYFOR3DSMAX_LIBS "${VRAYFOR3DSMAX_LIBDIR}/${VRAYFOR3DSMAX_LIBDIRVC
 
 add_subdirectory (vrayGolaem)
 add_subdirectory (vrayGolaemSwitch)
+add_subdirectory (vrayGolaemHSL)
 
 ############################################################
 # END Project

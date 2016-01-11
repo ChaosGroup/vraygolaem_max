@@ -26,9 +26,9 @@
 
 #include "resource.h"
 
-#include "vraygolaemSwitch_impl.h"
+#include "vraygolaemHSL_impl.h"
 //Class_ID and paramblock enum moved to that file ... 
-#include "vraygolaemSwitch.h"
+#include "vraygolaemHSL.h"
 
 
 #if MAX_RELEASE<13900
@@ -39,7 +39,7 @@
 #include "maxscript/kernel/value.h"
 #endif
 
-using namespace VRayGolaemSwitch;
+using namespace VRayGolaemHSL;
 
 // no param block script access for VRay free
 #ifdef _FREE_
@@ -71,7 +71,7 @@ public:
 	void* Create(BOOL loading) { return new SkeletonTexmap; }
 	const TCHAR* ClassName() { return STR_CLASSNAME; }
 	SClass_ID SuperClassID() { return TEXMAP_CLASS_ID; }
-	Class_ID ClassID() { return VRAYGOLAEMSWITCH_CLASS_ID; }
+	Class_ID ClassID() { return VRAYGOLAEMHSL_CLASS_ID; }
 	const TCHAR* Category() { return _T(""); }
 
 	// Hardwired name, used by MAX Script as unique identifier
@@ -196,56 +196,20 @@ static ParamBlockDesc2 stex_param_blk (
 	//rollout
 	0, 0, 0, 0, NULL,
 	// params
-	pb_map_selector, _FT("texmap_selector"), TYPE_TEXMAP, 0, 0,
+	pb_map_input, _FT("texmap_input"), TYPE_TEXMAP, 0, 0,
 	p_subtexno, 0,
 	p_ui, TYPE_TEXMAPBUTTON, ctrlID(),
 	PB_END,
-	pb_start_offset, _FT("startOffset"), TYPE_INT, P_ANIMATABLE, 0,
-	p_default, 0,
-	p_ui, TYPE_SPINNER, EDITTYPE_POS_INT, ctrlID(), ctrlID(), 1,
-	PB_END,
-	pb_map_default, _FT("texmap_default"), TYPE_TEXMAP, 0, 0,
+	pb_map_h, _FT("texmap_h"), TYPE_TEXMAP, 0, 0,
 	p_subtexno, 1,
 	p_ui, TYPE_TEXMAPBUTTON, ctrlID(),
 	PB_END,
-	pb_map_shader0, _FT("texmap_shader0"), TYPE_TEXMAP, 0, 0,
+	pb_map_s, _FT("texmap_s"), TYPE_TEXMAP, 0, 0,
 	p_subtexno, 2,
 	p_ui, TYPE_TEXMAPBUTTON, ctrlID(),
 	PB_END,
-	pb_map_shader1, _FT("texmap_shader1"), TYPE_TEXMAP, 0, 0,
+	pb_map_l, _FT("texmap_l"), TYPE_TEXMAP, 0, 0,
 	p_subtexno, 3,
-	p_ui, TYPE_TEXMAPBUTTON, ctrlID(),
-	PB_END,
-	pb_map_shader2, _FT("texmap_shader2"), TYPE_TEXMAP, 0, 0,
-	p_subtexno, 4,
-	p_ui, TYPE_TEXMAPBUTTON, ctrlID(),
-	PB_END,
-	pb_map_shader3, _FT("texmap_shader3"), TYPE_TEXMAP, 0, 0,
-	p_subtexno, 5,
-	p_ui, TYPE_TEXMAPBUTTON, ctrlID(),
-	PB_END,
-	pb_map_shader4, _FT("texmap_shader4"), TYPE_TEXMAP, 0, 0,
-	p_subtexno, 6,
-	p_ui, TYPE_TEXMAPBUTTON, ctrlID(),
-	PB_END,
-	pb_map_shader5, _FT("texmap_shader5"), TYPE_TEXMAP, 0, 0,
-	p_subtexno, 7,
-	p_ui, TYPE_TEXMAPBUTTON, ctrlID(),
-	PB_END,
-	pb_map_shader6, _FT("texmap_shader6"), TYPE_TEXMAP, 0, 0,
-	p_subtexno, 8,
-	p_ui, TYPE_TEXMAPBUTTON, ctrlID(),
-	PB_END,
-	pb_map_shader7, _FT("texmap_shader7"), TYPE_TEXMAP, 0, 0,
-	p_subtexno, 9,
-	p_ui, TYPE_TEXMAPBUTTON, ctrlID(),
-	PB_END,
-	pb_map_shader8, _FT("texmap_shader8"), TYPE_TEXMAP, 0, 0,
-	p_subtexno, 10,
-	p_ui, TYPE_TEXMAPBUTTON, ctrlID(),
-	PB_END,
-	pb_map_shader9, _FT("texmap_shader9"), TYPE_TEXMAP, 0, 0,
-	p_subtexno, 11,
 	p_ui, TYPE_TEXMAPBUTTON, ctrlID(),
 	PB_END,
 PB_END
@@ -356,33 +320,15 @@ void SkeletonTexmap::Update(TimeValue t, Interval& valid) {
 	if (!_ivalid.InInterval(t)) 
 	{
 		_ivalid.SetInfinite();
-		pblock->GetValue(pb_map_selector, t, _texmapSelector, _ivalid);
-		pblock->GetValue(pb_start_offset, t, _startOffset, _ivalid);
+		pblock->GetValue(pb_map_input, t, _texmapInput, _ivalid);
+		pblock->GetValue(pb_map_h, t, _texmapH, _ivalid);
+		pblock->GetValue(pb_map_s, t, _texmapS, _ivalid);
+		pblock->GetValue(pb_map_l, t, _texmapL, _ivalid);
 
-		pblock->GetValue(pb_map_default, t, _texmapDefault, _ivalid);
-		pblock->GetValue(pb_map_shader0, t, _texmapShader0, _ivalid);
-		pblock->GetValue(pb_map_shader1, t, _texmapShader1, _ivalid);
-		pblock->GetValue(pb_map_shader2, t, _texmapShader2, _ivalid);
-		pblock->GetValue(pb_map_shader3, t, _texmapShader3, _ivalid);
-		pblock->GetValue(pb_map_shader4, t, _texmapShader4, _ivalid);
-		pblock->GetValue(pb_map_shader5, t, _texmapShader5, _ivalid);
-		pblock->GetValue(pb_map_shader6, t, _texmapShader6, _ivalid);
-		pblock->GetValue(pb_map_shader7, t, _texmapShader7, _ivalid);
-		pblock->GetValue(pb_map_shader8, t, _texmapShader8, _ivalid);
-		pblock->GetValue(pb_map_shader9, t, _texmapShader9, _ivalid);
-
-		if (_texmapSelector) _texmapSelector->Update(t, _ivalid);
-		if (_texmapDefault) _texmapDefault->Update(t, _ivalid);
-		if (_texmapShader0) _texmapShader0->Update(t, _ivalid);
-		if (_texmapShader1) _texmapShader1->Update(t, _ivalid);
-		if (_texmapShader2) _texmapShader2->Update(t, _ivalid);
-		if (_texmapShader3) _texmapShader3->Update(t, _ivalid);
-		if (_texmapShader4) _texmapShader4->Update(t, _ivalid);
-		if (_texmapShader5) _texmapShader5->Update(t, _ivalid);
-		if (_texmapShader6) _texmapShader6->Update(t, _ivalid);
-		if (_texmapShader7) _texmapShader7->Update(t, _ivalid);
-		if (_texmapShader8) _texmapShader8->Update(t, _ivalid);
-		if (_texmapShader9) _texmapShader9->Update(t, _ivalid);
+		if (_texmapInput) _texmapInput->Update(t, _ivalid);
+		if (_texmapH) _texmapH->Update(t, _ivalid);
+		if (_texmapS) _texmapS->Update(t, _ivalid);
+		if (_texmapL) _texmapL->Update(t, _ivalid);
 	}
 	_shadeCache.renderEnd(NULL);
 	_cacheInit=false;
@@ -430,6 +376,115 @@ void SkelTexParamDlg::DeleteThis(void) {
 |	Actual shading takes place
 \*===========================================================================*/
 
+//************************************************************
+/*! @name Color Utilities
+*/ //*********************************************************
+//@{
+//------------------------------------------------------------
+//! Convert RGB to HSL
+/*	\param rgbValue RGB color in the set [0, 1]
+\note From http://mjijackson.com/2008/02/rgb-to-hsl-and-rgb-to-hsv-color-model-conversion-algorithms-in-javascript
+*/ //---------------------------------------------------------
+void rbgToHsl(const AColor& inColor, Point3& outHSL)
+{
+	float maxC(max(inColor.r, (max(inColor.g, inColor.b))));
+	float minC(min(inColor.r, (min(inColor.g, inColor.b))));
+
+	outHSL.x = outHSL.y =  outHSL.z = (maxC + minC) / 2.f;
+
+	if (maxC == minC)
+	{
+		outHSL.x = outHSL.y = 0.f; // achromatic
+	}
+	else
+	{
+		// saturation
+		float diff = maxC - minC;
+		outHSL.y = (outHSL.z > 0.5) ? (diff / (2.f - maxC - minC)) : (diff / (maxC + minC));
+
+		// hue
+		if (maxC == inColor.r)
+			outHSL.x = (inColor.g - inColor.b) / diff + (inColor.g < inColor.b ? 6.f : 0.f);
+		else if (maxC == inColor.g)
+			outHSL.x = (inColor.b - inColor.r) / diff + 2.f;
+		else if (maxC == inColor.b)
+			outHSL.x = (inColor.r - inColor.g) / diff + 4.f;
+
+		outHSL.x /= 6.f;
+	}
+}
+
+//------------------------------------------------------------
+//! Convert hue component to rgb (used by hslToRgb)
+/*	\return a scalar in the set [0, 1]
+\note From http://mjijackson.com/2008/02/rgb-to-hsl-and-rgb-to-hsv-color-model-conversion-algorithms-in-javascript
+*/ //---------------------------------------------------------
+float hueToRgb(float p, float q, float t)
+{
+	if (t < 0) t += 1.f;
+	if (t > 1) t -= 1.f;
+	if (t < (1.f / 6.f)) return (p + (q - p) * 6.f * t);
+	if (t < (1.f / 2.f)) return q;
+	if (t < (2.f / 3.f)) return (p + (q - p) * (2.f / 3.f - t) * 6.f);
+	return p;
+}
+
+//------------------------------------------------------------
+//! Convert HSL to RBG
+/*	\param hslValue Assumes h, s, and l are contained in the set [0, 1] and
+\return corresponding RGB color in the set [0, 1]
+\note From http://mjijackson.com/2008/02/rgb-to-hsl-and-rgb-to-hsv-color-model-conversion-algorithms-in-javascript
+*/ //---------------------------------------------------------
+void hslToRgb(const Point3& inHSL, AColor& outColor)
+{
+	if (inHSL.y == 0.)
+	{
+		outColor.r = outColor.g = outColor.b = inHSL.z; // achromatic
+	}
+	else
+	{
+		float q((inHSL.z < 0.5) ? (inHSL.z*(1 + inHSL.y)) : (inHSL.z + inHSL.y - inHSL.z*inHSL.y));
+		float p(2.f * inHSL.z - q);
+		outColor.r = hueToRgb(p, q, (inHSL.x + 1.f / 3.f));
+		outColor.g = hueToRgb(p, q, inHSL.x);
+		outColor.b = hueToRgb(p, q, (inHSL.x - 1.f / 3.f));
+	}
+}
+
+//------------------------------------------------------------
+//! Modify a color from some hsl parameters
+/*	\param inColor source color
+	\param h hue delta in the set [-1, 1]
+	\param s sat delta in the set [-1, 1]
+	\param l lit delta in the set [-1, 1]
+	\param outColor corresponding RGB color in the set [0, 1]
+*/ //---------------------------------------------------------
+void changeColorHSL(const AColor& inColor, float h, float s, float l, AColor& outColor)
+{
+	// go to hsl
+	Point3 inColorAsHsl;
+	rbgToHsl(inColor, inColorAsHsl);
+
+	// bound hsl values
+	h = clamp(h, -1.f, 1.f);
+	s = clamp(s, -1.f, 1.f);
+	l = clamp(l, -1.f, 1.f);
+
+	// circular hue
+	h /= 2;
+	inColorAsHsl[0] = fmod(inColorAsHsl[0] + h, 1.f);
+	if (inColorAsHsl[0] < 0) inColorAsHsl[0] = 1.f + inColorAsHsl[0];
+
+	// saturation
+	inColorAsHsl[1] = (s > 0) ? (inColorAsHsl[1] + (1 - inColorAsHsl[1]) * s) : (inColorAsHsl[1] + (inColorAsHsl[1]) * s);
+
+	// lightness
+	inColorAsHsl[2] = (l > 0) ? (inColorAsHsl[2] + (1 - inColorAsHsl[2]) * l) : (inColorAsHsl[2] + (inColorAsHsl[2]) * l);
+
+	// back to rgb
+	hslToRgb(inColorAsHsl, outColor);
+}
+
 static AColor white(1.0f,1.0f,1.0f,1.0f);
 
 void SkeletonTexmap::writeElements(VR::VRayContext &rc, const TexmapCache &res) 
@@ -466,21 +521,12 @@ AColor SkeletonTexmap::EvalColor(ShadeContext& sc)
 	if (_shadeCache.getCache(rc, res)) 
 		return res.color;
 
-	// invalid selector
-	//int newSelector(getSelectorValue(rc)-_startOffset);
-	int newSelector(-_startOffset);
-	if (_texmapSelector) newSelector+= (int)_texmapSelector->EvalMono(sc);
-	if ((newSelector < 0) || (newSelector >= 10))
-	{
-		Texmap* map (GetSubTexmap(0));
-		if (map) res.color = map->EvalColor(sc);
-	}
-	// valid
-	else
-	{
-		Texmap* map (GetSubTexmap(newSelector+2)); // +2 as the first subTexMaps are the selector & the defaultShader
-		if (map) res.color = map->EvalColor(sc);
-	}
+	float h(0.f), s(0.f), l(0.f);
+	if (_texmapInput) res.color = _texmapInput->EvalColor(sc);
+	if (_texmapH) h = _texmapH->EvalMono(sc);
+	if (_texmapS) s = _texmapS->EvalMono(sc);
+	if (_texmapL) l = _texmapL->EvalMono(sc);
+	changeColorHSL(res.color, h, s, l, res.color);
 
 	_shadeCache.putCache(rc, res);
 	return res.color;
@@ -502,49 +548,25 @@ int SkeletonTexmap::NumSubTexmaps() { return 12; }
 
 Texmap* SkeletonTexmap::GetSubTexmap(int i) 
 {
-	if (i==0) return pblock->GetTexmap(pb_map_selector);
-	else if (i==1) return pblock->GetTexmap(pb_map_default);
-	else if (i==2) return pblock->GetTexmap(pb_map_shader0);
-	else if (i==3) return pblock->GetTexmap(pb_map_shader1);
-	else if (i==4) return pblock->GetTexmap(pb_map_shader2);
-	else if (i==5) return pblock->GetTexmap(pb_map_shader3);
-	else if (i==6) return pblock->GetTexmap(pb_map_shader4);
-	else if (i==7) return pblock->GetTexmap(pb_map_shader5);
-	else if (i==8) return pblock->GetTexmap(pb_map_shader6);
-	else if (i==9) return pblock->GetTexmap(pb_map_shader7);
-	else if (i==10) return pblock->GetTexmap(pb_map_shader8);
-	else if (i==11) return pblock->GetTexmap(pb_map_shader9);
+	if (i==0) return pblock->GetTexmap(pb_map_input);
+	else if (i==1) return pblock->GetTexmap(pb_map_h);
+	else if (i==2) return pblock->GetTexmap(pb_map_s);
+	else if (i==3) return pblock->GetTexmap(pb_map_l);
 	return NULL;
 }
 void SkeletonTexmap::SetSubTexmap(int i, Texmap *m) 
 {
-	if (i==0) pblock->SetValue(pb_map_selector, 0, m);	
-	else if (i==1) pblock->SetValue(pb_map_default, 0, m);
-	else if (i==2) pblock->SetValue(pb_map_shader0, 0, m);
-	else if (i==3) pblock->SetValue(pb_map_shader1, 0, m);
-	else if (i==4) pblock->SetValue(pb_map_shader2, 0, m);
-	else if (i==5) pblock->SetValue(pb_map_shader3, 0, m);
-	else if (i==6) pblock->SetValue(pb_map_shader4, 0, m);
-	else if (i==7) pblock->SetValue(pb_map_shader5, 0, m);
-	else if (i==8) pblock->SetValue(pb_map_shader6, 0, m);
-	else if (i==9) pblock->SetValue(pb_map_shader7, 0, m);
-	else if (i==10) pblock->SetValue(pb_map_shader8, 0, m);
-	else if (i==11) pblock->SetValue(pb_map_shader9, 0, m);
+	if (i==0) pblock->SetValue(pb_map_input, 0, m);	
+	else if (i==1) pblock->SetValue(pb_map_h, 0, m);
+	else if (i==2) pblock->SetValue(pb_map_s, 0, m);
+	else if (i==3) pblock->SetValue(pb_map_l, 0, m);
 }
 TSTR SkeletonTexmap::GetSubTexmapSlotName(int i) 
 {
-	if (i==0) return TSTR(STR_SELECTORNAME);
-	if (i==1) return TSTR(STR_DEFAULTNAME);
-	if (i==2) return TSTR(STR_SHADER0NAME);
-	if (i==3) return TSTR(STR_SHADER1NAME);
-	if (i==4) return TSTR(STR_SHADER2NAME);
-	if (i==5) return TSTR(STR_SHADER3NAME);
-	if (i==6) return TSTR(STR_SHADER4NAME);
-	if (i==7) return TSTR(STR_SHADER5NAME);
-	if (i==8) return TSTR(STR_SHADER6NAME);
-	if (i==9) return TSTR(STR_SHADER7NAME);
-	if (i==10) return TSTR(STR_SHADER8NAME);
-	if (i==11) return TSTR(STR_SHADER9NAME);
+	if (i==0) return TSTR(STR_INPNAME);
+	if (i==1) return TSTR(STR_HUENAME);
+	if (i==2) return TSTR(STR_SATNAME);
+	if (i==3) return TSTR(STR_LITNAME);
 	return TSTR(_T(""));
 }
 

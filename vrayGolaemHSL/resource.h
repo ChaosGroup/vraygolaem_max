@@ -1,6 +1,6 @@
 //{{NO_DEPENDENCIES}}
 // Microsoft Visual C++ generated include file.
-// Used by vrayGolaemSwitch.rc
+// Used by vrayGolaemHSL.rc
 //
 #define ids_mode_ao                     101
 #define ids_mode_phong                  102
