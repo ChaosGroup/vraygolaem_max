@@ -151,7 +151,7 @@ INode *getNode(VRayGolaem *golaem) {
 //------------------------------------------------------------
 bool fileExists(const CStr& pathname)
 {
-	return ( _access( pathname.ToCStr(), 0 ) == 0 ) ;
+	return ( _waccess( pathname.ToWStr(), 0 ) == 0 ) ;
 }
 
 //************************************************************
