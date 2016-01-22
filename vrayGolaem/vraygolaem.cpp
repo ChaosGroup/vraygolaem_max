@@ -205,10 +205,6 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	pb_character_files, _T("character_files"), TYPE_STRING, P_RESET_DEFAULT, 0,
 	p_ui, TYPE_EDITBOX, ED_CHARACTERFILES,
 	PB_END,
-	pb_excluded_entities, _T("excluded_entities"), TYPE_STRING, P_RESET_DEFAULT, 0,
-	p_ui, TYPE_EDITBOX, ED_EXCLUDEDENTITIES,
-	PB_END,
-
 	// culling attributes
 	pb_frustum_enable, _T("frustum_enable"), TYPE_BOOL, P_RESET_DEFAULT, 0,
 	p_default, FALSE,
@@ -257,6 +253,7 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	pb_visible_in_reflections, _T(""), TYPE_BOOL, 0, 0, PB_END,
 	pb_visible_in_refractions, _T(""), TYPE_BOOL, 0, 0, PB_END,
 	pb_override_node_properties, _T(""), TYPE_BOOL, 0, 0, PB_END,
+	pb_excluded_entities, _T(""), TYPE_STRING, 0, 0, PB_END,
 
 PB_END
 );
@@ -649,30 +646,62 @@ void VRayGolaem::readGolaemCache(TimeValue t)
 			CStr currentFrameStr; currentFrameStr.printf("%i", currentFrame);
 			CStr gscsFileStr(_cacheDir + "/" + _cacheName + "." + crowdFields[iCf] + ".gscs");
 			CStr gscfFileStr(_cacheDir + "/" + _cacheName + "." + crowdFields[iCf] + "." + currentFrameStr + ".gscf");
+			CStr gsclFileStr(_cacheDir + "/" + _cacheName + "." + crowdFields[iCf] + ".gscl");
 
+			// load gscs
 			GlmSimulationCacheStatus status;
 			GlmSimulationData* simulationData(NULL);
 			GlmFrameData* frameData(NULL);
 			status = glmCreateAndReadSimulationData(&simulationData, gscsFileStr);
-			if (status == GSC_SUCCESS)
+			if (status != GSC_SUCCESS)
 			{
-				glmCreateFrameData(&frameData, simulationData);
-				status = glmReadFrameData(frameData, simulationData, gscfFileStr);
-				if (status == GSC_SUCCESS)
-				{
-					_simulationData.append(simulationData);
-					_frameData.append(frameData);
-				}
-				else
-				{
-					glmDestroySimulationData(&simulationData);
-					DebugPrint(_T("VRayGolaem: Error loading .gscf file \"%s\""), gscfFileStr);
-				}
-			}
-			else
-			{
+				glmDestroySimulationData(&simulationData);
 				DebugPrint(_T("VRayGolaem: Error loading .gscs file \"%s\""), gscsFileStr);
+				return;
 			}
+
+			// load gscf
+			glmCreateFrameData(&frameData, simulationData);
+			status = glmReadFrameData(frameData, simulationData, gscfFileStr);
+			if (status != GSC_SUCCESS)
+			{
+				glmDestroyFrameData(&frameData, simulationData);
+				DebugPrint(_T("VRayGolaem: Error loading .gscf file \"%s\""), gscfFileStr);
+				return;
+			}
+
+			// load gscl
+			GlmHistory* history = NULL;
+			GlmEntityTransform* entityTransforms = NULL;
+			int entityTransformCount(0);
+
+			GlmSimulationCacheStatus gsclStatus = glmCreateAndReadHistoryJSON(&history, gsclFileStr);
+			if (gsclStatus == GSC_SUCCESS)
+			{
+				//history->_terrainMesh = terrainMesh;
+				//glmRaycastClosest = RaycastClosest;
+
+				glmCreateEntityTransforms(simulationData, history, &entityTransforms, &entityTransformCount);
+
+				GlmSimulationData* simulationDataOut;
+				GlmFrameData* frameDataOut;
+				glmCreateModifiedSimulationData(simulationData, entityTransforms, entityTransformCount, &simulationDataOut);
+				glmCreateModifiedFrameData(simulationData, frameData, entityTransforms, entityTransformCount, history, simulationDataOut, &frameDataOut, currentFrame);
+
+				// replace previous simulation & frame data
+				glmDestroyFrameData(&frameData, simulationData);
+				glmDestroySimulationData(&simulationData);
+
+				frameData = frameDataOut;
+				simulationData = simulationDataOut;
+			}
+
+			if (history) glmDestroyHistory(&history);
+			if (entityTransforms) glmDestroyEntityTransforms(&entityTransforms, entityTransformCount);
+			
+			_simulationData.append(simulationData);
+			_frameData.append(frameData);
+			
 		}
 	}
 }
@@ -883,13 +912,6 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 	else {
 		GET_MBCS(characterFiles_wstr, characterFiles_mbcs);
 		_characterFiles=characterFiles_mbcs;
-	}
-
-	const TCHAR *excludedEntities_wstr=pblock2->GetStr(pb_excluded_entities, t);
-	if (!excludedEntities_wstr) _excludedEntities="";
-	else {
-		GET_MBCS(excludedEntities_wstr, excludedEntities_mbcs);
-		_excludedEntities=excludedEntities_mbcs;
 	}
 
 	// motion blur attributes
@@ -1563,7 +1585,6 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 		outputStr << "\t" << "glmCacheName=\"" << _cacheName << "\";" << std::endl;
 		outputStr << "\t" << "glmCacheFileDir=\"" << _cacheDir << "\";" << std::endl;
 		outputStr << "\t" << "glmCharacterFiles=\"" << _characterFiles << "\";" << std::endl;
-		outputStr << "\t" << "glmExcludedEntities=\"" << _excludedEntities << "\";" << std::endl;
 		// moblur
 		outputStr << "\t" << "glmMBlurEnabled=" << _mBlurEnable << ";" << std::endl;
 		if (_overMBlurWindowSize) outputStr << "\t" << "glmMBlurWindowSize=" << _mBlurWindowSize << ";" << std::endl;

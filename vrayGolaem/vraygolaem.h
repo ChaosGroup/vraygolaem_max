@@ -170,7 +170,6 @@ class VRayGolaem: public GeomObject, public VR::VRenderObject, public VR::VRayPl
 	CStr _cacheName;
 	CStr _cacheDir;
 	CStr _characterFiles;
-	CStr _excludedEntities;
 
 	// MoBlur attributes
 	bool _mBlurEnable;
