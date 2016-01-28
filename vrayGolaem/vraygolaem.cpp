@@ -17,6 +17,7 @@
 
 #include <fstream>	// std::ofstream
 #include <sstream>	// std::stringstream
+#include <io.h>		// _access
 
 #if GET_MAX_RELEASE(VERSION_3DSMAX) >= 9000
 #include "IPathConfigMgr.h"
@@ -145,6 +146,12 @@ INode *getNode(VRayGolaem *golaem) {
 	golaem->NotifyDependents(FOREVER, (PartID)&handle, REFMSG_GET_NODE_HANDLE);
 	INode *node=GetCOREInterface()->GetINodeByHandle(handle);
 	return node;
+}
+
+//------------------------------------------------------------
+bool fileExists(const CStr& pathname)
+{
+	return ( _waccess( pathname.ToWStr(), 0 ) == 0 ) ;
 }
 
 //************************************************************
@@ -1066,32 +1073,97 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 
 	// Load the .vrscene into the plugin manager
 	_vrayScene=new VR::VRayScene(golaemPlugman);
+	int prevNbPlugins(_vrayScene->getPluginManager()->enumPlugins(NULL));
+	int newNbPlugins(prevNbPlugins);
 
 	// Create wrapper plugins for all 3ds Max materials in the scene, so that the Golaem plugin can use them, if needed
+	sdata.progress->info("VRayGolaem: Create materials attached to the VRayGolaem node");
 	createMaterials(vray);
+	newNbPlugins=_vrayScene->getPluginManager()->enumPlugins(NULL);
+	sdata.progress->info("VRayGolaem: Materials created successfully, %i materials created", newNbPlugins-prevNbPlugins);
+	prevNbPlugins = newNbPlugins;
 
 	if (vrSceneFileToLoad.empty()) {
 		sdata.progress->warning("VRayGolaem: No .vrscene file specified");
 	} else {
 		VR::ErrorCode errCode=_vrayScene->readFile(vrSceneFileToLoad.ptr());
+		newNbPlugins=_vrayScene->getPluginManager()->enumPlugins(NULL);
 		if (errCode.error()) {
 			VR::CharString errMsg=errCode.getErrorString();
 			sdata.progress->warning("VRayGolaem: Error loading .vrscene file \"%s\": %s", vrSceneFileToLoad.ptr(), errMsg.ptr());
 		} else {
-			sdata.progress->info("VRayGolaem: Scene file \"%s\" loaded successfully", vrSceneFileToLoad.ptr());
+			sdata.progress->info("VRayGolaem: Scene file \"%s\" loaded successfully, %i nodes loaded", vrSceneFileToLoad.ptr(), newNbPlugins-prevNbPlugins);
 		}
+		prevNbPlugins = newNbPlugins;
 	}
 
 	if (_shadersFile.empty()) {
 		sdata.progress->warning("VRayGolaem: No shaders .vrscene file specified");
 	} else {
 		VR::ErrorCode errCode=_vrayScene->readFile(_shadersFile.ptr());
+		newNbPlugins=_vrayScene->getPluginManager()->enumPlugins(NULL);
 		if (errCode.error()) {
 			VR::CharString errMsg=errCode.getErrorString();
 			sdata.progress->warning("VRayGolaem: Error loading shaders .vrscene file \"%s\": %s", _shadersFile.ptr(), errMsg.ptr());
 		} else {
-			sdata.progress->info("VRayGolaem: Shaders file \"%s\" loaded successfully", _shadersFile.ptr());
+			sdata.progress->info("VRayGolaem: Shaders file \"%s\" loaded successfully, %i materials loaded", _shadersFile.ptr(), newNbPlugins-prevNbPlugins);
 		}
+		prevNbPlugins = newNbPlugins;
+	}
+
+	// check dependency files
+	FindPluginOfTypeCallback pluginCallback(CROWDVRAYPLUGINID);
+	_vrayScene->enumPlugins(&pluginCallback);
+	if (pluginCallback._foundPlugins.length())
+	{
+		int frameOffset(0); // Todo
+		
+		// per crowdField
+		VR::VRayPluginParameter* currentParam = NULL;
+		CStr crowdField, cacheName, cacheDir, characterFiles;
+		for (size_t iPlugin=0; iPlugin<pluginCallback._foundPlugins.length(); ++iPlugin)
+		{
+			VR::VRayPlugin* plugin (pluginCallback._foundPlugins[iPlugin]);
+			currentParam = plugin->getParameter("glmCrowdField");
+			if (currentParam) crowdField = currentParam->getString();
+			currentParam = plugin->getParameter("glmCacheName");
+			if (currentParam) cacheName = currentParam->getString();
+			currentParam = plugin->getParameter("glmCacheFileDir");
+			if (currentParam) cacheDir = currentParam->getString();
+			currentParam = pluginCallback._foundPlugins[0]->getParameter("glmCharacterFiles");
+			if (currentParam) characterFiles = currentParam->getString();
+
+			int currentFrame = (int)((float)t / (float)TIME_TICKSPERSEC * (float)GetFrameRate()) + frameOffset; 
+			CStr currentFrameStr; currentFrameStr.printf("%i", currentFrame);
+			
+			// caa
+			CStr caaName (cacheDir + "/" + cacheName + "." + crowdField + ".caa");
+			if (!fileExists(caaName)) sdata.progress->warning("VRayGolaem: Error loading Crowd Assets Association file \"%s\"", caaName);
+			else sdata.progress->info("VRayGolaem: Crowd Assets Association file \"%s\" loaded successfully.", caaName);
+
+			// gscs
+			CStr gscsName (cacheDir + "/" + cacheName + "." + crowdField + ".gscs");
+			if (!fileExists(gscsName)) sdata.progress->warning("VRayGolaem: Error loading Simulation Cache file \"%s\"", gscsName);
+			else sdata.progress->info("VRayGolaem: Simulation Cache file \"%s\" loaded successfully.", gscsName);
+
+			// gscf
+			CStr gscfName (cacheDir + "/" + cacheName + "." + crowdField + "." + currentFrameStr +".gscf");
+			if (!fileExists(gscfName)) sdata.progress->warning("VRayGolaem: Error loading Simulation Cache file \"%s\"", gscfName);
+			else sdata.progress->info("VRayGolaem: Simulation Cache file \"%s\" loaded successfully.", gscfName);
+
+			// character files
+			MaxSDK::Array<CStr> characters;
+			splitStr(characterFiles, ';', characters);
+			for (size_t iCh = 0, nbCh = characters.length(); iCh<nbCh; ++iCh)
+			{
+				if (!fileExists(characters[iCh])) sdata.progress->warning("VRayGolaem: Error loading Character file \"%s\"", characters[iCh]);
+				else sdata.progress->info("VRayGolaem: Character file file \"%s\" loaded successfully.", characters[iCh]);
+			}
+		}
+	}
+	else
+	{
+		sdata.progress->warning("VRayGolaem: No GolaemCrowd node found in the current scene");
 	}
 
 	callRenderBegin(vray);

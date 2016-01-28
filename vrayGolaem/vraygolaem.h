@@ -8,7 +8,7 @@
 #define __VRAYGOLAEM_H__
 
 #pragma warning( push )
-#pragma warning( disable : 4100 4251 4275 )
+#pragma warning( disable : 4100 4251 4275 4996 )
 
 #include "max.h"
 #include <bmmlib.h>

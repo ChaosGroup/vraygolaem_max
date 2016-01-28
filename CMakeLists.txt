@@ -97,26 +97,9 @@ list(APPEND VRAYFOR3DSMAX_LIBS "${VRAYFOR3DSMAX_LIBDIR}/${VRAYFOR3DSMAX_LIBDIRVC
 
 #MESSAGE(${3DSMAXSDK_INCDIR})
 
-# List Files 
-list_files( "." "h;cpp;c;def;rc" )
-
-# Create a library
-set( VRAYGOLAEMLIB "vraygolaem${3DSMAXSDK_VERSION}" )
-add_library( ${VRAYGOLAEMLIB} SHARED ${LIST_FILES} )
-
-# Include
-include_directories( ${3DSMAXSDK_INCDIR} )
-include_directories( ${VRAYFOR3DSMAX_INCDIR} )
-
-# Link
-target_link_libraries( ${VRAYGOLAEMLIB} "comctl32.lib")
-target_link_libraries( ${VRAYGOLAEMLIB} "${3DSMAXSDK_LIBS}" )
-target_link_libraries( ${VRAYGOLAEMLIB} "${VRAYFOR3DSMAX_LIBS}" )
-
-# todo extension dlo
-
-# Flags
-add_definitions(-DUNICODE -D_UNICODE)
+add_subdirectory (vrayGolaem)
+add_subdirectory (vrayGolaemSwitch)
+add_subdirectory (vrayGolaemHSL)
 
 ############################################################
 # END Project
