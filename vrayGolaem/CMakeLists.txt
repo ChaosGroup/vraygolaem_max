@@ -2,7 +2,7 @@
 # BEGIN Project
 ############################################################
 
-# List Files 
+# List Files
 list_files( "." "h;cpp;c;def;rc" )
 
 # Create a library
@@ -23,6 +23,10 @@ set_target_properties(${VRAYGOLAEMLIB} PROPERTIES SUFFIX ".dlo")
 
 # Flags
 add_definitions(-DUNICODE -D_UNICODE)
+
+# Install
+install (TARGETS ${VRAYGOLAEMLIB} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}/vrayplugins/")
+install (FILES "vraygolaem.py" DESTINATION "${CMAKE_INSTALL_PREFIX}/scripts/")
 
 ############################################################
 # END Project
