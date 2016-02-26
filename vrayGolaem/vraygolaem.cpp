@@ -1067,11 +1067,10 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 	CStr outputDir(getenv (_tempVRSceneFileDir));
 	if (outputDir!=NULL) 
 	{
-		MaxSDK::Array<CStr> crowdFields;
-		splitStr(_crowdFields, ';', crowdFields);
-		if (outputDir.Length() != 0 && _cacheName.Length() != 0 && crowdFields.length() != 0)
+		if (outputDir.Length() != 0 && _cacheName.Length() != 0 && _crowdFields.length() != 0)
 		{
-			CStr outputPathStr(outputDir + "/" + _cacheName + "." + crowdFields[0] + ".vrscene");
+			GET_MBCS(node->GetName(), nodeName);
+			CStr outputPathStr(outputDir + "/" + _cacheName + "." + nodeName + ".vrscene");
 			VR::CharString vrSceneExportPath(outputPathStr); // TODO
 			if (!writeCrowdVRScene(vrSceneExportPath)) 
 			{
@@ -1158,20 +1157,25 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 			int currentFrame = (int)((float)t / (float)TIME_TICKSPERSEC * (float)GetFrameRate()) + frameOffset; 
 			CStr currentFrameStr; currentFrameStr.printf("%i", currentFrame);
 			
+			MaxSDK::Array<CStr> crowdFields;
+			splitStr(crowdField, ';', crowdFields);
+			for (size_t iCf=0, nbCf=crowdFields.length(); iCf<nbCf; ++iCf)
+			{
 			// caa
-			CStr caaName (cacheDir + "/" + cacheName + "." + crowdField + ".caa");
+				CStr caaName (cacheDir + "/" + cacheName + "." + crowdFields[iCf] + ".caa");
 			if (!fileExists(caaName)) sdata.progress->warning("VRayGolaem: Error loading Crowd Assets Association file \"%s\"", caaName);
 			else sdata.progress->info("VRayGolaem: Crowd Assets Association file \"%s\" loaded successfully.", caaName);
 
 			// gscs
-			CStr gscsName (cacheDir + "/" + cacheName + "." + crowdField + ".gscs");
+				CStr gscsName (cacheDir + "/" + cacheName + "." + crowdFields[iCf] + ".gscs");
 			if (!fileExists(gscsName)) sdata.progress->warning("VRayGolaem: Error loading Simulation Cache file \"%s\"", gscsName);
 			else sdata.progress->info("VRayGolaem: Simulation Cache file \"%s\" loaded successfully.", gscsName);
 
 			// gscf
-			CStr gscfName (cacheDir + "/" + cacheName + "." + crowdField + "." + currentFrameStr +".gscf");
+				CStr gscfName (cacheDir + "/" + cacheName + "." + crowdFields[iCf] + "." + currentFrameStr +".gscf");
 			if (!fileExists(gscfName)) sdata.progress->warning("VRayGolaem: Error loading Simulation Cache file \"%s\"", gscfName);
 			else sdata.progress->info("VRayGolaem: Simulation Cache file \"%s\" loaded successfully.", gscfName);
+			}
 
 			// character files
 			MaxSDK::Array<CStr> characters;
@@ -1534,6 +1538,7 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 		mprintf(logMessage.ToBSTR());
 		return false;
 	}
+	GET_MBCS(node->GetName(), nodeName);
 	Matrix3 transform = node->GetObjectTM(0) * maxToGolaem();
 	
 	// check file path
@@ -1546,42 +1551,23 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 	CStr correctedCacheName(_cacheName);
 	convertToValidVrsceneName(_cacheName, correctedCacheName);
 
-	MaxSDK::Array<CStr> crowdFields;
-	splitStr(_crowdFields, ';', crowdFields);
-
-	for (size_t iCf = 0, nbCf = crowdFields.length(); iCf<nbCf; ++iCf)
-	{
-		// crowd material
-		outputStr << "CrowdCharacterShader " << correctedCacheName << crowdFields[iCf] << "Mtl@material" << std::endl;
-		outputStr << "{" << std::endl;
-		outputStr << "}" << std::endl;
-		outputStr << std::endl;
-
-		// render stats
-		outputStr << "MtlRenderStats " << correctedCacheName << crowdFields[iCf] << "Mtl@renderStats" << std::endl;
-		outputStr << "{" << std::endl;
-		outputStr << "\t" << "base_mtl=" << correctedCacheName << crowdFields[iCf] << "Mtl@material;" << std::endl;
-		outputStr << "}" << std::endl;
-		outputStr << std::endl;
-
 		// node
-		outputStr << "Node " << correctedCacheName << crowdFields[iCf] << "@node" << std::endl;
+	outputStr << "Node " << correctedCacheName << nodeName << "@node" << std::endl;
 		outputStr << "{" << std::endl;
 		outputStr << "\t" << "transform=Transform(Matrix(Vector(1, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1)), Vector(0, 0, 0));" << std::endl;
-		outputStr << "\t" << "geometry=" << correctedCacheName << crowdFields[iCf] << "@mesh1;" << std::endl;
-		outputStr << "\t" << "material=" << correctedCacheName << crowdFields[iCf] << "Mtl@renderStats;" << std::endl;
+	outputStr << "\t" << "geometry=" << correctedCacheName << nodeName << "@mesh1;" << std::endl;
 		outputStr << "\t" << "visible=1;" << std::endl;
 		outputStr << "}" << std::endl;
 		outputStr << std::endl;
 
-		outputStr << "GolaemCrowd " << correctedCacheName << crowdFields[iCf] << "@mesh1" << std::endl;
+	outputStr << "GolaemCrowd " << correctedCacheName << nodeName << "@mesh1" << std::endl;
 		outputStr << "{" << std::endl;
 		outputStr << "\t" << "glmTransform=Transform(Matrix(Vector("<< transform.GetRow(0)[0] <<", "<< transform.GetRow(0)[1] <<", "<< transform.GetRow(0)[2] <<")," << 
 														   "Vector("<< transform.GetRow(1)[0] <<", "<< transform.GetRow(1)[1] <<", "<< transform.GetRow(1)[2] <<")," <<
 														   "Vector("<< transform.GetRow(2)[0] <<", "<< transform.GetRow(2)[1] <<", "<< transform.GetRow(2)[2] <<"))," << 
 														   "Vector("<< transform.GetRow(3)[0] <<", "<< transform.GetRow(3)[1] <<", "<< transform.GetRow(3)[2] <<"));" << std::endl;
 		outputStr << "\t" << "glmFrameOffset="<< _frameOffset <<";" << std::endl;
-		outputStr << "\t" << "glmCrowdField=\"" << crowdFields[iCf] << "\";" << std::endl;
+	outputStr << "\t" << "glmCrowdField=\"" << _crowdFields << "\";" << std::endl;
 		outputStr << "\t" << "glmCacheName=\"" << _cacheName << "\";" << std::endl;
 		outputStr << "\t" << "glmCacheFileDir=\"" << _cacheDir << "\";" << std::endl;
 		outputStr << "\t" << "glmCharacterFiles=\"" << _characterFiles << "\";" << std::endl;
@@ -1606,7 +1592,6 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 
 		outputStr << "}" << std::endl;
 		outputStr << std::endl;
-	}
 
 	// write in file
 	outputFileStream << outputStr.str();

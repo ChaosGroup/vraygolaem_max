@@ -2,7 +2,7 @@
 # BEGIN Project
 ############################################################
 
-# List Files 
+# List Files
 list_files( "." "h;cpp;c;def;rc" )
 
 # Create a library
@@ -23,6 +23,9 @@ set_target_properties(${VRAYGOLAEMHSLLIB} PROPERTIES SUFFIX ".dlt")
 
 # Flags
 add_definitions(-DUNICODE -D_UNICODE)
+
+#Install
+install (TARGETS ${VRAYGOLAEMHSLLIB} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}/vrayplugins/")
 
 ############################################################
 # END Project

@@ -225,29 +225,43 @@ protected:
 struct TimeConversionRAII {
 	TimeConversionRAII(VR::VRayCore *vrayCore):vray(vrayCore) {
 		const VR::VRayFrameData &fdata=vray->getFrameData();
+		const VR::VRaySequenceData &sdata=vray->getSequenceData();
+
 		VR::VRayFrameData &cfdata=const_cast<VR::VRayFrameData&>(fdata);
+		VR::VRaySequenceData &csdata=const_cast<VR::VRaySequenceData&>(sdata);
 
 		maxTime=cfdata.t;
 		maxFrameStart=cfdata.frameStart;
 		maxFrameEnd=cfdata.frameEnd;
+		maxDuration=csdata.params.moblur.duration;
+		maxCenter=csdata.params.moblur.intervalCenter;
 
 		double ticksPerFrame=(double) GetTicksPerFrame();
 
 		cfdata.t=maxTime/ticksPerFrame;
 		cfdata.frameStart=maxFrameStart/ticksPerFrame;
 		cfdata.frameEnd=maxFrameEnd/ticksPerFrame;
+
+		csdata.params.moblur.duration=cfdata.frameEnd-cfdata.frameStart;
+		csdata.params.moblur.intervalCenter=(cfdata.frameStart+cfdata.frameEnd)*0.5f-cfdata.t;
 	}
 
 	~TimeConversionRAII(void) {
 		const VR::VRayFrameData &fdata=vray->getFrameData();
+		const VR::VRaySequenceData &sdata=vray->getSequenceData();
+
 		VR::VRayFrameData &cfdata=const_cast<VR::VRayFrameData&>(fdata);
+		VR::VRaySequenceData &csdata=const_cast<VR::VRaySequenceData&>(sdata);
 
 		cfdata.t=maxTime;
 		cfdata.frameStart=maxFrameStart;
 		cfdata.frameEnd=maxFrameEnd;
+
+		csdata.params.moblur.duration=maxDuration;
+		csdata.params.moblur.intervalCenter=maxCenter;
 	}
 protected:
-	double maxTime, maxFrameStart, maxFrameEnd;
+	double maxTime, maxFrameStart, maxFrameEnd, maxDuration, maxCenter;
 	VR::VRayCore *vray;
 };
 
