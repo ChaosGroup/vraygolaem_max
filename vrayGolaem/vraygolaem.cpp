@@ -1045,11 +1045,10 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 	CStr outputDir(getenv (_tempVRSceneFileDir));
 	if (outputDir!=NULL) 
 	{
-		MaxSDK::Array<CStr> crowdFields;
-		splitStr(_crowdFields, ';', crowdFields);
-		if (outputDir.Length() != 0 && _cacheName.Length() != 0 && crowdFields.length() != 0)
+		if (outputDir.Length() != 0 && _cacheName.Length() != 0 && _crowdFields.length() != 0)
 		{
-			CStr outputPathStr(outputDir + "/" + _cacheName + "." + crowdFields[0] + ".vrscene");
+			GET_MBCS(node->GetName(), nodeName);
+			CStr outputPathStr(outputDir + "/" + _cacheName + "." + nodeName + ".vrscene");
 			VR::CharString vrSceneExportPath(outputPathStr); // TODO
 			if (!writeCrowdVRScene(vrSceneExportPath)) 
 			{
@@ -1517,6 +1516,7 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 		mprintf(logMessage.ToBSTR());
 		return false;
 	}
+	GET_MBCS(node->GetName(), nodeName);
 	Matrix3 transform = node->GetObjectTM(0) * maxToGolaem();
 	
 	// check file path
@@ -1529,19 +1529,16 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 	CStr correctedCacheName(_cacheName);
 	convertToValidVrsceneName(_cacheName, correctedCacheName);
 
-	MaxSDK::Array<CStr> crowdFields;
-	splitStr(_crowdFields, ';', crowdFields);
-
 	// node
-	outputStr << "Node " << correctedCacheName << crowdFields[0] << "@node" << std::endl;
+	outputStr << "Node " << correctedCacheName << nodeName << "@node" << std::endl;
 	outputStr << "{" << std::endl;
 	outputStr << "\t" << "transform=Transform(Matrix(Vector(1, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1)), Vector(0, 0, 0));" << std::endl;
-	outputStr << "\t" << "geometry=" << correctedCacheName << crowdFields[0] << "@mesh1;" << std::endl;
+	outputStr << "\t" << "geometry=" << correctedCacheName << nodeName << "@mesh1;" << std::endl;
 	outputStr << "\t" << "visible=1;" << std::endl;
 	outputStr << "}" << std::endl;
 	outputStr << std::endl;
 
-	outputStr << "GolaemCrowd " << correctedCacheName << crowdFields[0] << "@mesh1" << std::endl;
+	outputStr << "GolaemCrowd " << correctedCacheName << nodeName << "@mesh1" << std::endl;
 	outputStr << "{" << std::endl;
 	outputStr << "\t" << "glmTransform=Transform(Matrix(Vector("<< transform.GetRow(0)[0] <<", "<< transform.GetRow(0)[1] <<", "<< transform.GetRow(0)[2] <<")," << 
 		"Vector("<< transform.GetRow(1)[0] <<", "<< transform.GetRow(1)[1] <<", "<< transform.GetRow(1)[2] <<")," <<
