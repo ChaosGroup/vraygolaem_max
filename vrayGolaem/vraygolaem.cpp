@@ -1890,6 +1890,18 @@ void BRDFWrapper::shade(VR::VRayContext &rc) {
 
 	// Just call the original 3ds Max material to shade itself.
 	vrayMtl->shade(vri, mtlID);
+
+	// Handle alpha contribution - there's no one to do it for us since we don't go through VRayInstance::fullShade().
+	if (rc.rayresult.surfaceProps && 0!=(rc.rayparams.localRayType & VR::RT_GBUFFER)) {
+		float alphaContrib=static_cast<VR::SurfaceProperties*>(rc.rayresult.surfaceProps)->alphaContribution;
+		if (alphaContrib>=0.0f) {
+			rc.mtlresult.alpha*=alphaContrib;
+			rc.mtlresult.alphaTransp=VR::Color(1.0f, 1.0f, 1.0f)*(1.0f-alphaContrib)+rc.mtlresult.alphaTransp*alphaContrib;
+		} else {
+			rc.mtlresult.alpha.makeZero();
+			rc.mtlresult.alphaTransp=VR::Color(1.0f, 1.0f, 1.0f)*(1.0f+alphaContrib)-rc.mtlresult.alphaTransp*alphaContrib;
+		}
+	}
 }
 
 int BRDFWrapper::getMaterialRenderID(const VR::VRayContext &rc) {
