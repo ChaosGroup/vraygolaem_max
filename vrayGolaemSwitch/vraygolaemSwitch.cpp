@@ -472,7 +472,7 @@ AColor SkeletonTexmap::EvalColor(ShadeContext& sc)
 	if (_texmapSelector) newSelector+= (int)_texmapSelector->EvalMono(sc);
 	if ((newSelector < 0) || (newSelector >= 10))
 	{
-		Texmap* map (GetSubTexmap(0));
+		Texmap* map (GetSubTexmap(1));
 		if (map) res.color = map->EvalColor(sc);
 	}
 	// valid
