@@ -47,7 +47,7 @@ enum {
 	pb_use_node_attributes,		// Not used anymore but kept for retrocomp
 	// display
 	pb_enable_display,
-	pb_display_percent,
+	pb_display_percent,			// Not used anymore but kept for retrocomp
 	pb_display_entity_ids,
 	// cache
 	pb_crowd_fields,
@@ -77,6 +77,8 @@ enum {
 	pb_excluded_entities,
 	pb_object_id_mode,
 	pb_default_material,
+	pb_display_percentage,
+	pb_instancing_enable,
 };
 
 //************************************************************
@@ -187,6 +189,8 @@ class VRayGolaem: public GeomObject, public VR::VRenderObject, public VR::VRayPl
 	int _frameOffset;
 	int _objectIDBase;
 	short _objectIDMode;
+	float _displayPercent;
+	bool _instancingEnable;
 	bool _primaryVisibility;
 	bool _castsShadows;
 	bool _visibleInReflections;

@@ -182,10 +182,10 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	p_default, TRUE,
 	p_ui, TYPE_SINGLECHEKBOX, ED_DISPLAYENABLE,
 	PB_END,
-	pb_display_percent, _T("display_percent"), TYPE_INT, P_RESET_DEFAULT, 0,
-	p_default, 100,
-	p_range, 0, 100, 
-	p_ui, TYPE_SPINNER,  EDITTYPE_POS_INT, ED_DISPLAYPERCENT, ED_DISPLAYPERCENTSPIN, 1,
+	pb_display_percentage, _T("display_percentage"), TYPE_FLOAT, P_RESET_DEFAULT, 0,
+	p_default, 100.f,
+	p_range, 0.f, 100.f, 
+	p_ui, TYPE_SPINNER,  EDITTYPE_FLOAT, ED_DISPLAYPERCENT, ED_DISPLAYPERCENTSPIN, 1.f,
 	PB_END,
 	pb_display_entity_ids, _T("display_entity_ids"), TYPE_BOOL, P_RESET_DEFAULT, 0,
 	p_default, TRUE,
@@ -239,8 +239,13 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	p_default, _T("TEMP"),
 	p_ui, TYPE_EDITBOX, ED_TEMPVRSCENEFILEDIR,
 	PB_END,
+	pb_instancing_enable, _T("instancing_enable"), TYPE_BOOL, P_RESET_DEFAULT, 0,
+	p_default, TRUE,
+	p_ui, TYPE_SINGLECHEKBOX, ED_INSTANCINGENABLE,
+	PB_END,
 
 	// not used anymore but kept for retrocomp
+	pb_display_percent, _T(""), TYPE_INT, 0, 0, PB_END,
 	pb_use_node_attributes, _T(""), TYPE_BOOL, 0, 0, PB_END,
 	pb_motion_blur_enable, _T(""), TYPE_BOOL, 0, 0, PB_END,
 	pb_motion_blur_start, _T(""), TYPE_FLOAT, 0, 0, PB_END,
@@ -713,7 +718,7 @@ void VRayGolaem::drawEntities(GraphicsWindow *gw, const Matrix3& transform, Time
 {
 	// get display attributes
 	bool displayEnable = pblock2->GetInt(pb_enable_display, t) == 1;
-	int displayPercent = pblock2->GetInt(pb_display_percent, t);
+	float displayPercent = pblock2->GetFloat(pb_display_percentage, t);
 	bool displayEntityIds = pblock2->GetInt(pb_display_entity_ids, t) == 1;
 	if (!displayEnable) return;
 
@@ -727,7 +732,7 @@ void VRayGolaem::drawEntities(GraphicsWindow *gw, const Matrix3& transform, Time
 	float transformScale(transform.GetRow(0).Length());
 	for (size_t iData=0, nbData=_simulationData.length(); iData<nbData; ++iData)
 	{
-		int maxDisplayedEntity = _simulationData[iData]->_entityCount * displayPercent / 100;
+		int maxDisplayedEntity = (int)(_simulationData[iData]->_entityCount * displayPercent / 100.f);
 		for (size_t iEntity=0, entityCount = maxDisplayedEntity; iEntity<entityCount; ++iEntity)
 		{
 			int64_t entityId = _simulationData[iData]->_entityIds[iEntity];
@@ -937,6 +942,8 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 		GET_MBCS(defaultMat_wstr, defaultMat_mbcs);
 		_defaultMaterial=defaultMat_mbcs;
 	}
+	_displayPercent = pblock2->GetFloat(pb_display_percentage, t);
+	_instancingEnable = pblock2->GetInt(pb_instancing_enable, t) == 1;
 	
 	// object properties
 	_objectIDBase=node->GetGBufID();
@@ -1447,6 +1454,8 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			if (currentParam) pblock2->SetValue(pb_camera_margin, 0, (float)currentParam->getDouble());
 
 			// vray
+			currentParam = plugin->getParameter("glmRenderPercent");
+			if (currentParam) pblock2->SetValue(pb_display_percentage, 0, currentParam->getFloat());
 			currentParam = plugin->getParameter("glmFrameOffset");
 			if (currentParam) pblock2->SetValue(pb_frame_offset, 0, currentParam->getInt());
 			currentParam = plugin->getParameter("glmDefaultMaterial");
@@ -1455,6 +1464,8 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 				GET_WSTR(currentParam->getString(), currentParamMbcs)
 				pblock2->SetValue(pb_default_material, 0, currentParamMbcs, 0);
 			}
+			currentParam = plugin->getParameter("glmInstancingEnabled");
+			if (currentParam) pblock2->SetValue(pb_instancing_enable, 0, currentParam->getBool() == 1);
 			
 			// properties (copy them in the max node as well if it exists)
 			int objectIDBase(0);
@@ -1567,7 +1578,7 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 														   "Vector("<< transform.GetRow(2)[0] <<", "<< transform.GetRow(2)[1] <<", "<< transform.GetRow(2)[2] <<"))," << 
 														   "Vector("<< transform.GetRow(3)[0] <<", "<< transform.GetRow(3)[1] <<", "<< transform.GetRow(3)[2] <<"));" << std::endl;
 		outputStr << "\t" << "glmFrameOffset="<< _frameOffset <<";" << std::endl;
-	outputStr << "\t" << "glmCrowdField=\"" << _crowdFields << "\";" << std::endl;
+		outputStr << "\t" << "glmCrowdField=\"" << _crowdFields << "\";" << std::endl;
 		outputStr << "\t" << "glmCacheName=\"" << _cacheName << "\";" << std::endl;
 		outputStr << "\t" << "glmCacheFileDir=\"" << _cacheDir << "\";" << std::endl;
 		outputStr << "\t" << "glmCharacterFiles=\"" << _characterFiles << "\";" << std::endl;
@@ -1583,6 +1594,8 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 		outputStr << "\t" << "glmDefaultMaterial=\""<< _defaultMaterial <<"\";" << std::endl;
 		outputStr << "\t" << "glmObjectIDBase=" << _objectIDBase << ";" << std::endl;
 		outputStr << "\t" << "glmObjectIDMode=" << _objectIDMode << ";" << std::endl;
+		outputStr << "\t" << "glmRenderPercent=" << _displayPercent << ";" << std::endl;
+		outputStr << "\t" << "glmInstancingEnabled=" << _instancingEnable << ";" << std::endl;
 		outputStr << "\t" << "glmCameraVisibility=" << _primaryVisibility << ";" << std::endl;
 		outputStr << "\t" << "glmShadowsVisibility=" << _castsShadows << ";" << std::endl;
 		outputStr << "\t" << "glmReflectionsVisibility=" << _visibleInReflections << ";" << std::endl;
