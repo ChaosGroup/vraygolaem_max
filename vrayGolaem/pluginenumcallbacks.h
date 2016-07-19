@@ -242,8 +242,8 @@ struct TimeConversionRAII {
 		cfdata.frameStart=maxFrameStart/ticksPerFrame;
 		cfdata.frameEnd=maxFrameEnd/ticksPerFrame;
 
-		csdata.params.moblur.duration=cfdata.frameEnd-cfdata.frameStart;
-		csdata.params.moblur.intervalCenter=(cfdata.frameStart+cfdata.frameEnd)*0.5f-cfdata.t;
+		csdata.params.moblur.duration=(float)(cfdata.frameEnd-cfdata.frameStart);
+		csdata.params.moblur.intervalCenter=(float)((cfdata.frameStart+cfdata.frameEnd)*0.5f-cfdata.t);
 	}
 
 	~TimeConversionRAII(void) {
@@ -257,8 +257,8 @@ struct TimeConversionRAII {
 		cfdata.frameStart=maxFrameStart;
 		cfdata.frameEnd=maxFrameEnd;
 
-		csdata.params.moblur.duration=maxDuration;
-		csdata.params.moblur.intervalCenter=maxCenter;
+		csdata.params.moblur.duration=(float)maxDuration;
+		csdata.params.moblur.intervalCenter=(float)maxCenter;
 	}
 protected:
 	double maxTime, maxFrameStart, maxFrameEnd, maxDuration, maxCenter;
