@@ -30,6 +30,7 @@
 #define GLMC_IMPLEMENTATION
 #define GLMC_NOT_INCLUDE_MINIZ
 #include "glm_crowd.h"	// golaem cache reader
+#include "glm_crowd_io.h"	// golaem cache reader
 
 // V-Ray plugin ID for the 3ds Max material wrapper
 #define MTL_WRAPPER_VRAY_ID LARGE_CONST(0x2015011056)
@@ -204,6 +205,20 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	PB_END,
 	pb_character_files, _T("character_files"), TYPE_STRING, P_RESET_DEFAULT, 0,
 	p_ui, TYPE_EDITBOX, ED_CHARACTERFILES,
+	PB_END,
+	// layout attributes
+	pb_layout_enable, _T("layout_enable"), TYPE_BOOL, P_RESET_DEFAULT, 0,
+	p_default, TRUE,
+	p_ui, TYPE_SINGLECHEKBOX, ED_LAYOUTENABLE,
+	PB_END,
+	pb_layout_name, _T("layout_file"), TYPE_STRING, P_RESET_DEFAULT, 0,
+	p_ui, TYPE_EDITBOX, ED_LAYOUTNAME,
+	PB_END,
+	pb_layout_dir, _T("layout_directory"), TYPE_STRING, P_RESET_DEFAULT, 0,
+	p_ui, TYPE_EDITBOX, ED_LAYOUTDIR,
+	PB_END,
+	pb_terrain_file, _T("terrain_file"), TYPE_STRING, P_RESET_DEFAULT, 0,
+	p_ui, TYPE_EDITBOX, ED_TERRAINFILE,
 	PB_END,
 	// culling attributes
 	pb_frustum_enable, _T("frustum_enable"), TYPE_BOOL, P_RESET_DEFAULT, 0,
@@ -649,9 +664,12 @@ void VRayGolaem::readGolaemCache(TimeValue t)
 		{
 			int currentFrame = (int)((float)t / (float)TIME_TICKSPERSEC * (float)GetFrameRate()) + _frameOffset; 
 			CStr currentFrameStr; currentFrameStr.printf("%i", currentFrame);
-			CStr gscsFileStr(_cacheDir + "/" + _cacheName + "." + crowdFields[iCf] + ".gscs");
-			CStr gscfFileStr(_cacheDir + "/" + _cacheName + "." + crowdFields[iCf] + "." + currentFrameStr + ".gscf");
-			CStr gsclFileStr(_cacheDir + "/" + _cacheName + "." + crowdFields[iCf] + ".gscl");
+			CStr cachePrefix(_cacheDir + "/" + _cacheName + "." + crowdFields[iCf] + ".");
+			CStr cacheStream(cachePrefix + "%d.gscf");
+			CStr gscsFileStr(cachePrefix + "gscs");
+			CStr gscfFileStr(cachePrefix + currentFrameStr + ".gscf");
+			CStr gsclFileStr(_layoutDir + "/" + _layoutName + "." + crowdFields[iCf] + ".gscl");
+			CStr srcTerrainFile(cachePrefix + "terrain.fbx");
 
 			// load gscs
 			GlmSimulationCacheStatus status;
@@ -680,25 +698,41 @@ void VRayGolaem::readGolaemCache(TimeValue t)
 			GlmEntityTransform* entityTransforms = NULL;
 			int entityTransformCount(0);
 
-			GlmSimulationCacheStatus gsclStatus = glmCreateAndReadHistoryJSON(&history, gsclFileStr);
-			if (gsclStatus == GSC_SUCCESS)
+			if (_layoutEnable)
 			{
-				//history->_terrainMesh = terrainMesh;
-				//glmRaycastClosest = RaycastClosest;
+				GlmSimulationCacheStatus gsclStatus = glmCreateAndReadHistoryJSON(&history, gsclFileStr);
+				if (gsclStatus == GSC_SUCCESS)
+				{
+					// Terrain
+					/*
+					CrowdTerrain::Mesh* terrainMeshSource(NULL), *terrainMeshDestination(NULL);
+					if (srcTerrainFile.Length()) terrainMeshSource = CrowdTerrain::loadTerrainAsset(srcTerrainFile);
+					if (_terrainFile.Length()) terrainMeshDestination = CrowdTerrain::loadTerrainAsset(_terrainFile);
+					if (terrainMeshDestination == NULL) terrainMeshDestination = terrainMeshSource;
+					
+					history->_terrainMeshSource = terrainMeshSource;
+					history->_terrainMeshDestination = terrainMeshDestination;
+					*/
 
-				glmCreateEntityTransforms(simulationData, history, &entityTransforms, &entityTransformCount);
+					glmCreateEntityTransforms(simulationData, history, &entityTransforms, &entityTransformCount);
 
-				GlmSimulationData* simulationDataOut;
-				GlmFrameData* frameDataOut;
-				glmCreateModifiedSimulationData(simulationData, entityTransforms, entityTransformCount, &simulationDataOut);
-				glmCreateModifiedFrameData(simulationData, frameData, entityTransforms, entityTransformCount, history, simulationDataOut, &frameDataOut, currentFrame);
+					GlmSimulationData* simulationDataOut;
+					GlmFrameData* frameDataOut;
+					glmCreateModifiedSimulationData(simulationData, entityTransforms, entityTransformCount, &simulationDataOut);
+					glmCreateModifiedFrameData(simulationData, frameData, entityTransforms, entityTransformCount, history, simulationDataOut, &frameDataOut, currentFrame, cacheStream, _cacheDir);
 
-				// replace previous simulation & frame data
-				glmDestroyFrameData(&frameData, simulationData);
-				glmDestroySimulationData(&simulationData);
+					// replace previous simulation & frame data
+					glmDestroyFrameData(&frameData, simulationData);
+					glmDestroySimulationData(&simulationData);
+					frameData = frameDataOut;
+					simulationData = simulationDataOut;
 
-				frameData = frameDataOut;
-				simulationData = simulationDataOut;
+					// Delete Terrain
+					/*
+					if (terrainMeshSource && terrainMeshSource != terrainMeshDestination) CrowdTerrain::closeTerrainAsset(terrainMeshSource);
+					if (terrainMeshDestination) CrowdTerrain::closeTerrainAsset(terrainMeshDestination);
+					*/
+				}
 			}
 
 			if (history) glmDestroyHistory(&history);
@@ -861,6 +895,18 @@ const tchar* getVRayPluginPath()
 	return s;
 }
 
+CStr getStrParam(IParamBlock2* block, ParamID id, TimeValue t, const CStr& defaultStr="")
+{
+	CStr returnedString=defaultStr;
+	const TCHAR *param_wstr=block->GetStr(id, t);
+	if (param_wstr)  
+	{
+		GET_MBCS(param_wstr, param_mbcs);
+		returnedString=param_mbcs;
+	}
+	return returnedString;
+}
+
 //------------------------------------------------------------
 // updateVRayParams
 //------------------------------------------------------------
@@ -876,48 +922,20 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 	}
 	
 	// vrscene attributes
-	const TCHAR *fname_wstr=pblock2->GetStr(pb_file, t);
-	if (!fname_wstr) _vrsceneFile="";
-	else {
-		GET_MBCS(fname_wstr, fname_mbcs);
-		_vrsceneFile=fname_mbcs;
-	}
-
-	const TCHAR *shadersName_wstr=pblock2->GetStr(pb_shaders_file, t);
-	if (!shadersName_wstr) _shadersFile="";
-	else {
-		GET_MBCS(shadersName_wstr, shadersName_mbcs);
-		_shadersFile=shadersName_mbcs;
-	}
+	_vrsceneFile = getStrParam(pblock2, pb_file, t);
+	_shadersFile = getStrParam(pblock2, pb_shaders_file, t);
 	
 	// cache attributes
-	const TCHAR *crowdFields_wstr=pblock2->GetStr(pb_crowd_fields, t);
-	if (!crowdFields_wstr) _crowdFields="";
-	else {
-		GET_MBCS(crowdFields_wstr, crowdFields_mbcs);
-		_crowdFields=crowdFields_mbcs;
-	}
+	_crowdFields = getStrParam(pblock2, pb_crowd_fields, t);
+	_cacheName = getStrParam(pblock2, pb_cache_name, t);
+	_cacheDir = getStrParam(pblock2, pb_cache_dir, t);
+	_characterFiles = getStrParam(pblock2, pb_character_files, t);
 
-	const TCHAR *cacheName_wstr=pblock2->GetStr(pb_cache_name, t);
-	if (!cacheName_wstr) _cacheName="";
-	else {
-		GET_MBCS(cacheName_wstr, cacheName_mbcs);
-		_cacheName=cacheName_mbcs;
-	}
-
-	const TCHAR *cacheDir_wstr=pblock2->GetStr(pb_cache_dir, t);
-	if (!cacheDir_wstr) _cacheDir="";
-	else {
-		GET_MBCS(cacheDir_wstr, cacheDir_mbcs);
-		_cacheDir=cacheDir_mbcs;
-	}
-
-	const TCHAR *characterFiles_wstr=pblock2->GetStr(pb_character_files, t);
-	if (!characterFiles_wstr) _characterFiles="";
-	else {
-		GET_MBCS(characterFiles_wstr, characterFiles_mbcs);
-		_characterFiles=characterFiles_mbcs;
-	}
+	// layout attributes
+	_layoutEnable = pblock2->GetInt(pb_layout_enable, t) == 1;
+	_layoutName = getStrParam(pblock2, pb_layout_name, t);
+	_layoutDir = getStrParam(pblock2, pb_layout_dir, t);
+	_terrainFile = getStrParam(pblock2, pb_terrain_file, t);
 
 	// motion blur attributes
 	BOOL overrideValue;
@@ -936,12 +954,7 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 
 	// vray
 	_frameOffset = pblock2->GetInt(pb_frame_offset, t);
-	const TCHAR *defaultMat_wstr=pblock2->GetStr(pb_default_material, t);
-	if (!defaultMat_wstr) _defaultMaterial="";
-	else {
-		GET_MBCS(defaultMat_wstr, defaultMat_mbcs);
-		_defaultMaterial=defaultMat_mbcs;
-	}
+	_defaultMaterial = getStrParam(pblock2, pb_default_material, t);
 	_displayPercent = pblock2->GetFloat(pb_display_percentage, t);
 	_instancingEnable = pblock2->GetInt(pb_instancing_enable, t) == 1;
 	
@@ -967,12 +980,7 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 	if (!vrayRefrVisibility) _visibleInRefractions=false;
 
 	// output
-	const TCHAR *tempVrScene_wstr=pblock2->GetStr(pb_temp_vrscene_file_dir, t);
-	if (!tempVrScene_wstr) _tempVRSceneFileDir="TEMP";
-	else {
-		GET_MBCS(tempVrScene_wstr, tempVrScene_mbcs);
-		_tempVRSceneFileDir=tempVrScene_mbcs;
-	}
+	_tempVRSceneFileDir = getStrParam(pblock2, pb_temp_vrscene_file_dir, t, "TEMP");
 }
 
 void VRayGolaem::wrapMaterial(Mtl *mtl) {
@@ -1414,11 +1422,27 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 				GET_WSTR(currentParam->getString(), currentParamMbcs)
 				pblock2->SetValue(pb_character_files, 0, currentParamMbcs, 0);
 			}
-			currentParam = plugin->getParameter("glmExcludedEntities");
+
+			// layout
+			currentParam = plugin->getParameter("glmEnableLayout");
+			if (currentParam) pblock2->SetValue(pb_layout_enable, 0, currentParam->getBool() == 1);
+			currentParam = plugin->getParameter("glmLayoutName");
 			if (currentParam)
 			{
 				GET_WSTR(currentParam->getString(), currentParamMbcs)
-				pblock2->SetValue(pb_excluded_entities, 0, currentParamMbcs, 0);
+				pblock2->SetValue(pb_layout_name, 0, currentParamMbcs, 0);
+			}
+			currentParam = plugin->getParameter("glmLayoutDir");
+			if (currentParam)
+			{
+				GET_WSTR(currentParam->getString(), currentParamMbcs)
+				pblock2->SetValue(pb_layout_dir, 0, currentParamMbcs, 0);
+			}
+			currentParam = plugin->getParameter("glmTerrainFile");
+			if (currentParam)
+			{
+				GET_WSTR(currentParam->getString(), currentParamMbcs)
+				pblock2->SetValue(pb_terrain_file, 0, currentParamMbcs, 0);
 			}
 
 			// motion blur
@@ -1582,6 +1606,11 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 		outputStr << "\t" << "glmCacheName=\"" << _cacheName << "\";" << std::endl;
 		outputStr << "\t" << "glmCacheFileDir=\"" << _cacheDir << "\";" << std::endl;
 		outputStr << "\t" << "glmCharacterFiles=\"" << _characterFiles << "\";" << std::endl;
+		// layout
+		outputStr << "\t" << "glmEnableLayout=" << _layoutEnable << ";" << std::endl;
+		outputStr << "\t" << "glmLayoutName=\"" << _layoutName << "\";" << std::endl;
+		outputStr << "\t" << "glmLayoutDir=\"" << _layoutDir << "\";" << std::endl;
+		outputStr << "\t" << "glmTerrainFile=\"" << _terrainFile << "\";" << std::endl;
 		// moblur
 		outputStr << "\t" << "glmMBlurEnabled=" << _mBlurEnable << ";" << std::endl;
 		if (_overMBlurWindowSize) outputStr << "\t" << "glmMBlurWindowSize=" << _mBlurWindowSize << ";" << std::endl;
