@@ -74,11 +74,16 @@ enum {
 	// output
 	pb_temp_vrscene_file_dir,
 	pb_override_node_properties,// Not used anymore but kept for retrocomp
-	pb_excluded_entities,
+	pb_excluded_entities,		// Not used anymore but kept for retrocomp
 	pb_object_id_mode,
 	pb_default_material,
 	pb_display_percentage,
 	pb_instancing_enable,
+	// layout
+	pb_layout_enable,
+	pb_layout_name,
+	pb_layout_dir,
+	pb_terrain_file,
 };
 
 //************************************************************
@@ -172,6 +177,12 @@ class VRayGolaem: public GeomObject, public VR::VRenderObject, public VR::VRayPl
 	CStr _cacheName;
 	CStr _cacheDir;
 	CStr _characterFiles;
+
+	// layout attributes
+	bool _layoutEnable;
+	CStr _layoutName;
+	CStr _layoutDir;
+	CStr _terrainFile;
 
 	// MoBlur attributes
 	bool _mBlurEnable;

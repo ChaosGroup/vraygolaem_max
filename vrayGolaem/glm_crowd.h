@@ -28,6 +28,7 @@
 #define GLM_CROWD_INCLUDE_H
 
 #include "stdint.h"
+#include "stdio.h"
 
 // DOCUMENTATION
 //
@@ -66,6 +67,7 @@ extern "C"
 	extern const char golaemFrameExtension[];
 	extern const char golaemSimulationExtension[];
 	extern const char golaemTransformHistoryExtension[];
+	extern const char golaemAssetAssociationExtension[];
 
 	// Simulation cache format----------------------------------------------------
 	typedef enum
@@ -124,6 +126,9 @@ extern "C"
 		char(*_ppVectorAttributeNames)[GSC_PP_MAX_NAME_LENGTH]; // name of the vector per particle attribute, array size first dimension = _vectorAttributeCount, second dimension = _entityCountPerCrowdField
 		uint8_t* _backwardCompatPPAttributeTypes;
 
+		float _proxyMatrix[16];
+		float _proxyMatrixInverse[16];
+
 	} GlmSimulationData_v0;
 	typedef GlmSimulationData_v0 GlmSimulationData;
 
@@ -141,33 +146,50 @@ extern "C"
 		float(*_snsValues)[4]; // Squatch and stretch values per EntityType, array size = _snsCountPerEntityType * entityCountPerEntityType* entityTypeCount
 		float* _blindData; // blind data per Entity per EntityType, array size = _blindDataCount * _entityCountPerEntityType * _entityTypeCount : [ET0-E0-0blindDataCount][ET0-E1-0blindDataCount][ET1-E0-0blindDataCount]etc..
 		uint16_t* _geoBehaviorGeometryIds; // geometry behavior geometry id, array size = _entityCountPerEntityType * _entityTypeCount
-		float(*_geoBehaviorAnimFrameInfo)[3]; // geometry behavior animation frame info per Entity of an Entitype, array size =  _entityCountPerEntityType * _entityTypeCount, NULL if no geometry behavior
+		float(*_geoBehaviorAnimFrameInfo)[3]; // geometry behavior animation frame info per Entity of an Entitype, array size =  _entityCountPerEntityType * _entityTypeCount, NULL if no geometry behavior. Infos are current, start and stop frames
 		uint8_t* _geoBehaviorBlendModes; // geometry behavior blend mode per Entity of an Entitype, array size =  _entityCountPerEntityType * _entityTypeCount, NULL if no geometry behavior - stores a boolean as 0 or 1
 
-		// allocation data for cloth, to avoid reallocation each frame if memoryspace is sufficient (not serialized)
+		// allocation data for cloth, to avoid reallocation each frame if memory space is sufficient (not serialized)
 		uint32_t _clothAllocatedEntities;
 		uint32_t _clothAllocatedIndices;
 		uint32_t _clothAllocatedVertices;
 
+		// cloth :
+		// entity uses cloth if _clothEntityCount != 0 && _entityClothIndex[entityIndex] is not -1
+		// one cloth entity may have several cloth meshes.
+		
+		// serialization helpers
 		uint32_t _clothEntityCount; // if 0, skip reading of everything else cloth-related (let to NULL)
 		uint32_t _clothTotalMeshIndices; // shortcut for reading
 		uint32_t _clothTotalVertices; // shortcut for reading
-		int32_t* _clothEntityIndex; // matching cloth entity index, or -1 if not used, size = _entityCount beware it is SIGNED
-		uint32_t* _clothMeshIndexOffsetPerClothEntity;	// mesh indices for a given clothEntity starts at this index
-		uint32_t* _clothMeshVertexOffsetPerClothEntity;	// vertices for a given clothEntity starts at this index. Add all meshes vertices count to shift to right vertex for a given mesh
 
-		uint32_t* _clothMeshIndexCount; // count of cloth mesh indices for this cloth entity, size = _clothEntityCount, read in entity order
-		float(*_clothReference)[3]; // _clothEntityCount elements, gives reference vertex for quantization = this entity vertices (min+max)/2 in all dimensions
-		float* _clothMaxExtent; //_clothEntityCount elements, gives maxExtent of cloth for quantization max of (_clothReference - min value) in all dimensions
+		// is entity using cloth ? if so, which cloth index to use if cloth arrays
+		int32_t* _entityClothIndex; // helper : matching cloth entity index, or -1 if not used, size = _entityCount beware it is SIGNED
+		
+		// one entity have _clothEntityMeshCount[clothEntityIndex] meshes
+		uint32_t* _clothEntityMeshCount; // count of cloth mesh indices for this cloth entity, size = _clothEntityCount, read in entity order
 
-		uint32_t* _clothIndices; // mesh indices for cloth, in serial, entity0 indices, then entity 1 indices, etc
-		uint32_t* _clothMeshVertexCountPerClothIndex; // number of vertices to read for a given mesh index
-		float(*_clothVertices)[3]; // vertices position, from ET0 { entity0_vertex0-n, entity1_vertex0-n, etc. }, ET1 { entity0_vertex0-n, entity1_vertex0-n, etc. }, ET2, etc. size = _entityTypeCount * _clothVertexCount * _entityCountPerEntityType;, only for entities using cloth
+		// one clothIndex has _clothEntityMeshCount[clothEntityIndex] meshes
+		// mesh indices in geometry starts at _clothEntityFirstAssetMeshIndex. 
+		// there vertices starts at _clothEntityFirstMeshVertex (sequential read of all meshes)
+		// the vertices are quantized according to _clothEntityQuantizationReference & _clothEntityQuantizationMaxExtent
+		uint32_t* _clothEntityFirstAssetMeshIndex;	// helper : mesh indices for a given clothEntity starts at this index
+		uint32_t* _clothEntityFirstMeshVertex;	// vertices for a given clothEntity starts at this index. Add all meshes vertices count to shift to right vertex for a given mesh
+		float(*_clothEntityQuantizationReference)[3]; // _clothEntityCount elements, gives reference vertex for quantization = this entity vertices (min+max)/2 in all dimensions
+		float* _clothEntityQuantizationMaxExtent; //_clothEntityCount elements, gives maxExtent of cloth for quantization max of (_clothEntityQuantizationReference - min value) in all dimensions
+
+		// for each mesh, from _clothEntityFirstMeshVertex[clothIndex] to _clothEntityFirstMeshVertex[clothIndex] + _clothEntityMeshCount[clothIndex], we must read _clothMeshVertexCount
+
+		// cloth data per mesh
+		uint32_t* _clothMeshIndicesInCharAssets; // mesh indices, in original geometry, for cloth, in serial, entity0 indices, then entity 1 indices, etc
+		uint32_t* _clothMeshVertexCount; // number of vertices to read for a given mesh index
+
+		// cloth vertex positions array		
+		float(*_clothVertices)[3]; // vertices position : clothEntity 0 mesh (0 to n1) vertices, clothEntity 1 mesh (0-n2), ..., up to last clothEntity last mesh vertices
 
 		// ppAttribute
 		float** _ppFloatAttributeData; // float data per particle attributes, array size first dimension = _floatAttributeCount
 		float(**_ppVectorAttributeData)[3]; // vector data per particle attributes, array size = _vectorAttributeCount
-		//void** _ppAttributeData; // data per particle attributes, can be casted using the _ppAttributeType information, array size = _ppAttributeCount
 	} GlmFrameData_v0;
 	typedef GlmFrameData_v0 GlmFrameData;
 
@@ -181,6 +203,11 @@ extern "C"
 		uint32_t* _renderingTypeIdx; // renderingTypeIdx if needed, size = _transformCount
 
 		uint32_t _options; // options. see GlmHistoryOptions
+
+		uint32_t _transformGroupCount;
+		uint8_t* _transformGroupActive; //size = _transformGroupCount
+		char(*_transformGroupName)[GSC_PP_MAX_NAME_LENGTH]; // name of the transform Group, array size first dimension = _transformGroupCount, second dimension = GSC_PP_MAX_NAME_LENGTH
+		uint32_t(* _transformGroupBoundaries)[2]; // group boundaries, size = _transformGroupCount
 
 
 		float(*_transformRotate)[4]; // transform Quaternion parameter, size = _transformCount
@@ -203,13 +230,29 @@ extern "C"
 		uint32_t* _duplicatedEntityArrayStartIndex; // size = _transformCount
 		uint32_t* _duplicatedEntityArrayCount; // size = _transformCount
 
-		// additional translation
-		// work the same way entityIds work
+		// mesh asset override
+		// Override is not visible in GlmEntityTransform because it's handled at rendering time with the .CAA
 		uint32_t _expandCount;
 		float(*_expands)[3];
 		uint32_t* _expandArrayStartIndex; // size = _transformCount
 		uint32_t* _expandArrayCount; // size = _transformCount
 
+		// trajectory/.. per frame translation&orientation
+		uint32_t _perFramePosOriCount;
+		float(*_frameCurvePos)[3];
+		float(*_frameCachePos)[3];
+		float(*_framePos)[3];
+		float(*_frameOri)[4];
+		uint32_t* _perFramePosOriArrayStartIndex; // size = _transformCount
+		uint32_t* _perFramePosOriArrayCount; // size = _transformCount
+
+		// additional scale
+		// work the same way entityIds work
+		uint32_t _scaleRangeCount;
+		float*_scaleRanges;
+		uint32_t* _scaleRangeArrayStartIndex; // size = _transformCount
+		uint32_t* _scaleRangeArrayCount; // size = _transformCount
+		// it's present here for storage and maniupulation (enable/disable)
 		// mesh asset override
 		// Override is not visible in GlmEntityTransform because it's handled at rendering time with the .CAA
 		// it's present here for storage and maniupulation (enable/disable)
@@ -238,10 +281,63 @@ extern "C"
 		float(*_posturesPositions)[3]; 
 		float(*_posturesOrientations)[4];
 
-		void *_terrainMesh;
+		// frame offsets
+		uint32_t _frameOffsetCount;
+		float* _frameOffsets;
+		uint32_t* _frameOffsetArrayStartIndex; // size = _transformCount
+		uint32_t* _frameOffsetArrayCount; // size = _transformCount
 
+		// frame scales
+		uint32_t _frameWarpCount;
+		float* _frameWarps;
+		uint32_t* _frameWarpArrayStartIndex; // size = _transformCount
+		uint32_t* _frameWarpArrayCount; // size = _transformCount
+
+		// frame transform paramters
+		float *_frameOffsetMin; // size = _transformCount
+		float *_frameOffsetMax; // size = _transformCount
+		float *_frameWarpMin; // size = _transformCount
+		float *_frameWarpMax; // size = _transformCount
+
+		// scale range min/max
+		float *_scaleRangeMin; // size = _transformCount
+		float *_scaleRangeMax; // size = _transformCount
+
+		// frame start/count for per frame pos/ori
+		uint32_t *_startFrame; // size = _transformCount
+		uint32_t *_frameCount; // size = _transformCount
+		uint32_t *_trajectoryMode; // size = _transformCount
+		uint32_t *_trajectorySteps; // size = _transformCount
+		uint32_t *_smoothIterationCount; // size = _transformCount
+		float *_smoothFrontBackRatio; // size = _transformCount
+		float(*_smoothComponents)[3]; // size = _transformCount
+
+		char(*_snapToTarget)[GSC_PP_MAX_NAME_LENGTH]; // name of the target object, array size first dimension = _transformCount, second dimension = GSC_PP_MAX_NAME_LENGTH
+		uint32_t _snapToTotalCount;	// total count of snapTo Target for all entities 
+		uint32_t* _snapToStartIndex; // size = _transformCount
+		uint32_t* _snapToCount; // size = _transformCount
+		float(*_snapToPositions)[3]; // size = _snapToTotalCount
+		float(*_snapToRotations)[4]; // size = _snapToTotalCount
+
+		char(*_shaderAttribute)[GSC_PP_MAX_NAME_LENGTH]; // name of the target object, array size first dimension = _transformCount, second dimension = GSC_PP_MAX_NAME_LENGTH
+		void *_terrainMeshSource; // used at rendering time. not serialized
+		void *_terrainMeshDestination; // used at rendering time. not serialized
 	} GlmHistory_v0;
 	typedef GlmHistory_v0 GlmHistory;
+
+	// transformation per entity for whole cache. *Not saved.* Only used for modification on cache
+
+	typedef struct GlmFrameOffset_V0
+	{
+		int _entityIndex;
+		// frame offset
+		float _frameOffset;
+		float _frameWarp;
+
+		int _frameIndex; // global frame index
+		int _framesLoadedIndex; // index in frames loaded
+		float _fraction;
+	} GlmFrameOffset;
 
 	// transformation per entity for whole cache. *Not saved.* Only used for modification on cache
 	typedef struct GlmEntityTransform_v0
@@ -256,7 +352,7 @@ extern "C"
 		float _scale; 
 
 		char _useCloth;
-
+		char _killed;
 		// pivot position used for scaling
 		float (_scalePivot)[3];
 
@@ -278,16 +374,25 @@ extern "C"
 		float(*_boneRestRelativePosition)[3];		// free if not NULL
 
 		// 
-		unsigned int _lastEditPostureHistoryIndex; // last history transform index in the transform list. So we can apply bone hisotry transform from that index. Edit posture works like keyframe.
+		unsigned int _lastEditPostureHistoryIndex; // last history transform index in the transform list. So we can apply bone history transform from that index. Edit posture works like keyframe.
 
 		// cloth
 		uint32_t _clothedEntityIndex;
 		float(*_clothVerticesSource)[3];
 		uint32_t* _clothIndicesSource;
-		uint32_t* _clothMeshVertexCountPerClothIndexSource;
+		uint32_t* _clothMeshVertexCountSource;
+		//uint32_t* _clothMeshVertexOffsetPerClothIndexSource;
 
 		int _clothTotalMeshIndices;
 		int _clothTotalVertices;
+
+		// work buffer allocated once for every entity -> transformation/frame modification is not threadsafe
+		GlmFrameOffset _frameOffset;
+		int _outOfCache; // when no frame can be loaded for that entity because of time offset/time warp
+
+		// per frame pos/or
+		int _perFramePosOriIndex;
+		int _perFramePosOriArrayCount;
 
 		// work buffer allocated once for every entity -> transformation/frame modification is not threadsafe
 		float(*_sortedBonesWorldOri)[4];
@@ -305,6 +410,13 @@ extern "C"
 	} GlmHistoryOptions;
 
 	// Transformation Types----------------------------------------------
+	typedef struct GlmFrameToLoad_V0
+	{
+		int _frameIndex;
+		GlmFrameData* _frame;
+	} GlmFrameToLoad;
+
+	// Transformation Types----------------------------------------------
 	typedef enum 
 	{
 		SimulationCacheNoop,
@@ -318,7 +430,13 @@ extern "C"
 		SimulationCachePostureBoneEdit,
 		SimulationCacheSetMeshAssets,
 		SimulationCacheEnableClothMeshAssets,
-		SimulationCacheExpand
+		SimulationCacheExpand,
+		SimulationCacheFrameOffset,
+		SimulationCacheFrameWarp,
+		SimulationCacheScaleRange,
+		SimulationCacheTrajectoryEdit,
+		SimulationCacheSnapTo,
+		SimulationCacheSetShaderAttribute,
 	} GlmSimulationCacheTransformType;
 
 	// Simulation cache status codes----------------------------------------------
@@ -330,6 +448,7 @@ extern "C"
 		GSC_FILE_VERSION_ERROR, // incorrect version, could be a newer version of the Golaem Simulation Cache
 		GSC_FILE_FORMAT_ERROR, // incorrect format, could be a newer version of the Golaem Simulation Cache
 		GSC_SIMULATION_FILE_DOES_NOT_MATCH, // used Golaem Simulation Cache simulation file does not match this frame file
+		GSC_SIMULATION_NO_FRAMES_FOUND, // used when no frame could be loaded from the cache
 	} GlmSimulationCacheStatus;
 
 	// convert a simulation cache status in an error message
@@ -360,6 +479,12 @@ extern "C"
 	extern void glmCreateFrameData(GlmFrameData** frameData, const GlmSimulationData* simulationData);
 
 	// allocate cloth data for frame data (except entityInUse), not in glmCreateFrameData because cloth count can change at every frame
+	uint64_t glmComputeSimulationDataSize(const GlmSimulationData* data);
+
+	// Compute the size in bytes allocated for a GlmFrameData
+	uint64_t glmComputeFrameDataSize(const GlmFrameData* frameData, const GlmSimulationData* simulationData);
+
+	// allocate cloth data for frame data (except entityInUse), not in glmCreateFrameData because cloth count can change at every frame
 	extern void glmCreateClothData(const GlmSimulationData* simuData, GlmFrameData* frameData, unsigned int clothEntityCount, unsigned int clothIndices, unsigned int clothVertices);
 
 	// read a .gscf file in the previously allocated *frameData
@@ -374,14 +499,15 @@ extern "C"
 	extern void glmDestroyFrameData(GlmFrameData** frameData, const GlmSimulationData* simulationData);
 
 	// create a transform layer
-	extern void glmCreateHistory(GlmHistory** history, unsigned int transformCount, unsigned int entityCount, unsigned int totalPostureCount, unsigned int totalPostureBoneCount, unsigned int totalEntityTypesBoneCount, unsigned int totalMeshAssetsOverride, unsigned int duplicatedEntityCount, unsigned int totalEntityTypeCount, unsigned int expandCount);
+	extern void glmCreateHistory(GlmHistory** history, unsigned int transformCount, unsigned int transformGroupCount, unsigned int entityCount, unsigned int totalPostureCount, unsigned int totalPostureBoneCount, unsigned int totalEntityTypesBoneCount, unsigned int totalMeshAssetsOverride, unsigned int duplicatedEntityCount, unsigned int totalEntityTypeCount, unsigned int expandCount, unsigned int totalFrameOffsetCount, unsigned int totalFrameWarpCount, unsigned int scaleRangeCount, unsigned int perFramePosOriCount, unsigned int snapToTotalCount);
 
 	// deallocate history and set it to NULL
 	extern void glmDestroyHistory(GlmHistory** history);
 
 	// perform a raycast on terrain mesh and return true if hit. collision point is the closest to the rayorigin
-	extern int (*glmRaycastClosest)(void *terrain, const float* rayOrigin, const float* rayEnd, float *collisionPoint, float *collisionNormal);
+	extern int (*glmRaycastClosest)(void *terrain, const float* rayOrigin, const float* rayEnd, float *collisionPoint, float *collisionNormal, float *proxyMatrix, float *proxyMatrixInverse);
 
+	extern void(*glmTerrainSetFrame)(void *terrainSource, void *terrainDestination, int frame);
 #ifndef GLMC_NO_JSON
 	// write *frameData in a JSON .gscla file
 	// return GSC_SUCCESS || GSC_FILE_OPEN_FAILED
@@ -392,6 +518,10 @@ extern "C"
 	extern GlmSimulationCacheStatus glmCreateAndReadHistoryJSON(GlmHistory** history, const char* file);
 #endif
 	// create an entityTransform array from TransformHistory and GlmSimulationData
+	// computes frames needed when using time offset and time scale
+	unsigned int glmComputeEntityFrameOffsets(GlmFrameOffset *frameOffsets, int entityCount, int currentFrame, GlmFrameToLoad *frames);
+
+	// create an entityTransform array from TransformHistory and GlmSimulationData
 	void glmCreateEntityTransforms(GlmSimulationData* simulationData, GlmHistory* history, GlmEntityTransform** entityTransforms, int *entityTransformCount);
 
 	// deallocate a GlmEntityTransform
@@ -401,9 +531,24 @@ extern "C"
 	void glmCreateModifiedSimulationData(GlmSimulationData* simulationDataSource, GlmEntityTransform* entityTransforms, unsigned int entityTransformCount, GlmSimulationData** simulationDataDestination);
 
 	// Create a new GlmFrameData pointed by frameDataDestination made of frameDataSource and modifications. User is responsible of frameDataDestination deletion
-	void glmCreateModifiedFrameData(GlmSimulationData* simulationDataIn, GlmFrameData* frameDataIn, GlmEntityTransform* entityTransforms, unsigned int entityTransformCount, GlmHistory* history, GlmSimulationData* simulationDataOut, GlmFrameData** frameDataOut, int currentFrame);
+	GlmSimulationCacheStatus glmCreateModifiedFrameData(GlmSimulationData* simulationDataIn, GlmFrameData* frameDataIn, GlmEntityTransform* entityTransforms, unsigned int entityTransformCount, GlmHistory* history, GlmSimulationData* simulationDataOut, GlmFrameData** frameDataOut, int currentFrame, const char * filePathModel, const char * cacheDirectory);
 
 	void glmInterpolateFrameData(const GlmSimulationData* simulationData, const GlmFrameData* frameData1, const GlmFrameData* frameData2, float ratio, GlmFrameData* result); // ratio must be between 0 (full frame 1) and 1 (full frame 2), frames must be of same simulationData
+
+	uint32_t getClothEntityMeshCount(const GlmFrameData* frameData, int clothEntityIndex);
+	uint32_t getClothEntityIMeshVertexCount(const GlmFrameData* frameData, int clothEntityIndex, int iMesh); // a clothEntity has "meshCount" meshes. Get each of its index in all cloth entities meshes cache via this.
+	void getClothEntityIMeshVerticesPtr(const GlmFrameData* frameData, int clothEntityIndex, int iMesh, float(**outFirstVertexPtr)[3]); // a clothEntity has "meshCount" meshes. Get each of its index in all cloth entities meshes cache via this.
+
+	// compression interface (usde in crowd_io)
+	extern void glmFileWrite(const void* data, unsigned long elementSize, unsigned long count, FILE* fp);
+	extern void glmFileWriteUInt16(const uint16_t* data, unsigned int count, FILE* fp);
+	extern void glmFileWriteUInt32(const uint32_t* data, unsigned int count, FILE* fp);
+	extern void glmFileWriteUInt64(const uint64_t* data, unsigned int count, FILE* fp);
+	
+	extern void glmFileRead(void* data, unsigned long elementSize, unsigned long count, FILE* fp);
+	extern void glmFileReadUInt16(uint16_t* data, unsigned int count, FILE* fp);
+	extern void glmFileReadUInt32(uint32_t* data, unsigned int count, FILE* fp);
+	extern void glmFileReadUInt64(uint64_t* data, unsigned int count, FILE* fp);
 
 #ifdef __cplusplus
 }
@@ -424,6 +569,19 @@ extern "C"
 #include <string.h>
 #include <math.h>
 #include <float.h>
+#include <limits.h>
+
+#ifdef _MSC_VER
+#include <direct.h>
+#include <io.h>
+#else
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <pwd.h>
+#endif
+
 #ifndef GLMC_ASSERT
 #include <assert.h>
 #ifdef NDEBUG
@@ -462,6 +620,10 @@ extern "C"
 #define INT32_MAX (0x7fffffffL)
 #endif
 
+#ifndef INT32_MIN
+#define INT32_MIN (-INT32_MAX-1)
+#endif
+
 #if defined(GLMC_MALLOC) && defined(GLMC_FREE) && defined(GLMC_REALLOC)
 // ok
 #elif !defined(GLMC_MALLOC) && !defined(GLMC_FREE) && !defined(GLMC_REALLOC)
@@ -481,7 +643,8 @@ extern "C"
 #define GLMC_PI_DIV_2 1.57079632679489661923f
 #define GLMC_1_DIV_SQRT_2 0.7071067811865475f
 
-int(*glmRaycastClosest)(void *terrain, const float* rayOrigin, const float* rayEnd, float *collisionPoint, float *collisionNormal) = NULL;
+int(*glmRaycastClosest)(void *terrain, const float* rayOrigin, const float* rayEnd, float *collisionPoint, float *collisionNormal, float *proxyMatrix, float *proxyMatrixInverse) = NULL;
+void(*glmTerrainSetFrame)(void *terrainSource, void *terrainDestination, int frame) = NULL;
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -813,7 +976,7 @@ extern "C"
 #endif
 
 // handle zlib uncompress
-static void glmFileRead(void* data, unsigned long elementSize, unsigned long count, FILE* fp)
+void glmFileRead(void* data, unsigned long elementSize, unsigned long count, FILE* fp)
 {
 	if (count > 1)
 	{
@@ -839,7 +1002,7 @@ static void glmFileRead(void* data, unsigned long elementSize, unsigned long cou
 }
 
 // handle 16-bit byte swapping for big endian machines
-static void glmFileReadUInt16(uint16_t* data, unsigned int count, FILE* fp)
+void glmFileReadUInt16(uint16_t* data, unsigned int count, FILE* fp)
 {
 #ifdef GLMC_BIG_ENDIAN
 	unsigned int i;
@@ -854,7 +1017,7 @@ static void glmFileReadUInt16(uint16_t* data, unsigned int count, FILE* fp)
 }
 
 // handle 32-bit byte swapping for big endian machines
-static void glmFileReadUInt32(uint32_t* data, unsigned int count, FILE* fp)
+void glmFileReadUInt32(uint32_t* data, unsigned int count, FILE* fp)
 {
 #ifdef GLMC_BIG_ENDIAN
 	unsigned int i;
@@ -869,7 +1032,7 @@ static void glmFileReadUInt32(uint32_t* data, unsigned int count, FILE* fp)
 }
 
 // handle 64-bit byte swapping for big endian machines
-static void glmFileReadUInt64(uint64_t* data, unsigned int count, FILE* fp)
+void glmFileReadUInt64(uint64_t* data, unsigned int count, FILE* fp)
 {
 #ifdef GLMC_BIG_ENDIAN
 	unsigned int i;
@@ -884,7 +1047,7 @@ static void glmFileReadUInt64(uint64_t* data, unsigned int count, FILE* fp)
 }
 
 // handle zlib compression
-static void glmFileWrite(const void* data, unsigned long elementSize, unsigned long count, FILE* fp)
+void glmFileWrite(const void* data, unsigned long elementSize, unsigned long count, FILE* fp)
 {
 	if (count > 1)
 	{
@@ -915,7 +1078,7 @@ static void glmFileWrite(const void* data, unsigned long elementSize, unsigned l
 }
 
 // handle 16-bit byte swapping for big endian machines
-static void glmFileWriteUInt16(uint16_t* data, unsigned int count, FILE* fp)
+void glmFileWriteUInt16(const uint16_t* data, unsigned int count, FILE* fp)
 {
 #ifdef GLMC_BIG_ENDIAN
 	unsigned int i;
@@ -934,7 +1097,7 @@ static void glmFileWriteUInt16(uint16_t* data, unsigned int count, FILE* fp)
 }
 
 // handle 32-bit byte swapping for big endian machines
-static void glmFileWriteUInt32(uint32_t* data, unsigned int count, FILE* fp)
+void glmFileWriteUInt32(const uint32_t* data, unsigned int count, FILE* fp)
 {
 #ifdef GLMC_BIG_ENDIAN
 	unsigned int i;
@@ -953,7 +1116,7 @@ static void glmFileWriteUInt32(uint32_t* data, unsigned int count, FILE* fp)
 }
 
 // handle 64-bit byte swapping for big endian machines
-static void glmFileWriteUInt64(uint64_t* data, unsigned int count, FILE* fp)
+void glmFileWriteUInt64(const uint64_t* data, unsigned int count, FILE* fp)
 {
 #ifdef GLMC_BIG_ENDIAN
 	unsigned int i;
@@ -988,6 +1151,9 @@ static void glmFileWriteUInt64(uint64_t* data, unsigned int count, FILE* fp)
 const char golaemFrameExtension[] = "gscf"; // need to be declared lowercase for comparison
 const char golaemSimulationExtension[] = "gscs"; // need to be declared lowercase for comparison
 const char golaemTransformHistoryExtension[] = "gscl"; // need to be declared lowercase for comparison
+const char golaemAssetAssociationExtension[] = "caa"; // need to be declared lowercase for comparison
+
+void glmSetIdentityMatrix(float *matrix);
 
 //----------------------------------------------------------------------------
 const char* glmConvertSimulationCacheStatus(GlmSimulationCacheStatus status)
@@ -1006,6 +1172,8 @@ const char* glmConvertSimulationCacheStatus(GlmSimulationCacheStatus status)
 		return "Golaem simulation cache: incorrect format, could be a newer version of the Golaem Simulation Cache";
 	case GSC_SIMULATION_FILE_DOES_NOT_MATCH:
 		return "Golaem simulation cache: used Golaem Simulation Cache simulation file does not match this frame file";
+	case GSC_SIMULATION_NO_FRAMES_FOUND:
+		return "Golaem simulation cache: unable to find and open a valid Simulation Cache Frame";
 	default:
 		return "Golaem simulation cache: unkown error code";
 	}
@@ -1057,9 +1225,44 @@ void glmCreateSimulationData(
 	data->_backwardCompatPPAttributeTypes = NULL;
 	data->_ppFloatAttributeCount = ppFloatAttributeCount;
 	data->_ppVectorAttributeCount = ppVectorAttributeCount;
-	data->_ppFloatAttributeNames = (char(*)[GSC_PP_MAX_NAME_LENGTH])GLMC_MALLOC(data->_ppFloatAttributeCount * GSC_PP_MAX_NAME_LENGTH * sizeof(char));
-	data->_ppVectorAttributeNames = (char(*)[GSC_PP_MAX_NAME_LENGTH])GLMC_MALLOC(data->_ppVectorAttributeCount * GSC_PP_MAX_NAME_LENGTH * sizeof(char));
+	data->_ppFloatAttributeNames = (char(*)[GSC_PP_MAX_NAME_LENGTH])GLMC_MALLOC(data->_ppFloatAttributeCount * sizeof(char[GSC_PP_MAX_NAME_LENGTH]));
+	data->_ppVectorAttributeNames = (char(*)[GSC_PP_MAX_NAME_LENGTH])GLMC_MALLOC(data->_ppVectorAttributeCount * sizeof(char[GSC_PP_MAX_NAME_LENGTH]));
 	//data->_ppAttributeTypes = (uint8_t*)GLMC_MALLOC(data->_ppAttributeCount * sizeof(uint8_t));
+
+	glmSetIdentityMatrix(data->_proxyMatrix);
+	glmSetIdentityMatrix(data->_proxyMatrixInverse);
+}
+
+//----------------------------------------------------------------------------
+uint64_t glmComputeSimulationDataSize(const GlmSimulationData* data)
+{
+	uint64_t totalSize = sizeof(GlmSimulationData);
+
+	// entity
+	totalSize += data->_entityCount * sizeof(int64_t);	// data->_entityIds
+	totalSize += data->_entityCount * sizeof(uint16_t); // data->_entityTypes
+	totalSize += data->_entityCount * sizeof(uint32_t); // data->_indexInEntityType
+	totalSize += data->_entityCount * sizeof(float);	// data->_scales
+	totalSize += data->_entityCount * sizeof(float);	// data->_entityRadius
+	totalSize += data->_entityCount * sizeof(float);	// data->_entityHeight
+
+	// entityType
+	totalSize += data->_entityTypeCount * sizeof(uint32_t); // data->_entityCountPerEntityType
+	totalSize += data->_entityTypeCount * sizeof(uint16_t); // data->_boneCount
+	totalSize += data->_entityTypeCount * sizeof(uint32_t); // data->_iBoneOffsetPerEntityType
+	totalSize += data->_entityTypeCount * sizeof(float);	// data->_maxBonesHierarchyLength
+	totalSize += data->_entityTypeCount * sizeof(uint16_t); // data->_blendShapeCount
+	totalSize += data->_entityTypeCount * sizeof(uint32_t); // data->_iBlendShapeOffsetPerEntityType
+	totalSize += data->_entityTypeCount * sizeof(uint8_t);	// data->_hasGeoBehavior
+	totalSize += data->_entityTypeCount * sizeof(uint32_t); // data->_iGeoBehaviorOffsetPerEntityType
+	totalSize += data->_entityTypeCount * sizeof(uint16_t); // data->_snsCountPerEntityType
+	totalSize += data->_entityTypeCount * sizeof(uint32_t); // data->_snsOffsetPerEntityType
+
+	// ppAttribute
+	totalSize += data->_ppFloatAttributeCount * GSC_PP_MAX_NAME_LENGTH * sizeof(char);
+	totalSize += data->_ppVectorAttributeCount * GSC_PP_MAX_NAME_LENGTH * sizeof(char);
+
+	return totalSize;
 }
 
 //----------------------------------------------------------------------------
@@ -1112,8 +1315,8 @@ GlmSimulationCacheStatus glmCreateAndReadSimulationData(GlmSimulationData** simu
 	}
 	else
 	{
-		glmFileRead(&ppFloatAttributeCount, sizeof(uint8_t), 1, fp);
-		glmFileRead(&ppVectorAttributeCount, sizeof(uint8_t), 1, fp);
+	glmFileRead(&ppFloatAttributeCount, sizeof(uint8_t), 1, fp);
+	glmFileRead(&ppVectorAttributeCount, sizeof(uint8_t), 1, fp);
 	}
 
 	// create
@@ -1148,7 +1351,7 @@ GlmSimulationCacheStatus glmCreateAndReadSimulationData(GlmSimulationData** simu
 	{
 		// read old names & types
 		int iPPAttribute = 0;
-		char(*ppAttributeNames)[GSC_PP_MAX_NAME_LENGTH] = (char(*)[GSC_PP_MAX_NAME_LENGTH])GLMC_MALLOC(ppAttributeCount * GSC_PP_MAX_NAME_LENGTH * sizeof(char));
+		char(*ppAttributeNames)[GSC_PP_MAX_NAME_LENGTH] = (char(*)[GSC_PP_MAX_NAME_LENGTH])GLMC_MALLOC(ppAttributeCount * sizeof(char[GSC_PP_MAX_NAME_LENGTH]));
 		data->_backwardCompatPPAttributeTypes = (uint8_t*)GLMC_MALLOC(ppAttributeCount * sizeof(uint8_t));
 				
 		glmFileRead(ppAttributeNames, sizeof(char), ppAttributeCount * GSC_PP_MAX_NAME_LENGTH, fp);
@@ -1169,8 +1372,8 @@ GlmSimulationCacheStatus glmCreateAndReadSimulationData(GlmSimulationData** simu
 		}
 
 		// allocate new names :
-		data->_ppFloatAttributeNames = (char(*)[GSC_PP_MAX_NAME_LENGTH])GLMC_MALLOC(data->_ppFloatAttributeCount * GSC_PP_MAX_NAME_LENGTH * sizeof(char));
-		data->_ppVectorAttributeNames = (char(*)[GSC_PP_MAX_NAME_LENGTH])GLMC_MALLOC(data->_ppVectorAttributeCount * GSC_PP_MAX_NAME_LENGTH * sizeof(char));
+		data->_ppFloatAttributeNames = (char(*)[GSC_PP_MAX_NAME_LENGTH])GLMC_MALLOC(data->_ppFloatAttributeCount * sizeof(char[GSC_PP_MAX_NAME_LENGTH]));
+		data->_ppVectorAttributeNames = (char(*)[GSC_PP_MAX_NAME_LENGTH])GLMC_MALLOC(data->_ppVectorAttributeCount * sizeof(char[GSC_PP_MAX_NAME_LENGTH]));
 
 		// set names :
 		data->_ppFloatAttributeCount = 0;
@@ -1180,11 +1383,11 @@ GlmSimulationCacheStatus glmCreateAndReadSimulationData(GlmSimulationData** simu
 			switch (data->_backwardCompatPPAttributeTypes[iPPAttribute])
 			{
 			case GSC_PP_FLOAT:
-				memcpy(data->_ppFloatAttributeNames[data->_ppFloatAttributeCount], ppAttributeNames[iPPAttribute], sizeof(char)*GSC_PP_MAX_NAME_LENGTH);
+				memcpy(data->_ppFloatAttributeNames[data->_ppFloatAttributeCount], ppAttributeNames[iPPAttribute], sizeof(char[GSC_PP_MAX_NAME_LENGTH]));
 				data->_ppFloatAttributeCount++;
 				break;
 			case GSC_PP_VECTOR:
-				memcpy(data->_ppVectorAttributeNames[data->_ppVectorAttributeCount], ppAttributeNames[iPPAttribute], sizeof(char)*GSC_PP_MAX_NAME_LENGTH);
+				memcpy(data->_ppVectorAttributeNames[data->_ppVectorAttributeCount], ppAttributeNames[iPPAttribute], sizeof(char[GSC_PP_MAX_NAME_LENGTH]));
 				data->_ppVectorAttributeCount++;
 				break;
 			}
@@ -1195,8 +1398,8 @@ GlmSimulationCacheStatus glmCreateAndReadSimulationData(GlmSimulationData** simu
 	}
 	else
 	{
-		glmFileRead(data->_ppFloatAttributeNames, sizeof(char), data->_ppFloatAttributeCount * GSC_PP_MAX_NAME_LENGTH, fp);
-		glmFileRead(data->_ppVectorAttributeNames, sizeof(char), data->_ppVectorAttributeCount * GSC_PP_MAX_NAME_LENGTH, fp);
+	glmFileRead(data->_ppFloatAttributeNames, sizeof(char), data->_ppFloatAttributeCount * GSC_PP_MAX_NAME_LENGTH, fp);
+	glmFileRead(data->_ppVectorAttributeNames, sizeof(char), data->_ppVectorAttributeCount * GSC_PP_MAX_NAME_LENGTH, fp);
 	}
 
 	fclose(fp);
@@ -1354,14 +1557,14 @@ void glmCreateFrameData(GlmFrameData** frameData, const GlmSimulationData* simul
 		}
 	}
 
-	data->_bonePositions = (float(*)[3])GLMC_MALLOC(totalBoneCount * 3 * sizeof(float));
-	data->_boneOrientations = (float(*)[4])GLMC_MALLOC(totalBoneCount * 4 * sizeof(float));
-	data->_snsValues = (float(*)[4])GLMC_MALLOC(totalSnSCount * 4 * sizeof(float));
+	data->_bonePositions = (float(*)[3])GLMC_MALLOC(totalBoneCount * sizeof(float[3]));
+	data->_boneOrientations = (float(*)[4])GLMC_MALLOC(totalBoneCount * sizeof(float[4]));
+	data->_snsValues = (float(*)[4])GLMC_MALLOC(totalSnSCount * sizeof(float[4]));
 	data->_blindData = (float*)GLMC_MALLOC(totalBlindDataCount * sizeof(float));
 	if (totalGeoBehaviorCount > 0)
 	{
 		data->_geoBehaviorGeometryIds = (uint16_t*)GLMC_MALLOC(totalGeoBehaviorCount * sizeof(uint16_t));
-		data->_geoBehaviorAnimFrameInfo = (float(*)[3])GLMC_MALLOC(totalGeoBehaviorCount * 3 * sizeof(float));
+		data->_geoBehaviorAnimFrameInfo = (float(*)[3])GLMC_MALLOC(totalGeoBehaviorCount * sizeof(float[3]));
 		data->_geoBehaviorBlendModes = (uint8_t*)GLMC_MALLOC(totalGeoBehaviorCount * sizeof(uint8_t));
 	}
 	else
@@ -1378,14 +1581,14 @@ void glmCreateFrameData(GlmFrameData** frameData, const GlmSimulationData* simul
 	data->_clothAllocatedEntities = 0;
 	data->_clothAllocatedIndices = 0;
 	data->_clothAllocatedVertices = 0;
-	data->_clothEntityIndex = NULL;
-	data->_clothMeshIndexOffsetPerClothEntity = NULL;
-	data->_clothMeshVertexOffsetPerClothEntity = NULL;
-	data->_clothMeshIndexCount = NULL;
-	data->_clothReference = NULL;
-	data->_clothMaxExtent = NULL;
-	data->_clothMeshVertexCountPerClothIndex = NULL;
-	data->_clothIndices = NULL;
+	data->_entityClothIndex = NULL;
+	data->_clothEntityFirstAssetMeshIndex = NULL;
+	data->_clothEntityFirstMeshVertex = NULL;
+	data->_clothEntityMeshCount = NULL;
+	data->_clothEntityQuantizationReference = NULL;
+	data->_clothEntityQuantizationMaxExtent = NULL;
+	data->_clothMeshVertexCount = NULL;
+	data->_clothMeshIndicesInCharAssets = NULL;
 	data->_clothVertices = NULL;
 
 	// ppAttribute
@@ -1401,10 +1604,10 @@ void glmCreateFrameData(GlmFrameData** frameData, const GlmSimulationData* simul
 	}
 	if (simulationData->_ppVectorAttributeCount > 0)
 	{
-		data->_ppVectorAttributeData = (float(**)[3]) GLMC_MALLOC(simulationData->_ppVectorAttributeCount * sizeof(float*));
+		data->_ppVectorAttributeData = (float(**)[3])GLMC_MALLOC(simulationData->_ppVectorAttributeCount * sizeof(float*));
 		for (i = 0; i < simulationData->_ppVectorAttributeCount; ++i)
 		{
-			data->_ppVectorAttributeData[i] = (float(*)[3])GLMC_MALLOC(simulationData->_entityCount * 3 * sizeof(float));
+			data->_ppVectorAttributeData[i] = (float(*)[3])GLMC_MALLOC(simulationData->_entityCount * sizeof(float[3]));
 		}
 	}
 }
@@ -1466,8 +1669,8 @@ void glmFileReadPositions(float(*bonesPositions)[3], unsigned int totalBoneCount
 			validEntityCount += data->_entityCountPerEntityType[iEntityType];
 		}
 
-		rootBonePositions = (float(*)[3])GLMC_MALLOC(validEntityCount * 3 * sizeof(float));
-		compressedBonePositions = (uint16_t(*)[3])GLMC_MALLOC((totalBoneCount - validEntityCount) * 3 * sizeof(uint16_t));
+		rootBonePositions = (float(*)[3])GLMC_MALLOC(validEntityCount * sizeof(float[3]));
+		compressedBonePositions = (uint16_t(*)[3])GLMC_MALLOC((totalBoneCount - validEntityCount) * sizeof(uint16_t[3]));
 		glmFileRead(rootBonePositions, sizeof(float), validEntityCount * 3, fp);
 		glmFileReadUInt16(compressedBonePositions[0], (totalBoneCount - validEntityCount) * 3, fp);
 		for (iEntityType = 0; iEntityType < data->_entityTypeCount; ++iEntityType)
@@ -1477,7 +1680,7 @@ void glmFileReadPositions(float(*bonesPositions)[3], unsigned int totalBoneCount
 			{
 				unsigned int iBone;
 				unsigned int iBoneOffset = data->_iBoneOffsetPerEntityType[iEntityType] + iEntity * data->_boneCount[iEntityType];
-				memcpy(bonesPositions[iBoneOffset], rootBonePositions[iRootBone], 3 * sizeof(float));
+				memcpy(bonesPositions[iBoneOffset], rootBonePositions[iRootBone], sizeof(float[3]));
 				++iRootBone;
 				for (iBone = 1; iBone < data->_boneCount[iEntityType]; ++iBone)
 				{
@@ -1514,7 +1717,7 @@ void glmFileReadClothVertices(GlmFrameData* frameData, FILE* fp, GlmSimulationCa
 		int iAbsoluteMeshVertex = 0;
 		int iAbsoluteClothMesh = 0;
 		unsigned int iClothEntity = 0;
-		uint16_t(*compressedClothVertices)[3] = (uint16_t(*)[3])GLMC_MALLOC(frameData->_clothTotalVertices * 3 * sizeof(uint16_t));
+		uint16_t(*compressedClothVertices)[3] = (uint16_t(*)[3])GLMC_MALLOC(frameData->_clothTotalVertices * sizeof(uint16_t[3]));
 
 		glmFileReadUInt16(compressedClothVertices[0], frameData->_clothTotalVertices * 3, fp);
 
@@ -1522,12 +1725,12 @@ void glmFileReadClothVertices(GlmFrameData* frameData, FILE* fp, GlmSimulationCa
 		for (iClothEntity = 0; iClothEntity < frameData->_clothEntityCount; iClothEntity++)
 		{
 			// cloth max extent and reference must be read priori to calling this function
-			float *referencePosition = frameData->_clothReference[iClothEntity];
-			float maxExtent = frameData->_clothMaxExtent[iClothEntity];
+			float *referencePosition = frameData->_clothEntityQuantizationReference[iClothEntity];
+			float maxExtent = frameData->_clothEntityQuantizationMaxExtent[iClothEntity];
 
-			for (iClothEntityMesh = 0; iClothEntityMesh < frameData->_clothMeshIndexCount[iClothEntity]; iClothEntityMesh++)
+			for (iClothEntityMesh = 0; iClothEntityMesh < frameData->_clothEntityMeshCount[iClothEntity]; iClothEntityMesh++)
 			{
-				for (iClothVertex = 0; iClothVertex < frameData->_clothMeshVertexCountPerClothIndex[iAbsoluteClothMesh]; iClothVertex++)
+				for (iClothVertex = 0; iClothVertex < frameData->_clothMeshVertexCount[iAbsoluteClothMesh]; iClothVertex++)
 				{
 					vertex = frameData->_clothVertices[iAbsoluteMeshVertex];
 
@@ -1557,42 +1760,43 @@ void glmCreateClothData(const GlmSimulationData* simuData, GlmFrameData* data, u
 {
 	if (clothEntityCount > 0)
 	{
-		if (data->_clothEntityIndex == NULL)
+		if (data->_entityClothIndex == NULL)
 		{
-			data->_clothEntityIndex = (int32_t*)GLMC_MALLOC(simuData->_entityCount * sizeof(int32_t));			
+			data->_entityClothIndex = (int32_t*)GLMC_MALLOC(simuData->_entityCount * sizeof(int32_t));			
 		}
 
 		if (clothEntityCount > data->_clothAllocatedEntities)
 		{
-			GLMC_FREE(data->_clothMeshIndexOffsetPerClothEntity);
-			GLMC_FREE(data->_clothMeshVertexOffsetPerClothEntity);
-			GLMC_FREE(data->_clothMeshIndexCount);
-			GLMC_FREE(data->_clothReference);
-			GLMC_FREE(data->_clothMaxExtent);
+			GLMC_FREE(data->_clothEntityFirstAssetMeshIndex);
+			GLMC_FREE(data->_clothEntityMeshCount);
+			GLMC_FREE(data->_clothEntityQuantizationReference);
+			GLMC_FREE(data->_clothEntityQuantizationMaxExtent);
 
-			data->_clothMeshIndexOffsetPerClothEntity = (uint32_t*)GLMC_MALLOC(clothEntityCount * sizeof(uint32_t));
-			data->_clothMeshVertexOffsetPerClothEntity = (uint32_t*)GLMC_MALLOC(clothEntityCount * sizeof(uint32_t));
-			data->_clothMeshIndexCount = (uint32_t*)GLMC_MALLOC(clothEntityCount * sizeof(uint32_t));
-			data->_clothReference = (float(*)[3])GLMC_MALLOC(clothEntityCount * sizeof(float) * 3);
-			data->_clothMaxExtent = (float*)GLMC_MALLOC(clothEntityCount * sizeof(float));
+			data->_clothEntityFirstAssetMeshIndex = (uint32_t*)GLMC_MALLOC(clothEntityCount * sizeof(uint32_t));
+			data->_clothEntityFirstMeshVertex = (uint32_t*)GLMC_MALLOC(clothEntityCount * sizeof(uint32_t));
+			data->_clothEntityMeshCount = (uint32_t*)GLMC_MALLOC(clothEntityCount * sizeof(uint32_t));
+			data->_clothEntityQuantizationReference = (float(*)[3])GLMC_MALLOC(clothEntityCount * sizeof(float[3]));
+			data->_clothEntityQuantizationMaxExtent = (float*)GLMC_MALLOC(clothEntityCount * sizeof(float));
 
 			data->_clothAllocatedEntities = clothEntityCount;
 		}
 
 		if (clothIndices > data->_clothAllocatedIndices)
 		{
-			GLMC_FREE(data->_clothIndices);
-			GLMC_FREE(data->_clothMeshVertexCountPerClothIndex);
+			GLMC_FREE(data->_clothMeshIndicesInCharAssets);
+			GLMC_FREE(data->_clothMeshVertexCount);
+			//GLMC_FREE(data->_clothMeshVertexOffsetPerClothIndex);
 
-			data->_clothIndices = (uint32_t*)GLMC_MALLOC(clothIndices * sizeof(uint32_t));
-			data->_clothMeshVertexCountPerClothIndex = (uint32_t*)GLMC_MALLOC(clothIndices * sizeof(uint32_t));
-
+			data->_clothMeshIndicesInCharAssets = (uint32_t*)GLMC_MALLOC(clothIndices * sizeof(uint32_t));
+			data->_clothMeshVertexCount = (uint32_t*)GLMC_MALLOC(clothIndices * sizeof(uint32_t));
+			//data->_clothMeshVertexOffsetPerClothIndex = (uint32_t*)GLMC_MALLOC(clothIndices * sizeof(uint32_t));
+			
 			data->_clothAllocatedIndices = clothIndices;
 		}
 		if (clothVertices > data->_clothAllocatedVertices)
 		{
 			GLMC_FREE(data->_clothVertices);
-			data->_clothVertices = (float(*)[3])GLMC_MALLOC(clothVertices * sizeof(float) * 3);
+			data->_clothVertices = (float(*)[3])GLMC_MALLOC(clothVertices * sizeof(float[3]));
 			data->_clothAllocatedVertices = clothVertices;
 		}
 
@@ -1600,6 +1804,52 @@ void glmCreateClothData(const GlmSimulationData* simuData, GlmFrameData* data, u
 		data->_clothTotalMeshIndices = clothIndices;
 		data->_clothTotalVertices = clothVertices;
 	}
+}
+
+//----------------------------------------------------------------------------
+uint64_t glmComputeFrameDataSize(const GlmFrameData* frameData, const GlmSimulationData* simulationData)
+{
+	unsigned int i;
+	unsigned int totalBoneCount = 0;
+	unsigned int totalSnSCount = 0;
+	unsigned int totalBlindDataCount = 0;
+	unsigned int totalGeoBehaviorCount = 0;
+
+	// allocate frame data
+	uint64_t totalSize = sizeof(GlmFrameData);
+
+	// entityType
+	for (i = 0; i < simulationData->_entityTypeCount; ++i)
+	{
+		totalBoneCount += simulationData->_boneCount[i] * simulationData->_entityCountPerEntityType[i];
+		totalSnSCount += simulationData->_snsCountPerEntityType[i] * simulationData->_entityCountPerEntityType[i];
+		totalBlindDataCount += simulationData->_blindDataCount[i] * simulationData->_entityCountPerEntityType[i];
+		if (simulationData->_hasGeoBehavior[i])
+		{
+			totalGeoBehaviorCount += simulationData->_entityCountPerEntityType[i];
+		}
+	}
+
+	totalSize += totalBoneCount * 3 * sizeof(float);
+	totalSize += totalBoneCount * 4 * sizeof(float);
+	totalSize += totalSnSCount * 4 * sizeof(float);
+	totalSize += totalBlindDataCount * sizeof(float);
+	if (totalGeoBehaviorCount > 0)
+	{
+		totalSize += totalGeoBehaviorCount * sizeof(uint16_t);
+		totalSize += totalGeoBehaviorCount * 3 * sizeof(float);
+		totalSize += totalGeoBehaviorCount * sizeof(uint8_t);
+	}
+	if (frameData->_clothEntityCount)
+	{
+		totalSize += simulationData->_entityCount * sizeof(uint8_t); // data->_entityUseCloth
+		totalSize += frameData->_clothEntityCount * sizeof(uint32_t); // data->_clothMeshIndexCount
+		totalSize += frameData->_clothEntityCount * sizeof(float) * 3; // data->_clothReference
+		totalSize += frameData->_clothEntityCount * sizeof(float); // data->_clothMaxExtent
+		totalSize += frameData->_clothTotalVertices * sizeof(float) * 3; // data->_clothVertices
+	}
+
+	return totalSize;
 }
 
 //----------------------------------------------------------------------------
@@ -1721,16 +1971,17 @@ GlmSimulationCacheStatus glmReadFrameData(GlmFrameData* data, const GlmSimulatio
 			uint8_t* entityUseCloth = NULL;
 
 			glmCreateClothData(simulationData, data, data->_clothEntityCount, data->_clothTotalMeshIndices, data->_clothTotalVertices);
-			
+
 			// temporary reading buffer
 			entityUseCloth = (uint8_t*)GLMC_MALLOC(simulationData->_entityCount * sizeof(uint8_t));
 
 			glmFileRead(entityUseCloth, sizeof(uint8_t), simulationData->_entityCount, fp);
-			glmFileReadUInt32(data->_clothMeshIndexCount, data->_clothEntityCount, fp);
-			glmFileRead(data->_clothReference, sizeof(float), data->_clothEntityCount * 3, fp);
-			glmFileRead(data->_clothMaxExtent, sizeof(float), data->_clothEntityCount, fp);
-			glmFileReadUInt32(data->_clothIndices, data->_clothTotalMeshIndices, fp);
-			glmFileReadUInt32(data->_clothMeshVertexCountPerClothIndex, data->_clothTotalMeshIndices, fp);
+			glmFileReadUInt32(data->_clothEntityMeshCount, data->_clothEntityCount, fp);
+			glmFileRead(data->_clothEntityQuantizationReference, sizeof(float), data->_clothEntityCount * 3, fp);
+			glmFileRead(data->_clothEntityQuantizationMaxExtent, sizeof(float), data->_clothEntityCount, fp);
+			glmFileReadUInt32(data->_clothMeshIndicesInCharAssets, data->_clothTotalMeshIndices, fp);
+			glmFileReadUInt32(data->_clothMeshVertexCount, data->_clothTotalMeshIndices, fp);
+
 			if (data->_clothTotalVertices > 0)
 			{
 				glmFileReadClothVertices(data, fp, (GlmSimulationCacheFormat)data->_cacheFormat);
@@ -1743,22 +1994,24 @@ GlmSimulationCacheStatus glmReadFrameData(GlmFrameData* data, const GlmSimulatio
 				{
 					uint32_t iClothMeshIndex;
 					uint32_t clothMeshCount;
-					data->_clothEntityIndex[iEntity] = iClothEntityIndex;
+					data->_entityClothIndex[iEntity] = iClothEntityIndex;
 					
-					data->_clothMeshIndexOffsetPerClothEntity[iClothEntityIndex] = iClothEntityFirstMeshIndex;
-					data->_clothMeshVertexOffsetPerClothEntity[iClothEntityIndex] = iClothEntityFirstVertexIndex;
+					data->_clothEntityFirstAssetMeshIndex[iClothEntityIndex] = iClothEntityFirstMeshIndex;
+					data->_clothEntityFirstMeshVertex[iClothEntityIndex] = iClothEntityFirstVertexIndex;
 
 					// advance indices (add current cloth meshes vertices, and advance first mesh index)
-					for (iClothMeshIndex = 0, clothMeshCount = data->_clothMeshIndexCount[iClothEntityIndex]; iClothMeshIndex < clothMeshCount ; iClothMeshIndex++)
+					for (iClothMeshIndex = 0, clothMeshCount = data->_clothEntityMeshCount[iClothEntityIndex]; iClothMeshIndex < clothMeshCount; iClothMeshIndex++)
 					{
-						iClothEntityFirstVertexIndex += data->_clothMeshVertexCountPerClothIndex[iClothEntityFirstMeshIndex++];
+						iClothEntityFirstVertexIndex += data->_clothMeshVertexCount[iClothEntityFirstMeshIndex + iClothMeshIndex];
 					}
+
+					iClothEntityFirstMeshIndex += data->_clothEntityMeshCount[iClothEntityIndex];
 
 					iClothEntityIndex++;
 				}
 				else
 				{
-					data->_clothEntityIndex[iEntity] = -1;
+					data->_entityClothIndex[iEntity] = -1;
 				}
 			}
 
@@ -1790,15 +2043,15 @@ GlmSimulationCacheStatus glmReadFrameData(GlmFrameData* data, const GlmSimulatio
 	}
 	else
 	{
-		// ppAttribute
-		for (i = 0; i < simulationData->_ppFloatAttributeCount; ++i)
-		{
-			glmFileRead(data->_ppFloatAttributeData[i], sizeof(float), simulationData->_entityCount, fp);
-		}
-		for (i = 0; i < simulationData->_ppVectorAttributeCount; ++i)
-		{
-			glmFileRead(data->_ppVectorAttributeData[i], sizeof(float), simulationData->_entityCount * 3, fp);
-		}
+	// ppAttribute
+	for (i = 0; i < simulationData->_ppFloatAttributeCount; ++i)
+	{
+		glmFileRead(data->_ppFloatAttributeData[i], sizeof(float), simulationData->_entityCount, fp);
+	}
+	for (i = 0; i < simulationData->_ppVectorAttributeCount; ++i)
+	{
+		glmFileRead(data->_ppVectorAttributeData[i], sizeof(float), simulationData->_entityCount * 3, fp);
+	}
 	}
 
 	fclose(fp);
@@ -1863,8 +2116,8 @@ void glmFileWritePositions(float(*bonesPositions)[3], unsigned int totalBoneCoun
 			validEntityCount += data->_entityCountPerEntityType[iEntityType];
 		}
 
-		rootBonePositions = (float(*)[3])GLMC_MALLOC(validEntityCount * 3 * sizeof(float));
-		compressedBonePositions = (uint16_t(*)[3])GLMC_MALLOC((totalBoneCount - validEntityCount) * 3 * sizeof(uint16_t));
+		rootBonePositions = (float(*)[3])GLMC_MALLOC(validEntityCount * sizeof(float[3]));
+		compressedBonePositions = (uint16_t(*)[3])GLMC_MALLOC((totalBoneCount - validEntityCount) * sizeof(uint16_t[3]));
 
 		for (iEntityType = 0; iEntityType < data->_entityTypeCount; ++iEntityType)
 		{
@@ -1873,7 +2126,7 @@ void glmFileWritePositions(float(*bonesPositions)[3], unsigned int totalBoneCoun
 			{
 				unsigned int iBone;
 				unsigned int iBoneOffset = data->_iBoneOffsetPerEntityType[iEntityType] + iEntity * data->_boneCount[iEntityType];
-				memcpy(rootBonePositions[iRootBone], bonesPositions[iBoneOffset], 3 * sizeof(float));
+				memcpy(rootBonePositions[iRootBone], bonesPositions[iBoneOffset], sizeof(float[3]));
 				++iRootBone;
 				for (iBone = 1; iBone < data->_boneCount[iEntityType]; ++iBone)
 				{
@@ -1911,7 +2164,7 @@ void glmFileWriteClothVertices(const GlmFrameData* frameData, FILE* fp, GlmSimul
 		unsigned int iClothVertex = 0;
 		float* currentVertex = NULL;
 
-		uint16_t(*compressedVertices)[3] = (uint16_t(*)[3])GLMC_MALLOC(frameData->_clothTotalVertices * 3 * sizeof(uint16_t));
+		uint16_t(*compressedVertices)[3] = (uint16_t(*)[3])GLMC_MALLOC(frameData->_clothTotalVertices * sizeof(uint16_t[3]));
 
 		int iAbsoluteClothMesh = 0;
 		int iAbsoluteMeshVertex = 0;
@@ -1919,12 +2172,12 @@ void glmFileWriteClothVertices(const GlmFrameData* frameData, FILE* fp, GlmSimul
 		// iteration per cloth entity:
 		for (iClothEntity = 0; iClothEntity < frameData->_clothEntityCount; iClothEntity++)
 		{
-			float *referencePosition = frameData->_clothReference[iClothEntity];
-			float maxExtent = frameData->_clothMaxExtent[iClothEntity];
+			float *referencePosition = frameData->_clothEntityQuantizationReference[iClothEntity];
+			float maxExtent = frameData->_clothEntityQuantizationMaxExtent[iClothEntity];
 
-			for (iClothEntityMesh = 0; iClothEntityMesh < frameData->_clothMeshIndexCount[iClothEntity]; iClothEntityMesh++)
+			for (iClothEntityMesh = 0; iClothEntityMesh < frameData->_clothEntityMeshCount[iClothEntity]; iClothEntityMesh++)
 			{
-				for (iClothVertex = 0; iClothVertex < frameData->_clothMeshVertexCountPerClothIndex[iAbsoluteClothMesh]; iClothVertex++)
+				for (iClothVertex = 0; iClothVertex < frameData->_clothMeshVertexCount[iAbsoluteClothMesh]; iClothVertex++)
 				{
 					currentVertex = frameData->_clothVertices[iAbsoluteMeshVertex];
 
@@ -2022,20 +2275,18 @@ GlmSimulationCacheStatus glmWriteFrameData(const char* file, const GlmFrameData*
 			uint32_t iEntity = 0;
 			for (; iEntity < simulationData->_entityCount; iEntity++)
 			{
-				entityUseCloth[iEntity] = data->_clothEntityIndex[iEntity] == -1 ? 0 : 1;
+				entityUseCloth[iEntity] = data->_entityClothIndex[iEntity] == -1 ? 0 : 1;
 			}
 			glmFileWrite(entityUseCloth, sizeof(uint8_t), simulationData->_entityCount, fp);
 			GLMC_FREE(entityUseCloth);
-			
-			//glmFileWriteUInt32((uint32_t*)(data->_clothEntityIndex), simulationData->_entityCount, fp);
-			//glmFileWriteUInt32(data->_clothMeshIndexOffsetPerClothEntity, data->_clothEntityCount, fp);
-			//glmFileWriteUInt32(data->_clothMeshVertexOffsetPerClothEntity, data->_clothEntityCount, fp);
-			glmFileWriteUInt32(data->_clothMeshIndexCount, data->_clothEntityCount, fp);
-			glmFileWrite(data->_clothReference, sizeof(float), data->_clothEntityCount * 3, fp);
-			glmFileWrite(data->_clothMaxExtent, sizeof(float), data->_clothEntityCount, fp);
 
-			glmFileWriteUInt32(data->_clothIndices, data->_clothTotalMeshIndices, fp);
-			glmFileWriteUInt32(data->_clothMeshVertexCountPerClothIndex, data->_clothTotalMeshIndices, fp);
+			// note : _clothEntityFirstMeshVertex & _clothEntityFirstAssetMeshIndex are recomputed, not serialized
+			glmFileWriteUInt32(data->_clothEntityMeshCount, data->_clothEntityCount, fp);
+			glmFileWrite(data->_clothEntityQuantizationReference, sizeof(float), data->_clothEntityCount * 3, fp);
+			glmFileWrite(data->_clothEntityQuantizationMaxExtent, sizeof(float), data->_clothEntityCount, fp);
+
+			glmFileWriteUInt32(data->_clothMeshIndicesInCharAssets, data->_clothTotalMeshIndices, fp);
+			glmFileWriteUInt32(data->_clothMeshVertexCount, data->_clothTotalMeshIndices, fp);
 
 			if (data->_clothTotalVertices > 0)
 			{
@@ -2073,14 +2324,14 @@ void glmDestroyFrameData(GlmFrameData** frameData, const GlmSimulationData* simu
 	GLMC_FREE(data->_geoBehaviorAnimFrameInfo);
 	GLMC_FREE(data->_geoBehaviorBlendModes);
 
-	GLMC_FREE(data->_clothEntityIndex);
-	GLMC_FREE(data->_clothMeshIndexOffsetPerClothEntity);
-	GLMC_FREE(data->_clothMeshVertexOffsetPerClothEntity);
-	GLMC_FREE(data->_clothMeshIndexCount);
-	GLMC_FREE(data->_clothReference);
-	GLMC_FREE(data->_clothMaxExtent);
-	GLMC_FREE(data->_clothIndices);
-	GLMC_FREE(data->_clothMeshVertexCountPerClothIndex);
+	GLMC_FREE(data->_entityClothIndex);
+	GLMC_FREE(data->_clothEntityFirstAssetMeshIndex);
+	GLMC_FREE(data->_clothEntityFirstMeshVertex);
+	GLMC_FREE(data->_clothEntityMeshCount);
+	GLMC_FREE(data->_clothEntityQuantizationReference);
+	GLMC_FREE(data->_clothEntityQuantizationMaxExtent);
+	GLMC_FREE(data->_clothMeshIndicesInCharAssets);
+	GLMC_FREE(data->_clothMeshVertexCount);
 
 	GLMC_FREE(data->_clothVertices);
 
@@ -2101,8 +2352,9 @@ void glmDestroyFrameData(GlmFrameData** frameData, const GlmSimulationData* simu
 }
 
 //----------------------------------------------------------------------------
-void glmCreateHistory(GlmHistory** history, unsigned int transformCount, unsigned int entityCount, unsigned int totalPostureCount, unsigned int totalPostureBoneCount, unsigned int totalEntityTypesBoneCount, unsigned int totalMeshAssetsOverride, unsigned int duplicatedEntityCount, unsigned int totalEntityTypeCount, unsigned int expandCount)
+void glmCreateHistory(GlmHistory** history, unsigned int transformCount, unsigned int transformGroupCount, unsigned int entityCount, unsigned int totalPostureCount, unsigned int totalPostureBoneCount, unsigned int totalEntityTypesBoneCount, unsigned int totalMeshAssetsOverride, unsigned int duplicatedEntityCount, unsigned int totalEntityTypeCount, unsigned int expandCount, unsigned int totalFrameOffsetCount, unsigned int totalFrameWarpCount, unsigned int scaleRangeCount, unsigned int perFramePosOriCount, unsigned int snapToTotalCount)
 {
+	unsigned int i;
 	GlmHistory* data;
 
 	// allocate frame data
@@ -2113,9 +2365,9 @@ void glmCreateHistory(GlmHistory** history, unsigned int transformCount, unsigne
 	data->_entityArrayStartIndex = (uint32_t *)GLMC_MALLOC( transformCount * sizeof(uint32_t) );
 	data->_entityIds = (int64_t *)GLMC_MALLOC( entityCount * sizeof(int64_t) );
 
-	data->_transformRotate = (float(*)[4])GLMC_MALLOC( transformCount * 4 * sizeof(float) );
-	data->_transformTranslate = (float(*)[3])GLMC_MALLOC( transformCount * 3 * sizeof(float) );
-	data->_transformPivot = (float(*)[3])GLMC_MALLOC( transformCount * 3 * sizeof(float) );
+	data->_transformRotate = (float(*)[4])GLMC_MALLOC( transformCount * sizeof(float[4]) );
+	data->_transformTranslate = (float(*)[3])GLMC_MALLOC( transformCount * sizeof(float[3]) );
+	data->_transformPivot = (float(*)[3])GLMC_MALLOC( transformCount * sizeof(float[3]) );
 	data->_scale = (float*)GLMC_MALLOC( transformCount * sizeof(float) );
 
 	data->_transformTypes = (uint8_t*)GLMC_MALLOC( transformCount *sizeof(uint8_t) );
@@ -2131,16 +2383,31 @@ void glmCreateHistory(GlmHistory** history, unsigned int transformCount, unsigne
 	data->_duplicatedEntityArrayStartIndex = (uint32_t*)GLMC_MALLOC(transformCount *sizeof(uint32_t));
 	data->_duplicatedEntityArrayCount = (uint32_t*)GLMC_MALLOC(transformCount *sizeof(uint32_t));
 
-	// expanded entities
+	// hierarchical bones
 	data->_expandCount = expandCount;
-	data->_expands = (float(*)[3])GLMC_MALLOC(expandCount * 3 * sizeof(float));
+	data->_expands = (float(*)[3])GLMC_MALLOC(expandCount * sizeof(float[3]));
 	data->_expandArrayStartIndex = (uint32_t*)GLMC_MALLOC(transformCount *sizeof(uint32_t));
 	data->_expandArrayCount = (uint32_t*)GLMC_MALLOC(transformCount *sizeof(uint32_t));
 
+	// per frame pos/ori
+	data->_perFramePosOriCount = perFramePosOriCount;
+	data->_frameCurvePos = (float(*)[3])GLMC_MALLOC(perFramePosOriCount * sizeof(float[3]));
+	data->_frameCachePos = (float(*)[3])GLMC_MALLOC(perFramePosOriCount * sizeof(float[3]));
+	data->_framePos = (float(*)[3])GLMC_MALLOC(perFramePosOriCount * sizeof(float[3]));
+	data->_frameOri = (float(*)[4])GLMC_MALLOC(perFramePosOriCount * sizeof(float[4]));
+	data->_perFramePosOriArrayStartIndex = (uint32_t*)GLMC_MALLOC(transformCount *sizeof(uint32_t));
+	data->_perFramePosOriArrayCount = (uint32_t*)GLMC_MALLOC(transformCount *sizeof(uint32_t));
+
+	// scale range entities
+	data->_scaleRangeCount = scaleRangeCount;
+	data->_scaleRanges = (float*)GLMC_MALLOC(scaleRangeCount * sizeof(float));
+	data->_scaleRangeArrayStartIndex = (uint32_t*)GLMC_MALLOC(transformCount *sizeof(uint32_t));
+	data->_scaleRangeArrayCount = (uint32_t*)GLMC_MALLOC(transformCount *sizeof(uint32_t));
+
 	// hierarchical bones
 	data->_localBoneCount = totalEntityTypesBoneCount;
-	data->_localBoneOrientation = (float(*)[4])GLMC_MALLOC(totalEntityTypesBoneCount * 4 * sizeof(float));
-	data->_localBonePosition = (float(*)[3])GLMC_MALLOC(totalEntityTypesBoneCount * 3 * sizeof(float));
+	data->_localBoneOrientation = (float(*)[4])GLMC_MALLOC(totalEntityTypesBoneCount * sizeof(float[4]));
+	data->_localBonePosition = (float(*)[3])GLMC_MALLOC(totalEntityTypesBoneCount * sizeof(float[3]));
 	data->_localBoneParent = (uint32_t*)GLMC_MALLOC(totalEntityTypesBoneCount *sizeof(uint32_t));
 
 	data->_localBoneOffsetCount = totalEntityTypeCount;
@@ -2160,22 +2427,93 @@ void glmCreateHistory(GlmHistory** history, unsigned int transformCount, unsigne
 	data->_posturesFrames = (uint32_t *)GLMC_MALLOC( totalPostureCount * sizeof(uint32_t) );
 
 	// posture edit bones
-	data->_posturesPositions = (float(*)[3])GLMC_MALLOC( totalPostureBoneCount * 3 * sizeof(float) );
-	data->_posturesOrientations = (float(*)[4])GLMC_MALLOC( totalPostureBoneCount * 4 * sizeof(float) );
+	data->_posturesPositions = (float(*)[3])GLMC_MALLOC( totalPostureBoneCount * sizeof(float[3]) );
+	data->_posturesOrientations = (float(*)[4])GLMC_MALLOC( totalPostureBoneCount * sizeof(float[4]) );
 
 	data->_postureTotalBoneCount = totalPostureBoneCount;
 	data->_postureCount = totalPostureCount;
 	data->_entityCount = entityCount;
 	data->_transformCount = transformCount;
 
-	data->_terrainMesh = NULL;
+	// groups
+	data->_transformGroupCount = transformGroupCount;
+	data->_transformGroupActive = (uint8_t*)GLMC_MALLOC(transformGroupCount *sizeof(uint8_t));
+	data->_transformGroupName = (char(*)[GSC_PP_MAX_NAME_LENGTH])GLMC_MALLOC(transformGroupCount * sizeof(char[GSC_PP_MAX_NAME_LENGTH]));
+	// init string marker
+	for (i = 0; i < transformGroupCount; i++)
+		data->_transformGroupName[i][0] = 0;
+	data->_transformGroupBoundaries = (uint32_t(*)[2])GLMC_MALLOC(transformGroupCount * sizeof(uint32_t[2]));
 
+	// frame offset
+	data->_frameOffsetCount = totalFrameOffsetCount;
+	data->_frameOffsets = (float *)GLMC_MALLOC(totalFrameOffsetCount * sizeof(float));
+	data->_frameOffsetArrayStartIndex = (uint32_t*)GLMC_MALLOC(transformCount *sizeof(uint32_t));
+	data->_frameOffsetArrayCount = (uint32_t*)GLMC_MALLOC(transformCount *sizeof(uint32_t));
+
+	// frame scale
+	data->_frameWarpCount = totalFrameWarpCount;
+	data->_frameWarps = (float *)GLMC_MALLOC(totalFrameWarpCount * sizeof(float));
+	data->_frameWarpArrayStartIndex = (uint32_t*)GLMC_MALLOC(transformCount *sizeof(uint32_t));
+	data->_frameWarpArrayCount = (uint32_t*)GLMC_MALLOC(transformCount *sizeof(uint32_t));
+	
+	// frame parameters
+	data->_frameOffsetMin = (float *)GLMC_MALLOC(transformCount * sizeof(float));
+	data->_frameOffsetMax = (float *)GLMC_MALLOC(transformCount * sizeof(float));
+	data->_frameWarpMin = (float *)GLMC_MALLOC(transformCount * sizeof(float));
+	data->_frameWarpMax = (float *)GLMC_MALLOC(transformCount * sizeof(float));
+
+	// scale range bound
+	data->_scaleRangeMin = (float *)GLMC_MALLOC(transformCount * sizeof(float));
+	data->_scaleRangeMax = (float *)GLMC_MALLOC(transformCount * sizeof(float));
+
+	// per frame pos/ori
+	data->_frameCount = (uint32_t *)GLMC_MALLOC(transformCount * sizeof(uint32_t));
+	data->_startFrame = (uint32_t *)GLMC_MALLOC(transformCount * sizeof(uint32_t));
+	data->_trajectoryMode = (uint32_t *)GLMC_MALLOC(transformCount * sizeof(uint32_t));
+	data->_trajectorySteps = (uint32_t *)GLMC_MALLOC(transformCount * sizeof(uint32_t));
+	data->_smoothIterationCount = (uint32_t *)GLMC_MALLOC(transformCount * sizeof(uint32_t));
+	data->_smoothFrontBackRatio = (float *)GLMC_MALLOC(transformCount * sizeof(float));
+	data->_smoothComponents = (float(*)[3])GLMC_MALLOC(transformCount * sizeof(float) * 3);
+
+	// default init
+	for (i = 0; i < transformCount; i++)
+	{
+		data->_trajectoryMode[i] = 0;
+		data->_trajectorySteps[i] = 1;
+		data->_smoothIterationCount[i] = 0;
+		data->_smoothFrontBackRatio[i] = 0.5f;
+		data->_smoothComponents[i][0] = 1.f;
+		data->_smoothComponents[i][1] = 1.f;
+		data->_smoothComponents[i][2] = 1.f;
+	}
+
+	data->_snapToTarget = (char(*)[GSC_PP_MAX_NAME_LENGTH])GLMC_MALLOC(transformCount * sizeof(char[GSC_PP_MAX_NAME_LENGTH]));
+	data->_shaderAttribute = (char(*)[GSC_PP_MAX_NAME_LENGTH])GLMC_MALLOC(transformCount * sizeof(char[GSC_PP_MAX_NAME_LENGTH]));
+
+	// init string marker
+	for (i = 0; i < transformCount; i++)
+	{
+		data->_snapToTarget[i][0] = 0;
+		data->_shaderAttribute[i][0] = 0;
+	}
+
+	data->_snapToTotalCount = snapToTotalCount;
+	data->_snapToStartIndex = (uint32_t*)GLMC_MALLOC(transformCount *sizeof(uint32_t));
+	data->_snapToCount = (uint32_t*)GLMC_MALLOC(transformCount *sizeof(uint32_t));
+	data->_snapToPositions = (float(*)[3])GLMC_MALLOC(snapToTotalCount * sizeof(float[3]));
+	data->_snapToRotations = (float(*)[4])GLMC_MALLOC(snapToTotalCount * sizeof(float[4]));
+
+	data->_terrainMeshSource = NULL;
+	data->_terrainMeshDestination = NULL;
 }
 
 //----------------------------------------------------------------------------
 void glmDestroyHistory(GlmHistory** history)
 {
 	GlmHistory* data = *history;
+	if (!data)
+		return;
+
 	GLMC_FREE(data->_transformTypes);
 	GLMC_FREE(data->_active);
 	GLMC_FREE(data->_boneIndex);
@@ -2197,10 +2535,23 @@ void glmDestroyHistory(GlmHistory** history)
 	GLMC_FREE(data->_duplicatedEntityArrayStartIndex);
 	GLMC_FREE(data->_duplicatedEntityArrayCount);
 
-	// expand entities
+	// hierarchy
 	GLMC_FREE(data->_expands);
 	GLMC_FREE(data->_expandArrayStartIndex);
 	GLMC_FREE(data->_expandArrayCount);
+
+	// per frame pos/ori
+	GLMC_FREE(data->_frameCurvePos);
+	GLMC_FREE(data->_frameCachePos);
+	GLMC_FREE(data->_framePos);
+	GLMC_FREE(data->_frameOri);
+	GLMC_FREE(data->_perFramePosOriArrayStartIndex);
+	GLMC_FREE(data->_perFramePosOriArrayCount);
+
+	// scale range entities
+	GLMC_FREE(data->_scaleRanges);
+	GLMC_FREE(data->_scaleRangeArrayStartIndex);
+	GLMC_FREE(data->_scaleRangeArrayCount);
 
 	// hierarchy
 	GLMC_FREE(data->_localBoneOrientation);
@@ -2221,6 +2572,50 @@ void glmDestroyHistory(GlmHistory** history)
 	// posture edit bones
 	GLMC_FREE(data->_posturesPositions);
 	GLMC_FREE(data->_posturesOrientations);
+
+	// Groups
+	GLMC_FREE(data->_transformGroupActive);
+	GLMC_FREE(data->_transformGroupName);
+	GLMC_FREE(data->_transformGroupBoundaries);
+
+	// frame offsets
+	GLMC_FREE(data->_frameOffsets);
+	GLMC_FREE(data->_frameOffsetArrayStartIndex);
+	GLMC_FREE(data->_frameOffsetArrayCount);
+
+	// frame scales
+	GLMC_FREE(data->_frameWarps);
+	GLMC_FREE(data->_frameWarpArrayStartIndex);
+	GLMC_FREE(data->_frameWarpArrayCount);
+
+	// frame parameters
+	GLMC_FREE(data->_frameOffsetMin);
+	GLMC_FREE(data->_frameOffsetMax);
+	GLMC_FREE(data->_frameWarpMin);
+	GLMC_FREE(data->_frameWarpMax);
+
+	// scale range bounds
+	GLMC_FREE(data->_scaleRangeMin);
+	GLMC_FREE(data->_scaleRangeMax);
+
+	// per frame
+	GLMC_FREE(data->_startFrame);
+	GLMC_FREE(data->_frameCount);
+	GLMC_FREE(data->_trajectoryMode);
+	GLMC_FREE(data->_trajectorySteps);
+	GLMC_FREE(data->_smoothIterationCount);
+	GLMC_FREE(data->_smoothFrontBackRatio);
+	GLMC_FREE(data->_smoothComponents);
+
+	// SnapTo
+	GLMC_FREE(data->_snapToTarget);
+	GLMC_FREE(data->_snapToStartIndex);
+	GLMC_FREE(data->_snapToCount);
+	GLMC_FREE(data->_snapToPositions);
+	GLMC_FREE(data->_snapToRotations);
+
+	// shader attribute
+	GLMC_FREE(data->_shaderAttribute);
 
 	GLMC_FREE(data);
 	*history = NULL;
@@ -2247,7 +2642,7 @@ int glmsprintf( char *str, int strSize, const char *format, ... )
 //----------------------------------------------------------------------------
 GlmSimulationCacheStatus glmWriteHistoryJSON(const char* file, GlmHistory* history)
 {
-	char tmps[512];
+	char tmps[1024];
 	GlmHistory* data = history;
 	unsigned int i, j;
 	unsigned int addComa = 0;
@@ -2268,7 +2663,8 @@ GlmSimulationCacheStatus glmWriteHistoryJSON(const char* file, GlmHistory* histo
 
 	// header
 	fputs("{", fp);
-	glmsprintf(tmps, sizeof(tmps), "\"entityCount\":%d,\"postureCount\":%d,\"postureTotalBoneCount\":%d,\"localBoneCount\":%d,\"meshAssetsOverrideTotalCount\":%d,\"options\":%d,\"duplicatedEntityCount\":%d,\"entityTypeCount\":%d,\"expandCount\":%d\n",
+	glmsprintf(tmps, sizeof(tmps), "\"transformGroupCount\":%d,\"entityCount\":%d,\"postureCount\":%d,\"postureTotalBoneCount\":%d,\"localBoneCount\":%d,\"meshAssetsOverrideTotalCount\":%d,\"options\":%d,\"duplicatedEntityCount\":%d,\"entityTypeCount\":%d,\"expandCount\":%d,\"frameOffsetCount\":%d,\"frameWarpCount\":%d,\"scaleRangeCount\":%d,\"perFramePosOriCount\":%d,\"snapToTotalCount\":%d\n",
+		data->_transformGroupCount,
 		data->_entityCount,
 		data->_postureCount,
 		data->_postureTotalBoneCount,
@@ -2277,7 +2673,12 @@ GlmSimulationCacheStatus glmWriteHistoryJSON(const char* file, GlmHistory* histo
 		data->_options,
 		data->_duplicatedEntityCount,
 		data->_localBoneOffsetCount,
-		data->_expandCount
+		data->_expandCount,
+		data->_frameOffsetCount,
+		data->_frameWarpCount,
+		data->_scaleRangeCount,
+		data->_perFramePosOriCount,
+		data->_snapToTotalCount
 		);
 	fputs(tmps, fp);
 
@@ -2287,7 +2688,7 @@ GlmSimulationCacheStatus glmWriteHistoryJSON(const char* file, GlmHistory* histo
 	{
 		if (i)
 			fputs(",\n", fp);
-		glmsprintf(tmps, sizeof(tmps), "{\n\"transformType\":%d,\"active\":%d,\"boneIndex\":%d,\"renderingTypeIdx\":%d,\"scale\":%f,\"rotate\":[%f,%f,%f,%f],\"translate\":[%f,%f,%f],\"pivot\":[%f,%f,%f],\"clothIndice\":%d,\"enableCloth\":%d,\n",
+		glmsprintf(tmps, sizeof(tmps), "{\n\"transformType\":%d,\"active\":%d,\"boneIndex\":%d,\"renderingTypeIdx\":%d,\"scale\":%f,\"rotate\":[%f,%f,%f,%f],\"translate\":[%f,%f,%f],\"pivot\":[%f,%f,%f],",
 			data->_transformTypes[i],
 			data->_active[i] ? 1 : 0,
 			data->_boneIndex[i],
@@ -2295,9 +2696,36 @@ GlmSimulationCacheStatus glmWriteHistoryJSON(const char* file, GlmHistory* histo
 			data->_scale[i],
 			data->_transformRotate[i][0], data->_transformRotate[i][1], data->_transformRotate[i][2], data->_transformRotate[i][3],
 			data->_transformTranslate[i][0], data->_transformTranslate[i][1], data->_transformTranslate[i][2],
-			data->_transformPivot[i][0], data->_transformPivot[i][1], data->_transformPivot[i][2],
+			data->_transformPivot[i][0], data->_transformPivot[i][1], data->_transformPivot[i][2]);
+		fputs(tmps, fp);
+
+		glmsprintf(tmps, sizeof(tmps), "\"clothIndice\":%d,\"enableCloth\":%d,\"frameOffsetMin\":%f,\"frameOffsetMax\":%f,\"frameWarpMin\":%f,\"frameWarpMax\":%f,\"scaleRangeMin\":%f,\"scaleRangeMax\":%f,",
 			data->_clothIndice[i],
-			data->_enableCloth[i]);
+			data->_enableCloth[i],
+			data->_frameOffsetMin[i],
+			data->_frameOffsetMax[i],
+			data->_frameWarpMin[i],
+			data->_frameWarpMax[i],
+			data->_scaleRangeMin[i],
+			data->_scaleRangeMax[i]);
+		fputs(tmps, fp);
+
+		glmsprintf(tmps, sizeof(tmps), "\"frameCount\":%d,\"startFrame\":%d,\"snapToTarget\":\"%s\",\"snapToStartIndex\":%d,\"snapToCount\":%d,\"trajectoryMode\":%d,\"trajectorySteps\":%d,\"smoothIterations\":%d,\"smoothRatio\":%f,\"smoothX\":%f,\"smoothY\":%f,\"smoothZ\":%f,",
+			(int)data->_frameCount[i],
+			(int)data->_startFrame[i],
+			data->_snapToTarget[i],
+			data->_snapToStartIndex[i],
+			data->_snapToCount[i],
+			data->_trajectoryMode[i],
+			data->_trajectorySteps[i],
+			data->_smoothIterationCount[i],
+			data->_smoothFrontBackRatio[i],
+			data->_smoothComponents[i][0],
+			data->_smoothComponents[i][1],
+			data->_smoothComponents[i][2]);
+		fputs(tmps, fp);
+
+		glmsprintf(tmps, sizeof(tmps), "\"shaderAttribute\":\"%s\",\n",	data->_shaderAttribute[i]);
 		fputs(tmps, fp);
 
 		// entities
@@ -2335,6 +2763,27 @@ GlmSimulationCacheStatus glmWriteHistoryJSON(const char* file, GlmHistory* histo
 			fputs(tmps, fp);
 		}
 		fputs("]\n", fp);
+
+		// frame offset
+		fputs(",\"frameOffsets\":[", fp);
+		for (j = 0; j<data->_frameOffsetArrayCount[i]; j++)
+		{
+			if (j) fputs(",", fp);
+			glmsprintf(tmps, sizeof(tmps), "%f", data->_frameOffsets[data->_frameOffsetArrayStartIndex[i] + j]);
+			fputs(tmps, fp);
+		}
+		fputs("]\n", fp);
+
+		// frame scales
+		fputs(",\"frameWarps\":[", fp);
+		for (j = 0; j<data->_frameWarpArrayCount[i]; j++)
+		{
+			if (j) fputs(",", fp);
+			glmsprintf(tmps, sizeof(tmps), "%f", data->_frameWarps[data->_frameWarpArrayStartIndex[i] + j]);
+			fputs(tmps, fp);
+		}
+		fputs("]\n", fp);
+
 		// expand entities
 		fputs(",\"expands\":[", fp);
 		for (j = 0; j<data->_expandArrayCount[i]; j++)
@@ -2347,6 +2796,44 @@ GlmSimulationCacheStatus glmWriteHistoryJSON(const char* file, GlmHistory* histo
 			fputs(tmps, fp);
 		}
 		fputs("]\n", fp);
+
+		// expand entities
+		fputs(",\"perFramePosOri\":[", fp);
+		for (j = 0; j<data->_perFramePosOriArrayCount[i]; j++)
+		{
+			if (j) fputs(",", fp);
+			glmsprintf(tmps, sizeof(tmps), "%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n", 
+				data->_frameCachePos[data->_perFramePosOriArrayStartIndex[i] + j][0],
+				data->_frameCachePos[data->_perFramePosOriArrayStartIndex[i] + j][1],
+				data->_frameCachePos[data->_perFramePosOriArrayStartIndex[i] + j][2],
+
+				data->_frameCurvePos[data->_perFramePosOriArrayStartIndex[i] + j][0],
+				data->_frameCurvePos[data->_perFramePosOriArrayStartIndex[i] + j][1],
+				data->_frameCurvePos[data->_perFramePosOriArrayStartIndex[i] + j][2],
+				
+				data->_framePos[data->_perFramePosOriArrayStartIndex[i] + j][0],
+				data->_framePos[data->_perFramePosOriArrayStartIndex[i] + j][1],
+				data->_framePos[data->_perFramePosOriArrayStartIndex[i] + j][2],
+
+				data->_frameOri[data->_perFramePosOriArrayStartIndex[i] + j][0],
+				data->_frameOri[data->_perFramePosOriArrayStartIndex[i] + j][1],
+				data->_frameOri[data->_perFramePosOriArrayStartIndex[i] + j][2],
+				data->_frameOri[data->_perFramePosOriArrayStartIndex[i] + j][3]
+				);
+			fputs(tmps, fp);
+		}
+		fputs("]\n", fp);
+
+		// scale range entities
+		fputs(",\"scaleRanges\":[", fp);
+		for (j = 0; j<data->_scaleRangeArrayCount[i]; j++)
+		{
+			if (j) fputs(",", fp);
+			glmsprintf(tmps, sizeof(tmps), "%f", data->_scaleRanges[data->_scaleRangeArrayStartIndex[i] + j]);
+			fputs(tmps, fp);
+		}
+		fputs("]\n", fp);
+
 		// posture frames
 		if (data->_transformTypes[i] == SimulationCachePosture)
 		{
@@ -2360,10 +2847,40 @@ GlmSimulationCacheStatus glmWriteHistoryJSON(const char* file, GlmHistory* histo
 			fputs("]\n",fp);
 		}
 
+		fputs(",\"snapTo\":[", fp);
+		for (j = 0; j<data->_snapToCount[i]; j++)
+		{
+			if (j) fputs(",", fp);
+			glmsprintf(tmps, sizeof(tmps), "{\"pos\":[%f,%f,%f],\"rot\":[%f,%f,%f,%f]}\n",
+						data->_snapToPositions[data->_snapToStartIndex[i] + j][0], data->_snapToPositions[data->_snapToStartIndex[i] + j][1], data->_snapToPositions[data->_snapToStartIndex[i] + j][2],
+						data->_snapToRotations[data->_snapToStartIndex[i] + j][0], data->_snapToRotations[data->_snapToStartIndex[i] + j][1], data->_snapToRotations[data->_snapToStartIndex[i] + j][2], data->_snapToRotations[data->_snapToStartIndex[i] + j][3]);
+			fputs(tmps, fp);
+		}
+		fputs("]\n", fp);
+
 		fputs("}", fp); // end transform object
 	}
 	fputs("\n]\n", fp);
 	
+	// posture edit bones
+	if (data->_transformGroupCount)
+	{
+		fputs(",\"transformGroup\":[", fp);
+		for (j = 0; j<data->_transformGroupCount; j++)
+		{
+			if (j)
+				fputs(",\n", fp);
+			glmsprintf(tmps, sizeof(tmps), "{\"groupName\":\"%s\",\"groupActive\":%d,\"groupFrom\":%d,\"groupTo\":%d}",
+					   data->_transformGroupName[j],
+					   data->_transformGroupActive[j],
+					   data->_transformGroupBoundaries[j][0],
+					   data->_transformGroupBoundaries[j][1]
+					   );
+			fputs(tmps, fp);
+		}
+		fputs("]\n", fp);
+	}
+
 	// posture edit bones
 	if (data->_postureTotalBoneCount)
 	{
@@ -2421,7 +2938,7 @@ GlmSimulationCacheStatus glmWriteHistoryJSON(const char* file, GlmHistory* histo
 		if (data->_meshAssetsOverrideCount[i]) addComa = 1;
 	}
 	fputs("]\n", fp);
-	
+
 	// end file object
 	fputs("}\n", fp);
 	
@@ -2431,7 +2948,7 @@ GlmSimulationCacheStatus glmWriteHistoryJSON(const char* file, GlmHistory* histo
 }
 
 //----------------------------------------------------------------------------
-size_t glmReadJSONFloatArray(struct json_value_s *value, float *floatArray, int expectedSize)
+int glmReadJSONFloatArray(struct json_value_s *value, float *floatArray, int expectedSize)
 {
 	int elementIndex = 0;
 	struct json_array_s* jsonArray;
@@ -2458,33 +2975,50 @@ size_t glmReadJSONFloatArray(struct json_value_s *value, float *floatArray, int 
 }
 
 //----------------------------------------------------------------------------
-size_t glmReadJSONInt64Array(struct json_value_s *value, int64_t *intArray)
+int glmReadJSONPosOriArray(struct json_value_s *value, float *floatCurveArrayPos, float *floatCacheArrayPos, float *floatArrayPos, float *floatArrayOri, int expectedSize)
 {
+	static const int arrayIndex[13] = { 0,0,0, 1,1,1, 2,2,2, 3,3,3,3 };
+	static const int arraySizes[13] = { 3,3,3, 3,3,3, 3,3,3, 4,4,4,4 };
+	static const int arrayElementIndex[13] = { 0,1,2, 0,1,2, 0,1,2, 0,1,2,3 };
+	static const int elementsModulo = sizeof(arrayIndex) / sizeof(int);
+
 	int elementIndex = 0;
 	struct json_array_s* jsonArray;
 	struct json_array_element_s *objectElement;
+	float * floatArrays[4];
+	floatArrays[0] = floatCurveArrayPos;
+	floatArrays[1] = floatCacheArrayPos;
+	floatArrays[2] = floatArrayPos;
+	floatArrays[3] = floatArrayOri;
 
 	if (value->type != json_type_array)
 		return 0;
 
 	jsonArray = (struct json_array_s*)value->payload;
+	if (expectedSize && (int)jsonArray->length != expectedSize)
+		return 0;
+
 	
 	objectElement = jsonArray->start;
-	while(objectElement)
+	while (objectElement)
 	{
 		struct json_value_s *elementValue = objectElement->value;
 		if (elementValue->type == json_type_number)
-			intArray[elementIndex] = atoi(((struct json_number_s*)(elementValue->payload))->number);
+		{
+			int currentArrayIndex = arrayIndex[elementIndex%elementsModulo];
+			int currentElementIndex = arrayElementIndex[elementIndex % elementsModulo];
+			int itemIndex = (elementIndex / elementsModulo) * arraySizes[elementIndex % elementsModulo];
+			floatArrays[currentArrayIndex][currentElementIndex + itemIndex] = (float)atof(((struct json_number_s*)(elementValue->payload))->number);
+		}
 
 		elementIndex++;
 		objectElement = objectElement->next;
 	};
-
-	return jsonArray->length;
+	return elementIndex/ elementsModulo;
 }
 
 //----------------------------------------------------------------------------
-size_t glmReadJSONIntArray(struct json_value_s *value, uint32_t *intArray)
+int glmReadJSONInt64Array(struct json_value_s *value, int64_t *intArray)
 {
 	int elementIndex = 0;
 	struct json_array_s* jsonArray;
@@ -2506,7 +3040,33 @@ size_t glmReadJSONIntArray(struct json_value_s *value, uint32_t *intArray)
 		objectElement = objectElement->next;
 	};
 
-	return jsonArray->length;
+	return (int)jsonArray->length;
+}
+
+//----------------------------------------------------------------------------
+int glmReadJSONIntArray(struct json_value_s *value, uint32_t *intArray)
+{
+	int elementIndex = 0;
+	struct json_array_s* jsonArray;
+	struct json_array_element_s *objectElement;
+
+	if (value->type != json_type_array)
+		return 0;
+
+	jsonArray = (struct json_array_s*)value->payload;
+	
+	objectElement = jsonArray->start;
+	while(objectElement)
+	{
+		struct json_value_s *elementValue = objectElement->value;
+		if (elementValue->type == json_type_number)
+			intArray[elementIndex] = atoi(((struct json_number_s*)(elementValue->payload))->number);
+
+		elementIndex++;
+		objectElement = objectElement->next;
+	};
+
+	return (int)jsonArray->length;
 }
 
 //----------------------------------------------------------------------------
@@ -2516,6 +3076,7 @@ GlmSimulationCacheStatus glmCreateAndReadHistoryJSON(GlmHistory** history, const
 	int fileSize;
 	GlmHistory* data = NULL;
 	void *fileSource;
+	uint32_t transformGroupCount = 0;
 	uint32_t entityCount = 0;
 	uint32_t transformCount = 0;
 	uint32_t totalPostureCount = 0;
@@ -2525,9 +3086,16 @@ GlmSimulationCacheStatus glmCreateAndReadHistoryJSON(GlmHistory** history, const
 	uint32_t options = 0;
 	uint32_t duplicatedEntityCount = 0;
 	uint32_t entityTypeCount = 0;
+	uint32_t frameOffsetCount = 0;
+	uint32_t frameWarpCount = 0;
 	uint32_t expandCount = 0;
+	uint32_t scaleRangeCount = 0;
+	uint32_t perFramePosOriCount = 0;
+	uint32_t snapToTotalCount = 0;
+
 	struct json_value_s *jsonvalue;
 	int transformIndex = 0;
+	int transformGroupIndex = 0;
 	int entitiesStartIndex = 0;
 	int meshAssetStartIndex = 0;
 	int meshAssetCountIndex = 0;
@@ -2535,7 +3103,12 @@ GlmSimulationCacheStatus glmCreateAndReadHistoryJSON(GlmHistory** history, const
 	int postureBoneStartIndex = 0;
 	int postureFramesStartIndex = 0;
 	int duplicatedEntitiesStartIndex = 0;
+	int frameOffsetStartIndex = 0;
+	int frameWarpStartIndex = 0;
 	int expandStartIndex = 0;
+	int scaleRangeStartIndex = 0;
+	int perFramePosOriStartIndex = 0;
+	int snapToStartIndex = 0;
 
 #ifdef _MSC_VER				
 	FILE* fp;
@@ -2566,7 +3139,15 @@ GlmSimulationCacheStatus glmCreateAndReadHistoryJSON(GlmHistory** history, const
 		{
 			const char* elementName = (const char*)(element->name->string);
 			struct json_value_s* elementValue = (struct json_value_s*)element->value;
-			if (!strcmp(elementName,"entityCount"))
+			if (!strcmp(elementName, "transformGroupCount"))
+			{
+				if (elementValue->type == json_type_number)
+				{
+					struct json_number_s *jsonnumber = (struct json_number_s*)elementValue->payload;
+					transformGroupCount = atoi(jsonnumber->number);
+				}
+			}
+			else if (!strcmp(elementName,"entityCount"))
 			{
 				if (elementValue->type == json_type_number)
 				{
@@ -2598,6 +3179,22 @@ GlmSimulationCacheStatus glmCreateAndReadHistoryJSON(GlmHistory** history, const
 					entityTypeCount = atoi(jsonnumber->number);
 				}
 			}
+			else if (!strcmp(elementName, "frameOffsetCount"))
+			{
+				if (elementValue->type == json_type_number)
+				{
+					struct json_number_s *jsonnumber = (struct json_number_s*)elementValue->payload;
+					frameOffsetCount = atoi(jsonnumber->number);
+				}
+			}
+			else if (!strcmp(elementName, "frameWarpCount"))
+			{
+				if (elementValue->type == json_type_number)
+				{
+					struct json_number_s *jsonnumber = (struct json_number_s*)elementValue->payload;
+					frameWarpCount = atoi(jsonnumber->number);
+				}
+			}
 			else if (!strcmp(elementName,"postureTotalBoneCount"))
 			{
 				if (elementValue->type == json_type_number)
@@ -2622,12 +3219,36 @@ GlmSimulationCacheStatus glmCreateAndReadHistoryJSON(GlmHistory** history, const
 					expandCount = atoi(jsonnumber->number);
 				}
 			}
+			else if (!strcmp(elementName, "scaleRangeCount"))
+			{
+				if (elementValue->type == json_type_number)
+				{
+					struct json_number_s *jsonnumber = (struct json_number_s*)elementValue->payload;
+					scaleRangeCount = atoi(jsonnumber->number);
+				}
+			}
+			else if (!strcmp(elementName, "perFramePosOriCount"))
+			{
+				if (elementValue->type == json_type_number)
+				{
+					struct json_number_s *jsonnumber = (struct json_number_s*)elementValue->payload;
+					perFramePosOriCount = atoi(jsonnumber->number);
+				}
+			}
 			else if (!strcmp(elementName,"meshAssetsOverrideTotalCount"))
 			{
 				if (elementValue->type == json_type_number)
 				{
 					struct json_number_s *jsonnumber = (struct json_number_s*)elementValue->payload;
 					meshAssetsOverrideTotalCount = atoi(jsonnumber->number);
+				}
+			}
+			else if (!strcmp(elementName, "snapToTotalCount"))
+			{
+				if (elementValue->type == json_type_number)
+				{
+					struct json_number_s *jsonnumber = (struct json_number_s*)elementValue->payload;
+					snapToTotalCount = atoi(jsonnumber->number);
 				}
 			}
 			else if (!strcmp(elementName,"options"))
@@ -2646,7 +3267,7 @@ GlmSimulationCacheStatus glmCreateAndReadHistoryJSON(GlmHistory** history, const
 					struct json_array_s* jsonarray = (struct json_array_s*)elementValue->payload;
 					transformCount = (uint32_t)jsonarray->length;
 
-					glmCreateHistory(history, transformCount, entityCount, totalPostureCount, totalPostureBoneCount, localBoneCount, meshAssetsOverrideTotalCount, duplicatedEntityCount, entityTypeCount, expandCount);
+					glmCreateHistory(history, transformCount, transformGroupCount, entityCount, totalPostureCount, totalPostureBoneCount, localBoneCount, meshAssetsOverrideTotalCount, duplicatedEntityCount, entityTypeCount, expandCount, frameOffsetCount, frameWarpCount, scaleRangeCount, perFramePosOriCount, snapToTotalCount);
 					data = *history;
 					data->_options = options;
 
@@ -2663,8 +3284,20 @@ GlmSimulationCacheStatus glmCreateAndReadHistoryJSON(GlmHistory** history, const
 						data->_posturesFrameCount[transformIndex] = 0;
 						data->_posturesFrameStart[transformIndex] = postureFramesStartIndex;
 
+						data->_frameOffsetArrayCount[transformIndex] = 0;
+						data->_frameOffsetArrayStartIndex[transformIndex] = frameOffsetStartIndex;
+
+						data->_frameWarpArrayCount[transformIndex] = 0;
+						data->_frameWarpArrayStartIndex[transformIndex] = frameWarpStartIndex;
+
 						data->_expandArrayCount[transformIndex] = 0;
 						data->_expandArrayStartIndex[transformIndex] = expandStartIndex;
+						// get transform values
+						data->_scaleRangeArrayCount[transformIndex] = 0;
+						data->_scaleRangeArrayStartIndex[transformIndex] = scaleRangeStartIndex;
+
+						data->_perFramePosOriArrayCount[transformIndex] = 0;
+						data->_perFramePosOriArrayStartIndex[transformIndex] = perFramePosOriStartIndex;
 
 						// get transform values
 						if (transformElement->value->type == json_type_object)
@@ -2700,6 +3333,81 @@ GlmSimulationCacheStatus glmCreateAndReadHistoryJSON(GlmHistory** history, const
 								{
 									if (transformElementValueType == json_type_number)
 										data->_scale[transformIndex] = (float)atof(((struct json_number_s*)(transformElementValue->payload))->number);
+								}
+								else if (!strcmp(transformObjectElementName, "frameWarpMin"))
+								{
+									if (transformElementValueType == json_type_number)
+										data->_frameWarpMin[transformIndex] = (float)atof(((struct json_number_s*)(transformElementValue->payload))->number);
+								}
+								else if (!strcmp(transformObjectElementName, "frameWarpMax"))
+								{
+									if (transformElementValueType == json_type_number)
+										data->_frameWarpMax[transformIndex] = (float)atof(((struct json_number_s*)(transformElementValue->payload))->number);
+								}
+								else if (!strcmp(transformObjectElementName, "frameOffsetMin"))
+								{
+									if (transformElementValueType == json_type_number)
+										data->_frameOffsetMin[transformIndex] = (float)atof(((struct json_number_s*)(transformElementValue->payload))->number);
+								}
+								else if (!strcmp(transformObjectElementName, "frameOffsetMax"))
+								{
+									if (transformElementValueType == json_type_number)
+										data->_frameOffsetMax[transformIndex] = (float)atof(((struct json_number_s*)(transformElementValue->payload))->number);
+								}
+								else if (!strcmp(transformObjectElementName, "scaleRangeMin"))
+								{
+									if (transformElementValueType == json_type_number)
+										data->_scaleRangeMin[transformIndex] = (float)atof(((struct json_number_s*)(transformElementValue->payload))->number);
+								}
+								else if (!strcmp(transformObjectElementName, "scaleRangeMax"))
+								{
+									if (transformElementValueType == json_type_number)
+										data->_scaleRangeMax[transformIndex] = (float)atof(((struct json_number_s*)(transformElementValue->payload))->number);
+								}
+								else if (!strcmp(transformObjectElementName, "startFrame"))
+								{
+									if (transformElementValueType == json_type_number)
+										data->_startFrame[transformIndex] = (uint32_t)atoi(((struct json_number_s*)(transformElementValue->payload))->number);
+								}
+								else if (!strcmp(transformObjectElementName, "frameCount"))
+								{
+									if (transformElementValueType == json_type_number)
+										data->_frameCount[transformIndex] = (uint32_t)atoi(((struct json_number_s*)(transformElementValue->payload))->number);
+								}
+								else if (!strcmp(transformObjectElementName, "trajectoryMode"))
+								{
+									if (transformElementValueType == json_type_number)
+										data->_trajectoryMode[transformIndex] = (uint32_t)atoi(((struct json_number_s*)(transformElementValue->payload))->number);
+								}
+								else if (!strcmp(transformObjectElementName, "trajectorySteps"))
+								{
+									if (transformElementValueType == json_type_number)
+										data->_trajectorySteps[transformIndex] = (uint32_t)atoi(((struct json_number_s*)(transformElementValue->payload))->number);
+								}
+								else if (!strcmp(transformObjectElementName, "smoothIterations"))
+								{
+									if (transformElementValueType == json_type_number)
+										data->_smoothIterationCount[transformIndex] = (uint32_t)atoi(((struct json_number_s*)(transformElementValue->payload))->number);
+								}
+								else if (!strcmp(transformObjectElementName, "smoothRatio"))
+								{
+									if (transformElementValueType == json_type_number)
+										data->_smoothFrontBackRatio[transformIndex] = (float)atof(((struct json_number_s*)(transformElementValue->payload))->number);
+								}
+								else if (!strcmp(transformObjectElementName, "smoothX"))
+								{
+									if (transformElementValueType == json_type_number)
+										data->_smoothComponents[transformIndex][0] = (float)atof(((struct json_number_s*)(transformElementValue->payload))->number);
+								}
+								else if (!strcmp(transformObjectElementName, "smoothY"))
+								{
+									if (transformElementValueType == json_type_number)
+										data->_smoothComponents[transformIndex][1] = (float)atof(((struct json_number_s*)(transformElementValue->payload))->number);
+								}
+								else if (!strcmp(transformObjectElementName, "smoothZ"))
+								{
+									if (transformElementValueType == json_type_number)
+										data->_smoothComponents[transformIndex][2] = (float)atof(((struct json_number_s*)(transformElementValue->payload))->number);
 								}
 								else if (!strcmp(transformObjectElementName,"rotate"))
 								{
@@ -2751,12 +3459,105 @@ GlmSimulationCacheStatus glmCreateAndReadHistoryJSON(GlmHistory** history, const
 									data->_expandArrayCount[transformIndex] = expandCount/3;
 									expandStartIndex += expandCount / 3;
 								}
+								else if (!strcmp(transformObjectElementName, "scaleRanges"))
+								{
+									uint32_t scaleRangeCount = (uint32_t)glmReadJSONFloatArray(transformElementValue, (float*)&data->_scaleRanges[scaleRangeStartIndex], 0);
+									data->_scaleRangeArrayCount[transformIndex] = scaleRangeCount;
+									scaleRangeStartIndex += scaleRangeCount;
+								}
+								else if (!strcmp(transformObjectElementName, "perFramePosOri"))
+								{
+									uint32_t perFramePosOriCount = (uint32_t)glmReadJSONPosOriArray(transformElementValue, 
+										(float*)&data->_frameCachePos[perFramePosOriStartIndex],
+										(float*)&data->_frameCurvePos[perFramePosOriStartIndex],
+										(float*)&data->_framePos[perFramePosOriStartIndex],
+										(float*)&data->_frameOri[perFramePosOriStartIndex], 0);
+
+									data->_perFramePosOriArrayCount[transformIndex] = perFramePosOriCount;
+									perFramePosOriStartIndex += perFramePosOriCount;
+								}
 								else if (!strcmp(transformObjectElementName,"postureFrames"))
 								{
 									uint32_t postureCount = (uint32_t)glmReadJSONIntArray(transformElementValue, &data->_posturesFrames[postureFramesStartIndex]);
 									data->_posturesFrameCount[transformIndex] = postureCount;
 									postureFramesStartIndex += postureCount;
 								}
+								else if (!strcmp(transformObjectElementName, "frameOffsets"))
+								{
+									size_t localFrameOffsetCount = ((struct json_array_s*)transformElementValue->payload)->length;
+									glmReadJSONFloatArray(transformElementValue, &data->_frameOffsets[frameOffsetStartIndex], (int)localFrameOffsetCount);
+									data->_frameOffsetArrayCount[transformIndex] = (uint32_t)localFrameOffsetCount;
+									frameOffsetStartIndex += (uint32_t)localFrameOffsetCount;
+								}
+								else if (!strcmp(transformObjectElementName, "frameWarps"))
+								{
+									size_t localFrameWarpCount = ((struct json_array_s*)transformElementValue->payload)->length;
+									glmReadJSONFloatArray(transformElementValue, &data->_frameWarps[frameWarpStartIndex], (int)localFrameWarpCount);
+									data->_frameWarpArrayCount[transformIndex] = (uint32_t)localFrameWarpCount;
+									frameWarpStartIndex += (uint32_t)localFrameWarpCount;
+								}
+								else if (!strcmp(transformObjectElementName, "snapToTarget"))
+								{
+									if (transformElementValueType == json_type_string)
+									{
+										struct json_string_s *jsonstring = (struct json_string_s*)transformElementValue->payload;
+										const char* snapToTarget = (const char*)(jsonstring->string);
+										memcpy(data->_snapToTarget[transformIndex], snapToTarget, jsonstring->string_size + 1);
+										data->_snapToTarget[transformIndex][jsonstring->string_size] = '\0';
+									}
+								}
+								else if (!strcmp(transformObjectElementName, "shaderAttribute"))
+								{
+									if (transformElementValueType == json_type_string)
+									{
+										struct json_string_s *jsonstring = (struct json_string_s*)transformElementValue->payload;
+										const char* shaderAttribute = (const char*)(jsonstring->string);
+										memcpy(data->_shaderAttribute[transformIndex], shaderAttribute, jsonstring->string_size + 1);
+										data->_shaderAttribute[transformIndex][jsonstring->string_size] = '\0';
+									}
+								}
+								else if (!strcmp(transformObjectElementName, "snapToStartIndex"))
+								{
+									if (transformElementValueType == json_type_number)
+										data->_snapToStartIndex[transformIndex] = (uint32_t)atoi(((struct json_number_s*)(transformElementValue->payload))->number);
+								}
+								else if (!strcmp(transformObjectElementName, "snapToCount"))
+								{
+									if (transformElementValueType == json_type_number)
+										data->_snapToCount[transformIndex] = (uint32_t)atoi(((struct json_number_s*)(transformElementValue->payload))->number);
+								}
+								else if (!strcmp(transformObjectElementName, "snapTo"))
+								{
+									if (transformElementValueType == json_type_array)
+									{
+										struct json_array_element_s * snapToElement;
+										struct json_array_s* jsonarray = (struct json_array_s*)transformElementValue->payload;
+
+										snapToElement = jsonarray->start;
+										while (snapToElement)
+										{
+											if (snapToElement->value->type == json_type_object)
+											{
+												struct json_object_s * snapToElementObject = (struct json_object_s *)snapToElement->value->payload;
+												struct json_object_element_s* snapToElementElement = snapToElementObject->start;
+												while (snapToElementElement)
+												{
+													const char* snapToElementElementName = (const char*)(snapToElementElement->name->string);
+
+													if (!strcmp(snapToElementElementName, "pos"))
+														glmReadJSONFloatArray(snapToElementElement->value, data->_snapToPositions[snapToStartIndex], 3);
+													else if (!strcmp(snapToElementElementName, "rot"))
+														glmReadJSONFloatArray(snapToElementElement->value, data->_snapToRotations[snapToStartIndex], 4);
+
+													snapToElementElement = snapToElementElement->next;
+												}; // snapToElementElement
+											}
+											snapToStartIndex++;
+											snapToElement = snapToElement->next;
+										}; // snapToElement
+									}
+								}
+
 								transformObjectElement = transformObjectElement->next;
 							}
 						}
@@ -2765,13 +3566,66 @@ GlmSimulationCacheStatus glmCreateAndReadHistoryJSON(GlmHistory** history, const
 					} // while(transformElement)
 				}
 			}
+			else if (!strcmp(elementName, "transformGroup"))
+			{
+				if (elementValue->type == json_type_array)
+				{
+					struct json_array_element_s * transformGroupElement;
+					struct json_array_s* jsonarray = (struct json_array_s*)elementValue->payload;
+
+					transformGroupElement = jsonarray->start;
+					while (transformGroupElement)
+					{
+						if (transformGroupElement->value->type == json_type_object)
+						{
+							struct json_object_s * transformGroupElementObject = (struct json_object_s *)transformGroupElement->value->payload;
+							struct json_object_element_s* transformGroupElementElement = transformGroupElementObject->start;
+							while (transformGroupElementElement)
+							{
+								const char* transformGroupElementElementName = (const char*)(transformGroupElementElement->name->string);
+								struct json_value_s * transformGroupElementElementValue = transformGroupElementElement->value;
+								size_t transformGroupElementElementValueType = transformGroupElementElementValue->type;
+
+								if (!strcmp(transformGroupElementElementName, "groupName"))
+								{
+									if (transformGroupElementElementValueType == json_type_string)
+									{
+										struct json_string_s *jsonstring = (struct json_string_s*)transformGroupElementElementValue->payload;
+										const char* groupName = (const char*)(jsonstring->string);
+										memcpy(data->_transformGroupName[transformGroupIndex], groupName, jsonstring->string_size + 1);
+										data->_transformGroupName[transformGroupIndex][jsonstring->string_size] = '\0';
+									}
+								}
+								else if (!strcmp(transformGroupElementElementName, "groupActive"))
+								{
+									if (transformGroupElementElementValueType == json_type_number)
+										data->_transformGroupActive[transformGroupIndex] = (uint8_t)atoi(((struct json_number_s*)(transformGroupElementElementValue->payload))->number);
+								}
+								else if (!strcmp(transformGroupElementElementName, "groupFrom"))
+								{
+									if (transformGroupElementElementValueType == json_type_number)
+										data->_transformGroupBoundaries[transformGroupIndex][0] = atoi(((struct json_number_s*)(transformGroupElementElementValue->payload))->number);
+								}
+								else if (!strcmp(transformGroupElementElementName, "groupTo"))
+								{ 
+									if (transformGroupElementElementValueType == json_type_number)
+										data->_transformGroupBoundaries[transformGroupIndex][1] = atoi(((struct json_number_s*)(transformGroupElementElementValue->payload))->number);
+								}
+
+								transformGroupElementElement = transformGroupElementElement->next;
+							}; // transformGroupElementElement
+						}
+						transformGroupIndex++;
+						transformGroupElement = transformGroupElement->next;
+					}; // transformGroupElement
+				}
+			}
 			else if (!strcmp(elementName,"postureBones"))
 			{
 				if (elementValue->type == json_type_array)
 				{
 					struct json_array_element_s * postureBoneElement;
 					struct json_array_s* jsonarray = (struct json_array_s*)elementValue->payload;
-					transformCount = (uint32_t)jsonarray->length;
 
 					postureBoneElement = jsonarray->start;
 					while(postureBoneElement)
@@ -2864,9 +3718,10 @@ GlmSimulationCacheStatus glmCreateAndReadHistoryJSON(GlmHistory** history, const
 						assetsIndex++;
 
 						assetsOverrideElement = assetsOverrideElement->next;
-					}; // boneHierarchyElement
+					}; // assetsOverrideElement
 				}
 			}
+			
 			element = element->next;
 		};
 	}
@@ -3137,6 +3992,22 @@ void glmMultVec3Quaternion(const float *rot, const float *pos, float *r)
 }
 
 
+float interpolateFloat(float value1, float value2, float ratio)
+{
+	return value1 + (value2 - value1) * ratio;
+}
+
+//-------------------------------------------------------------------------
+void interpolateNFloats(float* value1, float *value2, float ratio, float *res, int count)
+{
+	int i;
+	for (i = 0; i < count; i++)
+	{
+		res[i] = value1[i] + (value2[i] - value1[i]) * ratio;
+	}
+}
+
+//-------------------------------------------------------------------------
 void glmComputeRestRelativesOrientationFromPosture(const float(*worldOrientations)[4], const float(*boneLocalOri)[4], uint32_t *parentIndex, const float(worldOrientation)[4], float(*restRelativeOrientations)[4], unsigned int boneCount)
 {
 	float worldOrientationInverse[4];
@@ -3146,7 +4017,7 @@ void glmComputeRestRelativesOrientationFromPosture(const float(*worldOrientation
 	//worldPositions[0] = worldPosition + worldOrientation * bones[0]->getLocalPos();
 	glmInverseQuaternion(worldOrientation, worldOrientationInverse);
 	glmMultQuaternion(worldOrientationInverse, &(*worldOrientations)[0], &(*restRelativeOrientations)[0]);
-
+	glmNormalizeQuaternion(restRelativeOrientations[0]);
 	//other bones:
 	//WO(bone) = WO(bone->father) * bone->getLocalOri() * PO(bone)
 	//WP(bone) = WP(bone->father) + WO(bone->father) * bone->getLocalPos()
@@ -3158,6 +4029,7 @@ void glmComputeRestRelativesOrientationFromPosture(const float(*worldOrientation
 		glmMultQuaternion( &*worldOrientations[boneParentIndex], boneLocalOri[i], parentOri);
 		glmInverseQuaternion(parentOri, parentOriInverse);
 		glmMultQuaternion( parentOriInverse, worldOrientations[i], restRelativeOrientations[i]);
+		glmNormalizeQuaternion(restRelativeOrientations[i]);
 	}
 }
 
@@ -3222,8 +4094,8 @@ void glmAllocateEntityTransformBoneEdit(GlmEntityTransform* tr, unsigned int bon
 {
 	unsigned int iLocal;
 	
-	tr->_boneRestRelativeOrientation = (float(*)[4])GLMC_MALLOC(boneCount * sizeof(float) * 4);
-	tr->_boneRestRelativePosition = (float(*)[3])GLMC_MALLOC(boneCount * sizeof(float) * 3);
+	tr->_boneRestRelativeOrientation = (float(*)[4])GLMC_MALLOC(boneCount * sizeof(float[4]));
+	tr->_boneRestRelativePosition = (float(*)[3])GLMC_MALLOC(boneCount * sizeof(float[3]));
 	if (trSource == NULL)
 	{
 		for (iLocal = 0; iLocal < boneCount; iLocal++)
@@ -3237,13 +4109,49 @@ void glmAllocateEntityTransformBoneEdit(GlmEntityTransform* tr, unsigned int bon
 	}
 	else
 	{
-		memcpy(tr->_boneRestRelativeOrientation, trSource->_boneRestRelativeOrientation, boneCount * sizeof(float) * 4);
-		memcpy(tr->_boneRestRelativePosition, trSource->_boneRestRelativePosition, boneCount * sizeof(float) * 3);
+		memcpy(tr->_boneRestRelativeOrientation, trSource->_boneRestRelativeOrientation, boneCount * sizeof(float[4]));
+		memcpy(tr->_boneRestRelativePosition, trSource->_boneRestRelativePosition, boneCount * sizeof(float[3]));
 	}
 }
 
 //---------------------------------------------------------------------------
-void glmCreateEntityTransforms(GlmSimulationData* simulationData, GlmHistory* history, GlmEntityTransform** entityTransforms, int *entityTransformCount )
+void glmCopyTransform(GlmSimulationData* simulationData, GlmEntityTransform* transformDestination, GlmEntityTransform* transformSource)
+{
+	unsigned int boneCount = simulationData->_boneCount[simulationData->_entityTypes[transformSource->_sourceIndexInCrowdField]];
+	// duplicate matrices
+	memcpy(&transformDestination->_matrixBase, &transformSource->_matrixBase, sizeof(float) * 16);
+	transformDestination->_scale = transformSource->_scale;
+	memcpy(&transformDestination->_orientationBase[0], &transformSource->_orientationBase[0], sizeof(float) * 4);
+	transformDestination->_sourceIndexInCrowdField = transformSource->_sourceIndexInCrowdField;
+	transformDestination->_postureBoneCount = transformSource->_postureBoneCount;
+	transformDestination->_killed = transformSource->_killed;
+
+	// duplicate bone edit
+	if (transformSource->_boneRestRelativeOrientation)
+	{
+		glmAllocateEntityTransformBoneEdit(transformDestination, boneCount, transformSource);
+	}
+}
+
+//---------------------------------------------------------------------------
+void glmSetSnapToPositionOrientation(GlmEntityTransform* transformDestination, const float *snapPosition, const float *snapRotation)
+{
+	float matrix[16];
+	float matrixSource[16];
+
+	float orientationSource[4];
+
+	memcpy(matrixSource, transformDestination->_matrixBase, sizeof(float) * 16);
+	memcpy(orientationSource, transformDestination->_orientationBase, sizeof(float) * 4);
+
+	glmConvertMatrix(matrix, snapPosition, snapRotation);
+	memcpy(transformDestination->_matrixBase, matrix, sizeof(float) * 16);
+	memcpy(transformDestination->_orientationBase, snapRotation, sizeof(float) * 4);
+	glmNormalizeQuaternion(transformDestination->_orientationBase);
+}
+
+//---------------------------------------------------------------------------
+void glmCreateEntityTransforms(GlmSimulationData* simulationData, GlmHistory* history, GlmEntityTransform** entityTransforms, int *entityTransformCount)
 {
 	// count duplications, allocate array
 	unsigned int i;
@@ -3265,7 +4173,9 @@ void glmCreateEntityTransforms(GlmSimulationData* simulationData, GlmHistory* hi
 	float(*posturesOrientationsHistorySource)[4];
 
 	GlmEntityTransform* data;
-	int64_t highestEntityType = 0;
+
+	unsigned int frameOffsetsAv = 0;
+	unsigned int frameWarpAv = 0;
 
 	static const float identityRotation[4] = { 0.f,0.f,0.f,1.f };
 
@@ -3273,8 +4183,8 @@ void glmCreateEntityTransforms(GlmSimulationData* simulationData, GlmHistory* hi
 	{
 		if (history->_active[i] == 0 || history->_transformTypes[i] == SimulationCacheNoop)
 			continue;
-		if (history->_transformTypes[i] == SimulationCacheDuplicate)
-			duplicateCount += history->_entityArrayCount[i];
+		if (history->_transformTypes[i] == SimulationCacheDuplicate || history->_transformTypes[i] == SimulationCacheSnapTo)
+			duplicateCount += history->_duplicatedEntityArrayCount[i];
 	}
 
 	// we don't store invalid entities anymore :
@@ -3294,10 +4204,10 @@ void glmCreateEntityTransforms(GlmSimulationData* simulationData, GlmHistory* hi
 	data = *entityTransforms;
 
 	// working arrays 
-	data->_sortedBonesWorldOri = (float(*)[4])GLMC_MALLOC(maxBonesPerEntity * 4 * sizeof(float));
-	data->_sortedBonesWorldPos = (float(*)[3])GLMC_MALLOC(maxBonesPerEntity * 3 * sizeof(float));
-	data->_sortedBonesScale = (float(*)[4])GLMC_MALLOC(maxBonesPerEntity * 4 * sizeof(float));
-	data->_restRelativeOri = (float(*)[4])GLMC_MALLOC(maxBonesPerEntity * 4 * sizeof(float));
+	data->_sortedBonesWorldOri = (float(*)[4])GLMC_MALLOC(maxBonesPerEntity * sizeof(float[4]));
+	data->_sortedBonesWorldPos = (float(*)[3])GLMC_MALLOC(maxBonesPerEntity * sizeof(float[3]));
+	data->_sortedBonesScale = (float(*)[4])GLMC_MALLOC(maxBonesPerEntity * sizeof(float[4]));
+	data->_restRelativeOri = (float(*)[4])GLMC_MALLOC(maxBonesPerEntity * sizeof(float[4]));
 	
 	// legacy entities
 	for (i = 0;i<simulationData->_entityCount;i++)
@@ -3305,7 +4215,6 @@ void glmCreateEntityTransforms(GlmSimulationData* simulationData, GlmHistory* hi
 		GlmEntityTransform* tr = &data[entityAv];
 
 		tr->_entityId = simulationData->_entityIds[i];
-		highestEntityType = (tr->_entityId>highestEntityType)?tr->_entityId:highestEntityType;
 		tr->_sourceIndexInCrowdField = i;
 		glmSetIdentityMatrix(tr->_matrix);
 		glmSetIdentityMatrix(tr->_matrixBase);
@@ -3313,6 +4222,7 @@ void glmCreateEntityTransforms(GlmSimulationData* simulationData, GlmHistory* hi
 		glmSetIdentityQuaternion(tr->_orientation);
 		tr->_lastEditPostureHistoryIndex = 0;
 		tr->_useCloth = 0;
+		tr->_killed = 0;
 		tr->_scale = 1.f;
 		tr->_postureCount = 0;
 		tr->_boneRestRelativeOrientation = 0;
@@ -3321,6 +4231,12 @@ void glmCreateEntityTransforms(GlmSimulationData* simulationData, GlmHistory* hi
 		tr->_groundAdaptOffset[0] = 0.f;
 		tr->_groundAdaptOffset[1] = 0.f;
 		tr->_groundAdaptOffset[2] = 0.f;
+		tr->_frameOffset._frameOffset = 0.f;
+		tr->_frameOffset._frameWarp = 1.f;
+		tr->_frameOffset._fraction = 0.f;
+		tr->_outOfCache = 0;
+		tr->_perFramePosOriIndex = INT_MIN;
+		tr->_perFramePosOriArrayCount = 0;
 		glmSetIdentityQuaternion(tr->_groundAdaptOrientation);
 		entityAv++;
 	}
@@ -3338,6 +4254,7 @@ void glmCreateEntityTransforms(GlmSimulationData* simulationData, GlmHistory* hi
 		glmSetIdentityQuaternion(tr->_orientationBase);
 		tr->_lastEditPostureHistoryIndex = 0;
 		tr->_useCloth = 0;
+		tr->_killed = 0;
 		tr->_scale = 1.f;
 		tr->_postureCount = 0;
 		tr->_boneRestRelativeOrientation = 0;
@@ -3346,6 +4263,12 @@ void glmCreateEntityTransforms(GlmSimulationData* simulationData, GlmHistory* hi
 		tr->_groundAdaptOffset[0] = 0.f;
 		tr->_groundAdaptOffset[1] = 0.f;
 		tr->_groundAdaptOffset[2] = 0.f;
+		tr->_frameOffset._frameOffset = 0.f;
+		tr->_frameOffset._frameWarp = 1.f;
+		tr->_frameOffset._fraction = 0.f;
+		tr->_outOfCache = 0;
+		tr->_perFramePosOriIndex = INT_MIN;
+		tr->_perFramePosOriArrayCount = 0;
 		glmSetIdentityQuaternion(tr->_groundAdaptOrientation);
 		entityAv++;
 	}
@@ -3356,23 +4279,22 @@ void glmCreateEntityTransforms(GlmSimulationData* simulationData, GlmHistory* hi
 	{
 		if (history->_active[i] == 0 || history->_transformTypes[i] == SimulationCacheNoop)
 		{
-			if (history->_transformTypes[i] == SimulationCacheDuplicate)
-				patchedDuplicateCount += history->_entityArrayCount[i];
+			if (history->_transformTypes[i] == SimulationCacheDuplicate || history->_transformTypes[i] == SimulationCacheSnapTo)
+				patchedDuplicateCount += history->_duplicatedEntityArrayCount[i];
 			continue;
 		}
-		if (history->_transformTypes[i] == SimulationCacheDuplicate)
+		if (history->_transformTypes[i] == SimulationCacheDuplicate || history->_transformTypes[i] == SimulationCacheSnapTo)
 		{
-			for (j = 0; j < history->_entityArrayCount[i]; j++)
+			for (j = 0; j < history->_duplicatedEntityArrayCount[i]; j++)
 			{
-				GlmEntityTransform* tr = &data[firstDuplicatedEntityIndex + patchedDuplicateCount + j];
+				GlmEntityTransform* tr = &data[duplicateIndex++];
 				tr->_entityId = history->_duplicatedEntityIds[patchedDuplicateCount+j];
-
-				highestEntityType = (tr->_entityId > highestEntityType) ? tr->_entityId : highestEntityType;
-				
 			}
-			patchedDuplicateCount += history->_entityArrayCount[i];
+			patchedDuplicateCount += history->_duplicatedEntityArrayCount[i];
 		}
 	}
+	duplicateIndex = sourceEntityCount;
+
 	// apply transformations
 	for (i=0;i<history->_transformCount;i++)
 	{
@@ -3433,6 +4355,56 @@ void glmCreateEntityTransforms(GlmSimulationData* simulationData, GlmHistory* hi
 						glmMultMatrix(matrixSource, matrix, data[entityPositionInCrowdField]._matrixBase);
 					}
 					break;
+				case SimulationCacheSnapTo:
+					{
+						int snapToIndex;
+						if (j >= history->_snapToCount[i])
+							continue;
+
+						snapToIndex = history->_snapToStartIndex[i] + j;
+						glmSetSnapToPositionOrientation(&data[entityPositionInCrowdField], history->_snapToPositions[snapToIndex], history->_snapToRotations[snapToIndex]);
+
+						if (j == history->_entityArrayCount[i] - 1) // move duplicated entities
+						{
+							unsigned int iSnapToDuplicate = 0;
+							int entityToDuplicateCount = history->_duplicatedEntityArrayCount[i];
+							// make duplicates
+							while (entityToDuplicateCount > 0)
+							{
+								int iCharacter;
+								for (iCharacter = 0; iCharacter < simulationData->_entityTypeCount; iCharacter++)
+								{
+									unsigned int iEntity;
+									for (iEntity = 0; iEntity < history->_entityArrayCount[i]; iEntity++)
+									{
+										int entityPositionInCrowdField;
+										entityPositionInCrowdField = glmFindEntityInSimulation(data, *entityTransformCount, history->_entityIds[history->_entityArrayStartIndex[i] + iEntity]);
+
+										if (simulationData->_entityTypes[entityPositionInCrowdField] != iCharacter)
+											continue;
+
+										// copy source transform
+										glmCopyTransform(simulationData, &data[duplicateIndex], &data[entityPositionInCrowdField]);
+
+										// set snap to
+										snapToIndex = history->_snapToStartIndex[i] + history->_entityArrayCount[i] + iSnapToDuplicate;
+										glmSetSnapToPositionOrientation(&data[duplicateIndex], history->_snapToPositions[snapToIndex], history->_snapToRotations[snapToIndex]);
+
+										// duplicate posture edit
+										duplicateIndex++;
+										entityToDuplicateCount--;
+										iSnapToDuplicate++;
+									} // entity
+								} // simulationData->_entityTypeCount
+							} // entityToDuplicateCount > 0)
+						}
+					}
+					break;
+				case SimulationCacheScaleRange:
+					{
+						data[entityPositionInCrowdField]._scale *= history->_scaleRanges[history->_scaleRangeArrayStartIndex[i] + j];
+					}
+					break;
 				case SimulationCacheDuplicate:
 					{
 						GlmEntityTransform* tr = &data[duplicateIndex];
@@ -3443,6 +4415,8 @@ void glmCreateEntityTransforms(GlmSimulationData* simulationData, GlmHistory* hi
 						memcpy(&tr->_orientationBase[0], &data[entityPositionInCrowdField]._orientationBase[0], sizeof(float) * 4);
 						tr->_sourceIndexInCrowdField = data[entityPositionInCrowdField]._sourceIndexInCrowdField;
 						tr->_postureBoneCount = data[entityPositionInCrowdField]._postureBoneCount;
+						tr->_killed = data[entityPositionInCrowdField]._killed;
+
 						// duplicate bone edit
 						if (data[entityPositionInCrowdField]._boneRestRelativeOrientation)
 						{
@@ -3451,6 +4425,10 @@ void glmCreateEntityTransforms(GlmSimulationData* simulationData, GlmHistory* hi
 						// duplicate posture edit
 						duplicateIndex++;
 					}
+					break;
+				case SimulationCacheUnkill:
+				case SimulationCacheKill:
+					data[entityPositionInCrowdField]._killed = (history->_transformTypes[i] == SimulationCacheKill);
 					break;
 				case SimulationCachePosture:
 					{
@@ -3462,11 +4440,13 @@ void glmCreateEntityTransforms(GlmSimulationData* simulationData, GlmHistory* hi
 				case SimulationCachePostureBoneEdit:
 					{
 						float localBoneOrientation[4];
-						float localBonePosition[3];
+						//float localBonePosition[3];
 						int boneIndex = history->_boneIndex[i];
 
 						GlmEntityTransform* tr = &data[entityPositionInCrowdField];
 						
+						if (tr->_sourceIndexInCrowdField == -1)
+							continue;
 						if (tr->_boneRestRelativeOrientation == 0)
 						{
 							unsigned int boneCount = simulationData->_boneCount[simulationData->_entityTypes[tr->_sourceIndexInCrowdField]];
@@ -3475,9 +4455,22 @@ void glmCreateEntityTransforms(GlmSimulationData* simulationData, GlmHistory* hi
 						
 						// multiply
 						memcpy(localBoneOrientation, tr->_boneRestRelativeOrientation[boneIndex], sizeof(float) * 4);
-						memcpy(localBonePosition, tr->_boneRestRelativePosition[boneIndex], sizeof(float) * 3); // unused for now
-						glmMultQuaternion(history->_transformRotate[i], localBoneOrientation, tr->_boneRestRelativeOrientation[boneIndex]);
+						//memcpy(localBonePosition, tr->_boneRestRelativePosition[boneIndex], sizeof(float) * 3); // unused for now
+						glmMultQuaternion(localBoneOrientation, history->_transformRotate[i], tr->_boneRestRelativeOrientation[boneIndex]);
 						glmNormalizeQuaternion(tr->_boneRestRelativeOrientation[boneIndex]);
+					}
+					break;
+				case SimulationCacheFrameOffset:
+					data[entityPositionInCrowdField]._frameOffset._frameOffset += history->_frameOffsets[frameOffsetsAv++];
+					break;
+				case SimulationCacheFrameWarp:
+					data[entityPositionInCrowdField]._frameOffset._frameWarp *= history->_frameWarps[frameWarpAv++];
+					break;
+				case SimulationCacheTrajectoryEdit:
+					{
+						// just add currentFrame
+						data[entityPositionInCrowdField]._perFramePosOriIndex = history->_perFramePosOriArrayStartIndex[i] + j * history->_frameCount[i] - history->_startFrame[i];
+						data[entityPositionInCrowdField]._perFramePosOriArrayCount = history->_perFramePosOriArrayCount[i];
 					}
 					break;
 				}
@@ -3495,8 +4488,8 @@ void glmCreateEntityTransforms(GlmSimulationData* simulationData, GlmHistory* hi
 	// postures edit. 1st transform has the pointer to the allocated posture bones & posture frames
 	
 	data->_postureFrames = (uint32_t*)GLMC_MALLOC(totalPostureCount * sizeof(uint32_t));
-	data->_posturesPositions = (float(*)[3])GLMC_MALLOC(totalPostureBoneCount * 3 * sizeof(float));
-	data->_posturesOrientations = (float(*)[4])GLMC_MALLOC(totalPostureBoneCount * 4 * sizeof(uint32_t));
+	data->_posturesPositions = (float(*)[3])GLMC_MALLOC(totalPostureBoneCount * sizeof(float[3]));
+	data->_posturesOrientations = (float(*)[4])GLMC_MALLOC(totalPostureBoneCount * sizeof(float[4]));
 	
 	postureFrames = data->_postureFrames;
 	posturesPositions = data->_posturesPositions;
@@ -3696,7 +4689,56 @@ void glmCreateModifiedSimulationData(GlmSimulationData* simulationDataSource, Gl
 }
 
 // -----------------------------------------------------------------------------
-void glmCopyEntityFrameData( GlmFrameData*frameDataIn, GlmFrameData*frameDataOut, GlmSimulationData *simuDataIn, GlmSimulationData *simuDataOut, int sourceIndexInCrowdField, int destIndexInCrowdField, int geoBeSource, int geoBeDestination, GlmEntityTransform *transform )
+void glmVoidEntityFrameData(GlmFrameData*frameDataOut, GlmSimulationData *simuDataIn, GlmSimulationData *simuDataOut, int sourceIndexInCrowdField, int destIndexInCrowdField, int geoBeDestination)
+{
+	unsigned int i;
+
+	// transform entity
+	uint16_t entityTypeIndex = simuDataIn->_entityTypes[sourceIndexInCrowdField];
+	uint16_t boneCount = simuDataIn->_boneCount[entityTypeIndex];
+	uint16_t snsCount = simuDataIn->_snsCountPerEntityType[entityTypeIndex];
+	uint16_t blindDataCount = simuDataIn->_blindDataCount[entityTypeIndex];
+
+	// copy pos/ori
+	uint32_t offsetDest = simuDataOut->_iBoneOffsetPerEntityType[entityTypeIndex] + boneCount * simuDataOut->_indexInEntityType[destIndexInCrowdField];
+	float(*bonePositionsPtrDest)[3] = frameDataOut->_bonePositions + offsetDest;
+	float(*boneOrientationPtrdest)[4] = frameDataOut->_boneOrientations + offsetDest;
+
+	for (i = 0; i<boneCount; i++)
+	{
+		memset(bonePositionsPtrDest[i], 0, sizeof(float) * 3);
+		glmSetIdentityQuaternion(boneOrientationPtrdest[i]);
+	}
+	
+	// copy snsValues
+	if (snsCount)
+	{
+		uint32_t offsetSnsDest = simuDataOut->_snsOffsetPerEntityType[entityTypeIndex] + snsCount * simuDataOut->_indexInEntityType[destIndexInCrowdField];
+		float(*boneSnsPtrDest)[4] = frameDataOut->_snsValues + offsetSnsDest;
+
+		memset(boneSnsPtrDest, 0, sizeof(float) * 4 * snsCount);
+	}
+
+	// blind data
+	if (blindDataCount)
+	{
+		uint32_t offsetBDDest = simuDataOut->_iBlindDataOffsetPerEntityType[entityTypeIndex] + blindDataCount * simuDataOut->_indexInEntityType[destIndexInCrowdField];
+		float *boneBDPtrDest = frameDataOut->_blindData + offsetBDDest;
+
+		memset(boneBDPtrDest, 0, sizeof(float) * blindDataCount);
+	}
+
+	// Geo Be
+	if (simuDataIn->_hasGeoBehavior[entityTypeIndex])
+	{
+		frameDataOut->_geoBehaviorGeometryIds[geoBeDestination] = 0;
+		memset(frameDataOut->_geoBehaviorAnimFrameInfo[geoBeDestination], 0, sizeof(float) * 3);
+		frameDataOut->_geoBehaviorBlendModes[geoBeDestination] = 0;
+	}
+}
+
+// -----------------------------------------------------------------------------
+void glmCopyEntityFrameData(const GlmFrameData*frameDataIn, GlmFrameData*frameDataOut, GlmSimulationData *simuDataIn, GlmSimulationData *simuDataOut, int sourceIndexInCrowdField, int destIndexInCrowdField, int geoBeSource, int geoBeDestination, GlmEntityTransform *transform )
 {
 	unsigned int i, j;
 	float *matrix = transform->_matrix;
@@ -3766,8 +4808,254 @@ void glmCopyEntityFrameData( GlmFrameData*frameDataIn, GlmFrameData*frameDataOut
 
 }
 
+void glmInterpolateEntityFrameData(const GlmFrameData*frameDataIn1, const GlmFrameData*frameDataIn2, float fraction, GlmFrameData*frameDataOut, GlmSimulationData *simuDataIn, GlmSimulationData *simuDataOut, int sourceIndexInCrowdField, int destIndexInCrowdField, int geoBeSource, int geoBeDestination, GlmEntityTransform *transform)
+{
+	unsigned int i, j;
+	float *matrix = transform->_matrix;
+	float scale = transform->_scale;
 //---------------------------------------------------------------------------
-void glmCreateModifiedFrameData(GlmSimulationData* simulationDataIn, GlmFrameData* frameDataIn, GlmEntityTransform* entityTransforms, unsigned int entityTransformCount, GlmHistory* history, GlmSimulationData* simulationDataOut, GlmFrameData** frameDataOut, int currentFrame )
+	// transform entity
+	uint16_t entityTypeIndex = simuDataIn->_entityTypes[sourceIndexInCrowdField];
+	uint16_t boneCount = simuDataIn->_boneCount[entityTypeIndex];
+	uint16_t snsCount = simuDataIn->_snsCountPerEntityType[entityTypeIndex];
+	uint16_t blindDataCount = simuDataIn->_blindDataCount[entityTypeIndex];
+
+	// copy pos/ori
+	uint32_t offsetSource = simuDataIn->_iBoneOffsetPerEntityType[entityTypeIndex] + boneCount * simuDataIn->_indexInEntityType[sourceIndexInCrowdField];
+	uint32_t offsetDest = simuDataOut->_iBoneOffsetPerEntityType[entityTypeIndex] + boneCount * simuDataOut->_indexInEntityType[destIndexInCrowdField];
+	float(*bonePositionsPtrSource1)[3] = frameDataIn1->_bonePositions + offsetSource;
+	float(*boneOrientationPtrSource1)[4] = frameDataIn1->_boneOrientations + offsetSource;
+	float(*bonePositionsPtrSource2)[3] = frameDataIn2->_bonePositions + offsetSource;
+	float(*boneOrientationPtrSource2)[4] = frameDataIn2->_boneOrientations + offsetSource;
+	float(*bonePositionsPtrDest)[3] = frameDataOut->_bonePositions + offsetDest;
+	float(*boneOrientationPtrdest)[4] = frameDataOut->_boneOrientations + offsetDest;
+
+	for (i = 0; i<boneCount; i++)
+{
+		float interpolatedOri[4];
+		float interpolatedPos[3];
+		interpolateNFloats(boneOrientationPtrSource1[i], boneOrientationPtrSource2[i], fraction, interpolatedOri, 4);
+		interpolateNFloats(bonePositionsPtrSource1[i], bonePositionsPtrSource2[i], fraction, interpolatedPos, 3);
+		glmNormalizeQuaternion(interpolatedOri);
+
+		glmTransformPoint(interpolatedPos, matrix, bonePositionsPtrDest[i]);
+		glmMultQuaternion(&transform->_orientation[0], interpolatedOri, boneOrientationPtrdest[i]);
+		glmNormalizeQuaternion(boneOrientationPtrdest[i]);
+	}
+
+	// scale posture
+	for (i = 1; i<boneCount; i++)
+	{
+		for (j = 0; j<3; j++)
+		{
+			float ref = bonePositionsPtrDest[0][j];
+			bonePositionsPtrDest[i][j] = (bonePositionsPtrDest[i][j] - ref) * scale + ref;
+			transform->_scalePivot[j] = ref;
+		}
+	}
+
+	// copy snsValues
+	if (snsCount)
+	{
+		uint32_t offsetSnsSource = simuDataIn->_snsOffsetPerEntityType[entityTypeIndex] + snsCount * simuDataIn->_indexInEntityType[sourceIndexInCrowdField];
+		uint32_t offsetSnsDest = simuDataOut->_snsOffsetPerEntityType[entityTypeIndex] + snsCount * simuDataOut->_indexInEntityType[destIndexInCrowdField];
+		float(*boneSnsPtrSource1)[4] = frameDataIn1->_snsValues + offsetSnsSource;
+		float(*boneSnsPtrSource2)[4] = frameDataIn2->_snsValues + offsetSnsSource;
+		float(*boneSnsPtrDest)[4] = frameDataOut->_snsValues + offsetSnsDest;
+
+		for (i = 0; i < snsCount; i++)
+		{
+			float res[4];
+			interpolateNFloats(boneSnsPtrSource1[i], boneSnsPtrSource2[i], fraction, res, 4);
+			memcpy(boneSnsPtrDest[i], res, sizeof(float) * 4);
+		}
+	}
+
+	// blind data
+	if (blindDataCount)
+	{
+		uint32_t offsetBDSource = simuDataIn->_iBlindDataOffsetPerEntityType[entityTypeIndex] + blindDataCount * simuDataIn->_indexInEntityType[sourceIndexInCrowdField];
+		uint32_t offsetBDDest = simuDataOut->_iBlindDataOffsetPerEntityType[entityTypeIndex] + blindDataCount * simuDataOut->_indexInEntityType[destIndexInCrowdField];
+		float *boneBDPtrSource1 = frameDataIn1->_blindData + offsetBDSource;
+		float *boneBDPtrSource2 = frameDataIn2->_blindData + offsetBDSource;
+		float *boneBDPtrDest = frameDataOut->_blindData + offsetBDDest;
+
+		for (i = 0; i < blindDataCount; i++)
+			boneBDPtrDest[i] = interpolateFloat(boneBDPtrSource1[i], boneBDPtrSource2[i], fraction);
+	}
+
+	// Geo Be
+	if (simuDataIn->_hasGeoBehavior[entityTypeIndex])
+	{
+		frameDataOut->_geoBehaviorGeometryIds[geoBeDestination] = frameDataIn1->_geoBehaviorGeometryIds[geoBeSource];
+		memcpy(frameDataOut->_geoBehaviorAnimFrameInfo[geoBeDestination], frameDataIn1->_geoBehaviorAnimFrameInfo[geoBeSource], sizeof(float) * 3);
+		frameDataOut->_geoBehaviorBlendModes[geoBeDestination] = frameDataIn1->_geoBehaviorBlendModes[geoBeSource];
+	}
+}
+
+//---------------------------------------------------------------------------
+int glmSortEntityFrameOffset(const void *a, const void *b)
+{
+	const GlmFrameOffset *pa = (const GlmFrameOffset*)a;
+	const GlmFrameOffset *pb = (const GlmFrameOffset*)b;
+	if (pa->_frameIndex < pb->_frameIndex)
+		return -1;
+	if (pa->_frameIndex > pb->_frameIndex)
+		return 1;
+	return 0;
+}
+
+//---------------------------------------------------------------------------
+unsigned int glmComputeEntityFrameOffsets(GlmFrameOffset *frameOffsets, int entityCount, int currentFrame, GlmFrameToLoad *frames)
+{
+	int i, j;
+	int lastFrame;
+	int differenteFrameCount = 1;
+	int entityIndex = 0;
+	int noFrameOffset = 1;
+	for (i = 0; i < (int)entityCount; i++)
+	{
+		float entityFrame;
+		GlmFrameOffset *frameOffset = &frameOffsets[i];
+		if (fabsf(frameOffset->_frameOffset) <= FLT_EPSILON && fabsf(frameOffset->_frameWarp - 1) <= FLT_EPSILON)
+		{
+			GlmFrameOffset *frameOffset = &frameOffsets[i];
+			frameOffset->_frameIndex = currentFrame;
+			frameOffset->_framesLoadedIndex = 0;
+			frameOffset->_fraction = 0.f;
+			continue;
+		}
+		noFrameOffset = 0;
+		entityFrame = (float)currentFrame * frameOffset->_frameWarp + frameOffset->_frameOffset;
+		if (entityFrame < 0.f)
+		{
+			frameOffset->_frameIndex = (int)entityFrame - 1;
+			frameOffset->_fraction = 1.f - (fabsf(entityFrame) - floorf(fabsf(entityFrame)));
+		}
+		else
+		{
+			frameOffset->_frameIndex = (int)entityFrame;
+			frameOffset->_fraction = entityFrame - floorf(entityFrame);
+		}
+	}
+	if (noFrameOffset)
+	{
+		frames[0]._frameIndex = currentFrame;
+		return 1;
+	}
+	// sort by _relativeFrame
+	qsort(frameOffsets, entityCount, sizeof(GlmFrameOffset), glmSortEntityFrameOffset);
+
+	// get all different frames
+	lastFrame = frames[0]._frameIndex = frameOffsets[0]._frameIndex;
+	for (i = 1; i < (int)entityCount; i++)
+	{
+		int framIndexe = frameOffsets[i]._frameIndex;
+		if (framIndexe != lastFrame)
+		{
+			frames[differenteFrameCount++]._frameIndex = framIndexe;
+			lastFrame = framIndexe;
+		}
+	}
+
+	// insert last capping frame
+	frames[differenteFrameCount]._frameIndex = frames[differenteFrameCount - 1]._frameIndex + 1;
+	differenteFrameCount++;
+
+	// insert in betweens
+	for (i = 0; i < differenteFrameCount - 1; i++)
+	{
+		if ((frames[i]._frameIndex + 1) == frames[i + 1]._frameIndex)
+			continue;
+
+		// if not, insert it
+		for (j = differenteFrameCount; j > i; j--)
+		{
+			frames[j]._frameIndex = frames[j - 1]._frameIndex;
+		}
+		frames[i + 1]._frameIndex++;
+		differenteFrameCount++;
+		i++; // skip what we inserted
+	}
+
+	// set loc
+	
+	for (i = 0; i < differenteFrameCount; i++)
+	{
+		while (frameOffsets[entityIndex]._frameIndex == frames[i]._frameIndex)
+		{
+			frameOffsets[entityIndex]._framesLoadedIndex = i;
+			entityIndex++;
+		};
+	}
+
+	// set every frame as not loaded
+	for (i = 0; i < differenteFrameCount; i++)
+		frames[i]._frame = NULL;
+
+	return (unsigned int)differenteFrameCount;
+}
+//---------------------------------------------------------------------------
+int glmComputeValidFrameIndex(int frameIndex, const char *filePathModel, const char *cacheDirectory)
+{
+#if _MSC_VER
+	struct _finddata_t fileinfo;
+	long fret;
+	intptr_t fndhand;
+	char pathFind[2048];
+#else
+	struct dirent *lecture;
+	DIR *rep;
+#endif
+	int bestFrameIndex = INT32_MIN;
+	const char *filePathModelNoDir = filePathModel;
+	filePathModelNoDir += strlen(filePathModel) - 1;
+	while (filePathModelNoDir > (filePathModel+1) && *(filePathModelNoDir-1) != '/' && *(filePathModelNoDir-1) != '\\')
+	{
+		filePathModelNoDir--;
+	}
+#if _MSC_VER
+	strcpy_s(pathFind, sizeof(pathFind), cacheDirectory);
+	strcat_s(pathFind, sizeof(pathFind), "/*");
+	
+	fndhand = _findfirst(pathFind, &fileinfo);
+	if (fndhand != -1)
+	{
+		do
+		{
+			int frameIndexFound;
+			if (sscanf_s(fileinfo.name, filePathModelNoDir, &frameIndexFound))
+			{
+				if (frameIndexFound > bestFrameIndex && frameIndexFound <= frameIndex)
+					bestFrameIndex = frameIndexFound;
+			}
+			fret = _findnext(fndhand, &fileinfo);
+		} while (fret != -1);
+	}
+	_findclose(fndhand);
+
+#else
+	rep = opendir(cacheDirectory);
+
+	while ((rep != NULL) && (lecture = readdir(rep)))
+	{
+		int frameIndexFound;
+		if (sscanf(lecture->d_name, filePathModelNoDir, &frameIndexFound))
+		{
+			if (frameIndexFound > bestFrameIndex && frameIndexFound <= frameIndex)
+				bestFrameIndex = frameIndexFound;
+		}
+	}
+
+	closedir(rep);
+
+#endif 
+
+	return bestFrameIndex;
+}
+
+//---------------------------------------------------------------------------
+GlmSimulationCacheStatus glmCreateModifiedFrameData(GlmSimulationData* simulationDataIn, GlmFrameData* frameDataIn, GlmEntityTransform* entityTransforms, unsigned int entityTransformCount, GlmHistory* history, GlmSimulationData* simulationDataOut, GlmFrameData** frameDataOut, int currentFrame, const char * filePathModel, const char * cacheDirectory)
 {
 	GlmFrameData *frameOut;
 	unsigned int i;
@@ -3787,9 +5075,91 @@ void glmCreateModifiedFrameData(GlmSimulationData* simulationDataIn, GlmFrameDat
 	
 	// cloth pointers
 	unsigned int clothedEntityIndex = 0;
-	uint32_t* clothIndicesSource = frameDataIn->_clothIndices;
-	uint32_t* clothMeshVertexCountPerClothIndexSource = frameDataIn->_clothMeshVertexCountPerClothIndex;
-	float(*clothVerticesSource)[3] = frameDataIn->_clothVertices;
+
+	uint32_t* clothIndicesSource = 0;
+	uint32_t* clothMeshVertexCountPerClothIndexSource = 0;
+	float(*clothVerticesSource)[3] = 0;
+	
+	// frames to load
+	unsigned int totalFrameOffsets;
+
+	// patch transforms for cloths
+	// need frame offset/frame scale?
+	GlmFrameOffset *entityFrameOffsets = (GlmFrameOffset*)GLMC_MALLOC(sizeof(GlmFrameOffset) * entityTransformCount);
+	GlmFrameToLoad *framesToLoad = (GlmFrameToLoad*)GLMC_MALLOC(sizeof(GlmFrameToLoad) * entityTransformCount * 2);
+
+	for (i = 0; i < entityTransformCount; i++)
+	{
+		GlmFrameOffset *offset = &entityFrameOffsets[i];
+		memcpy(offset, &entityTransforms[i]._frameOffset, sizeof(GlmFrameOffset));
+		offset->_entityIndex = i;
+	}
+	
+	totalFrameOffsets = glmComputeEntityFrameOffsets(entityFrameOffsets, entityTransformCount, currentFrame, framesToLoad);
+
+	// set it back to entities modification
+	for (i = 0; i < entityTransformCount; i++)
+	{
+		int destinationTransformIndex = entityFrameOffsets[i]._entityIndex;
+		memcpy(&entityTransforms[destinationTransformIndex]._frameOffset, &entityFrameOffsets[i], sizeof(GlmFrameOffset));
+	}
+	GLMC_FREE(entityFrameOffsets);
+
+	// set current frame as loaded
+	for (i = 0; i < totalFrameOffsets; i++)
+	{
+		if (framesToLoad[i]._frameIndex == currentFrame)
+			framesToLoad[i]._frame = frameDataIn;
+	}
+	
+	// load missing frames 
+	for (i = 0; i < totalFrameOffsets; i++)
+	{
+		if (!framesToLoad[i]._frame)
+		{
+			GlmSimulationCacheStatus status;
+			char frameFilePath[2048];
+			glmsprintf(frameFilePath, 2048, filePathModel, framesToLoad[i]._frameIndex);
+			glmCreateFrameData(&framesToLoad[i]._frame, simulationDataIn);
+			status = glmReadFrameData(framesToLoad[i]._frame, simulationDataIn, frameFilePath);
+			if (status != GSC_SUCCESS)
+			{
+				// try to find previous
+				int previousValidFrameIndex = glmComputeValidFrameIndex(framesToLoad[i]._frameIndex, filePathModel, cacheDirectory);
+				if (previousValidFrameIndex != INT32_MIN)
+				{
+					glmsprintf(frameFilePath, 2048, filePathModel, previousValidFrameIndex);
+					status = glmReadFrameData(framesToLoad[i]._frame, simulationDataIn, frameFilePath);
+					if (status != GSC_SUCCESS)
+						previousValidFrameIndex = INT32_MIN;
+				}
+
+				if (previousValidFrameIndex == INT32_MIN)
+					glmDestroyFrameData(&framesToLoad[i]._frame, simulationDataIn);
+			}
+		}
+	}
+
+	// frame 0 not found, catch the 1st one
+	if (!frameDataIn)
+	{
+		for (i = 0; i < totalFrameOffsets; i++)
+		{
+			if (framesToLoad[i]._frame)
+				frameDataIn = framesToLoad[i]._frame;
+		}
+	}
+
+	if (!frameDataIn)
+		return GSC_SIMULATION_NO_FRAMES_FOUND;
+
+	// cloth info
+	if (frameDataIn)
+	{
+		clothIndicesSource = frameDataIn->_clothMeshIndicesInCharAssets;
+		clothMeshVertexCountPerClothIndexSource = frameDataIn->_clothMeshVertexCount;
+		clothVerticesSource = frameDataIn->_clothVertices;
+	}
 
 	// patch transforms for cloths
 	if (frameDataIn->_clothEntityCount)
@@ -3802,7 +5172,7 @@ void glmCreateModifiedFrameData(GlmSimulationData* simulationDataIn, GlmFrameDat
 			entityTransforms[i]._clothTotalMeshIndices = 0;
 			entityTransforms[i]._clothTotalVertices = 0;
 
-			clothEntityIndex = frameDataIn->_clothEntityIndex[entityTransforms[i]._sourceIndexInCrowdField];
+			clothEntityIndex = frameDataIn->_entityClothIndex[entityTransforms[i]._sourceIndexInCrowdField];
 
 			if ( entityTransforms[i]._sourceIndexInCrowdField == (int)i && 
 				clothEntityIndex != -1 )
@@ -3813,9 +5183,9 @@ void glmCreateModifiedFrameData(GlmSimulationData* simulationDataIn, GlmFrameDat
 				entityTransforms[i]._clothedEntityIndex = clothedEntityIndex;
 				entityTransforms[i]._clothVerticesSource = clothVerticesSource;
 				entityTransforms[i]._clothIndicesSource = clothIndicesSource;
-				entityTransforms[i]._clothMeshVertexCountPerClothIndexSource = clothMeshVertexCountPerClothIndexSource;
+				entityTransforms[i]._clothMeshVertexCountSource = clothMeshVertexCountPerClothIndexSource;
 
-				meshIndexCount = frameDataIn->_clothMeshIndexCount[entityTransforms[i]._clothedEntityIndex];
+				meshIndexCount = frameDataIn->_clothEntityMeshCount[entityTransforms[i]._clothedEntityIndex];
 				
 				entityTransforms[i]._clothTotalMeshIndices = meshIndexCount;
 
@@ -3834,12 +5204,12 @@ void glmCreateModifiedFrameData(GlmSimulationData* simulationDataIn, GlmFrameDat
 		for (i = 0 ; i < entityTransformCount; ++i)
 		{
 			// patch EntityTransform for cloth
-			entityTransforms[i]._useCloth = frameDataIn->_clothEntityIndex[entityTransforms[i]._sourceIndexInCrowdField] != -1;
+			entityTransforms[i]._useCloth = frameDataIn->_entityClothIndex[entityTransforms[i]._sourceIndexInCrowdField] != -1;
 			entityTransforms[i]._clothedEntityIndex = entityTransforms[entityTransforms[i]._sourceIndexInCrowdField]._clothedEntityIndex;
 			entityTransforms[i]._clothVerticesSource = entityTransforms[entityTransforms[i]._sourceIndexInCrowdField]._clothVerticesSource;
 			entityTransforms[i]._clothIndicesSource = entityTransforms[entityTransforms[i]._sourceIndexInCrowdField]._clothIndicesSource;
-			entityTransforms[i]._clothMeshVertexCountPerClothIndexSource = entityTransforms[entityTransforms[i]._sourceIndexInCrowdField]._clothMeshVertexCountPerClothIndexSource;
-
+			entityTransforms[i]._clothMeshVertexCountSource = entityTransforms[entityTransforms[i]._sourceIndexInCrowdField]._clothMeshVertexCountSource;
+			
 			// now counts cloth/vertices
 			if (entityTransforms[i]._useCloth)
 			{
@@ -3876,8 +5246,50 @@ void glmCreateModifiedFrameData(GlmSimulationData* simulationDataIn, GlmFrameDat
 		memcpy(tr->_orientation, tr->_orientationBase, sizeof(float) *4);
 	}
 
-	if (glmRaycastClosest && history->_terrainMesh && (history->_options&(uint32_t)(OptionsGroundAdaptUseTerrain)))
+	// per frame pos/ori
+	for (iTransform = 0; iTransform < entityTransformCount; iTransform++)
 	{
+		GlmEntityTransform* tr = &entityTransforms[iTransform];
+
+		if (tr->_perFramePosOriIndex != INT_MIN && tr->_perFramePosOriArrayCount > 0)
+		{
+			// get frame offset interpolated
+			int frameIndexA = (tr->_frameOffset._frameIndex < tr->_perFramePosOriArrayCount) ? tr->_frameOffset._frameIndex : (tr->_perFramePosOriArrayCount - 1);
+			int frameIndexB = ((tr->_frameOffset._frameIndex + 1) < tr->_perFramePosOriArrayCount) ? (tr->_frameOffset._frameIndex + 1) : (tr->_perFramePosOriArrayCount - 1);
+			int frameOffsetA = tr->_perFramePosOriIndex + frameIndexA;
+			int frameOffsetB = tr->_perFramePosOriIndex + frameIndexB;
+
+			float* frameOriA = history->_frameOri[frameOffsetA];
+			float* frameOriB = history->_frameOri[frameOffsetB];
+
+			float* framePosA = history->_framePos[frameOffsetA];
+			float* framePosB = history->_framePos[frameOffsetB];
+
+			float interpolatedOri[4];
+			float interpolatedPos[3];
+
+			// clamp frame
+
+			interpolateNFloats(frameOriA, frameOriB, tr->_frameOffset._fraction, interpolatedOri, 4);
+			interpolateNFloats(framePosA, framePosB, tr->_frameOffset._fraction, interpolatedPos, 3);
+			glmNormalizeQuaternion(interpolatedOri);
+
+			// set matrix and orientation
+			glmConvertMatrix(tr->_matrix, interpolatedPos, interpolatedOri);
+			memcpy(tr->_orientation, interpolatedOri, sizeof(float) * 4);
+
+			// set it as base for ground adaptation
+			memcpy(tr->_orientationBase, tr->_orientation, sizeof(float) * 4);
+			memcpy(tr->_matrixBase, tr->_matrix, sizeof(float) * 16);
+		}
+	}
+
+	// ground adapt
+	if (glmRaycastClosest && (history->_options&(uint32_t)(OptionsGroundAdaptUseTerrain)))
+	{
+		if (glmTerrainSetFrame)
+			glmTerrainSetFrame(history->_terrainMeshSource, history->_terrainMeshDestination, currentFrame);
+
 		for (iTransform = 0; iTransform < entityTransformCount; iTransform++)
 		{
 			float deltaGroundHeight = 0.f;
@@ -3896,6 +5308,12 @@ void glmCreateModifiedFrameData(GlmSimulationData* simulationDataIn, GlmFrameDat
 			float nulTranslation[] = { 0.f,0.f,0.f };
 			float preRot[16];
 			float postRot[16];
+			int iRayCastPass1 = 0;
+			int iRayCastPass2 = 0;
+			int rayCastStart;
+			int rayCastEnd;
+			int firstRaycast = 1;
+			static const float deltas[] = { -9999999.f, 9999999.f };
 
 			GlmEntityTransform* tr = &entityTransforms[iTransform];
 			// transform entity
@@ -3906,72 +5324,99 @@ void glmCreateModifiedFrameData(GlmSimulationData* simulationDataIn, GlmFrameDat
 			uint32_t offsetSource = simulationDataIn->_iBoneOffsetPerEntityType[entityTypeIndex] + boneCount * simulationDataIn->_indexInEntityType[tr->_sourceIndexInCrowdField];
 			bonePositionsPtrSource = frameDataIn->_bonePositions + offsetSource;
 	
-			rayOriginSource[0] = (*bonePositionsPtrSource)[0];
-			rayOriginSource[1] = (*bonePositionsPtrSource)[1] + 1.f;
-			rayOriginSource[2] = (*bonePositionsPtrSource)[2];
+			if (tr->_sourceIndexInCrowdField == -1)
+				continue;
 
-			rayEndSource[0] = rayOriginSource[0];
-			rayEndSource[1] = rayOriginSource[1] - 9999999.f;
-			rayEndSource[2] = rayOriginSource[2];
-
-			glmSetIdentityQuaternion(deltaGroundOri);
-
-			if (glmRaycastClosest(history->_terrainMesh, rayOriginSource, rayEndSource, collisionPointSource, collisionNormalSource))
+			for (iRayCastPass1 = 0; iRayCastPass1 < 2; iRayCastPass1++)
 			{
-				int iRayCast = 0;
-				float(rayOriginDestination)[3];
-				// transform ray destination
-				glmTransformPoint(rayOriginSource, tr->_matrixBase, rayOriginDestination);
-				// --
-				for (iRayCast = 0; iRayCast < 2; iRayCast++)
+
+				rayOriginSource[0] = (*bonePositionsPtrSource)[0];
+				rayOriginSource[1] = (*bonePositionsPtrSource)[1] + 1.f;
+				rayOriginSource[2] = (*bonePositionsPtrSource)[2];
+
+				rayEndSource[0] = rayOriginSource[0];
+				rayEndSource[1] = rayOriginSource[1] + deltas[iRayCastPass1];
+				rayEndSource[2] = rayOriginSource[2];
+
+				glmSetIdentityQuaternion(deltaGroundOri);
+
+				rayCastStart = 0;
+				if (history->_terrainMeshSource)
+					rayCastStart = glmRaycastClosest(history->_terrainMeshSource, rayOriginSource, rayEndSource, collisionPointSource, collisionNormalSource, NULL, NULL);
+				else
 				{
-					static const float deltas[] = { -9999999.f, 9999999.f };
-					int rayHasHit = 0;
-					float(rayEndDestination)[3];
-					rayEndDestination[0] = rayOriginDestination[0];
-					rayEndDestination[1] = rayOriginDestination[1] + deltas[iRayCast];
-					rayEndDestination[2] = rayOriginDestination[2];
-					if (glmRaycastClosest(history->_terrainMesh, rayOriginDestination, rayEndDestination, collisionPointDestination, collisionNormalDestination))
-					{
-						deltaGroundHeight = collisionPointDestination[1] - collisionPointSource[1];
-						rayHasHit = 0;
-					}
-
-					if (history->_options&(uint32_t)(OptionsGroundAdaptOrient))
-					{
-						glmRotationBetweenUnitVectors(collisionNormalSource, collisionNormalDestination, deltaGroundOri);
-						glmNormalizeQuaternion(deltaGroundOri);
-					}
-					if (rayHasHit)
-						break;
+					collisionPointSource[0] = rayOriginSource[0];
+					collisionPointSource[1] = 0.f;
+					collisionPointSource[2] = rayOriginSource[2];
+					collisionNormalSource[0] = 0.f;
+					collisionNormalSource[1] = 1.f;
+					collisionNormalSource[2] = 0.f;
+					rayCastStart = 1;
 				}
-			}
-			
+				if (rayCastStart)
+				{
+					float(rayOriginDestination)[3];
+					// transform ray destination
+					glmTransformPoint(rayOriginSource, tr->_matrixBase, rayOriginDestination);
+					// --
+					for (iRayCastPass2 = 0; iRayCastPass2 < 2; iRayCastPass2++)
+					{
+						float(rayEndDestination)[3];
+						
+						rayEndDestination[0] = rayOriginDestination[0];
+						rayEndDestination[1] = rayOriginDestination[1] + deltas[iRayCastPass2];
+						rayEndDestination[2] = rayOriginDestination[2];
+
+						rayCastEnd = 0;
+						if (history->_terrainMeshDestination)
+							rayCastEnd = glmRaycastClosest(history->_terrainMeshDestination, rayOriginDestination, rayEndDestination, collisionPointDestination, collisionNormalDestination, simulationDataIn->_proxyMatrix, simulationDataIn->_proxyMatrixInverse);
+						else
+						{
+							collisionPointDestination[0] = rayOriginDestination[0];
+							collisionPointDestination[1] = 0.f;
+							collisionPointDestination[2] = rayOriginDestination[2];
+							collisionNormalDestination[0] = 0.f;
+							collisionNormalDestination[1] = 1.f;
+							collisionNormalDestination[2] = 0.f;
+							rayCastEnd = 1;
+						}
+						if (rayCastEnd)
+						{
+							float potentialDeltaGroundHeight = collisionPointDestination[1] - collisionPointSource[1] - tr->_matrixBase[13];
+							if (potentialDeltaGroundHeight < deltaGroundHeight || firstRaycast)
+							{
+								firstRaycast = 0;
+								deltaGroundHeight = potentialDeltaGroundHeight;
+
+								if (history->_options&(uint32_t)(OptionsGroundAdaptOrient))
+								{
+									glmRotationBetweenUnitVectors(collisionNormalSource, collisionNormalDestination, deltaGroundOri);
+									glmNormalizeQuaternion(deltaGroundOri);
+								}
+							}
+						}
+					} // iRayCastPass2
+				} // if (hasRayCast)
+			} // iRayCastPass1
 			glmTransformPoint((*bonePositionsPtrSource), tr->_matrixBase, transformedRootPos);
-			{
-				glmSetIdentityMatrix(preRot);
-				glmSetIdentityMatrix(postRot);
+			
+			glmSetIdentityMatrix(preRot);
+			glmSetIdentityMatrix(postRot);
 
-				preRot[12] = -transformedRootPos[0];
-				preRot[13] = -transformedRootPos[1];
-				preRot[14] = -transformedRootPos[2];
+			preRot[12] = -transformedRootPos[0];
+			preRot[13] = -transformedRootPos[1];
+			preRot[14] = -transformedRootPos[2];
 
-				postRot[12] = transformedRootPos[0];
-				postRot[13] = transformedRootPos[1] + deltaGroundHeight;
-				postRot[14] = transformedRootPos[2];
+			postRot[12] = transformedRootPos[0];
+			postRot[13] = transformedRootPos[1] + deltaGroundHeight;
+			postRot[14] = transformedRootPos[2];
 
-				glmConvertMatrix(groundRot, nulTranslation, deltaGroundOri);
-
-				//Matrix4 deltaGroundMat = preRot * groundRot * postRot;
-				glmMultMatrix(preRot, groundRot, deltaGroundMatIntermediate);
-				glmMultMatrix(deltaGroundMatIntermediate, postRot, deltaGroundMat);
-
-				glmMultMatrix(tr->_matrixBase, deltaGroundMat, tr->_matrix);
-				//Matrix4 newMat = svgMatrices[i] * deltaGroundMat;
-				//memcpy(transform[i]._matrix, &newMat, sizeof(float) * 16 );
-
-				glmMultQuaternion(deltaGroundOri, tr->_orientationBase, tr->_orientation);
-			}
+			glmConvertMatrix(groundRot, nulTranslation, deltaGroundOri);
+			glmMultMatrix(preRot, groundRot, deltaGroundMatIntermediate);
+			glmMultMatrix(deltaGroundMatIntermediate, postRot, deltaGroundMat);
+			glmMultMatrix(tr->_matrixBase, deltaGroundMat, tr->_matrix);
+			glmMultQuaternion(deltaGroundOri, tr->_orientationBase, tr->_orientation);
+			
 		}
 	}
 
@@ -4018,10 +5463,62 @@ void glmCreateModifiedFrameData(GlmSimulationData* simulationDataIn, GlmFrameDat
 			}
 			
 			// bones/sns/...
-			glmCopyEntityFrameData(frameDataIn, frameOut, simulationDataIn, simulationDataOut, 
-				sourceIndexInCrowdField, iTransform,
-				geoBeSourceIndex, geoBeDestinationIndex, 
-				&entityTransforms[iTransform] );
+			if (fabsf(entityTransforms[iTransform]._frameOffset._fraction) < FLT_EPSILON)
+			{
+				// simple copy 
+				int framesLoadedIndex = entityTransforms[iTransform]._frameOffset._framesLoadedIndex;
+				const GlmFrameData* frameDataInput = framesToLoad[framesLoadedIndex]._frame;
+
+				if (!frameDataInput)
+				{
+					entityTransforms[iTransform]._outOfCache = 1;
+					glmVoidEntityFrameData(frameOut, simulationDataIn, simulationDataOut,
+						entityTransforms[iTransform]._sourceIndexInCrowdField, iTransform,
+						geoBeDestinationIndex);
+				}
+				else
+				{
+					glmCopyEntityFrameData(frameDataInput, frameOut, simulationDataIn, simulationDataOut,
+						entityTransforms[iTransform]._sourceIndexInCrowdField, iTransform,
+						geoBeSourceIndex, geoBeDestinationIndex,
+						&entityTransforms[iTransform]);
+				}
+			}
+			else
+			{
+				// interpolated copy
+				int framesLoadedIndex = entityTransforms[iTransform]._frameOffset._framesLoadedIndex;
+				float fraction = entityTransforms[iTransform]._frameOffset._fraction;
+				const GlmFrameData* frameDataInput1 = framesToLoad[framesLoadedIndex]._frame;
+				const GlmFrameData* frameDataInput2 = framesToLoad[framesLoadedIndex+1]._frame;
+
+				if (frameDataInput1 || frameDataInput2)
+				{
+					if (!frameDataInput1 || !frameDataInput2)
+					{
+						// any chance of missing 1 data?
+						const GlmFrameData* frameDataInput = frameDataInput1 ? frameDataInput1 : frameDataInput2;
+						glmCopyEntityFrameData(frameDataInput, frameOut, simulationDataIn, simulationDataOut,
+							entityTransforms[iTransform]._sourceIndexInCrowdField, iTransform,
+							geoBeSourceIndex, geoBeDestinationIndex,
+							&entityTransforms[iTransform]);
+					}
+					else
+					{
+						glmInterpolateEntityFrameData(frameDataInput1, frameDataInput2, fraction, frameOut, simulationDataIn, simulationDataOut,
+							entityTransforms[iTransform]._sourceIndexInCrowdField, iTransform,
+							geoBeSourceIndex, geoBeDestinationIndex,
+							&entityTransforms[iTransform]);
+					}
+				}
+				else
+				{
+					entityTransforms[iTransform]._outOfCache = 1;
+					glmVoidEntityFrameData(frameOut, simulationDataIn, simulationDataOut,
+						entityTransforms[iTransform]._sourceIndexInCrowdField, iTransform,
+						geoBeDestinationIndex);
+				}
+			}
 		}
 	}
 
@@ -4041,7 +5538,6 @@ void glmCreateModifiedFrameData(GlmSimulationData* simulationDataIn, GlmFrameDat
 		uint16_t snsCount;
 		unsigned int i;
 
-		float(*frameRestRelativePositionPtrSrc)[3] = NULL;
 		float(*frameRestRelativeOrientationPtrSrc)[4] = NULL;
 
 		GlmEntityTransform* tr = &entityTransforms[iTransform];
@@ -4052,7 +5548,6 @@ void glmCreateModifiedFrameData(GlmSimulationData* simulationDataIn, GlmFrameDat
 			if ( tr->_postureFrames[iFrame] == (unsigned int)currentFrame )
 			{
 				uint32_t offsetSrc = iFrame * tr->_postureBoneCount;
-				frameRestRelativePositionPtrSrc = tr->_posturesPositions + offsetSrc;
 				frameRestRelativeOrientationPtrSrc = tr->_posturesOrientations + offsetSrc;
 			}
 		}
@@ -4092,7 +5587,7 @@ void glmCreateModifiedFrameData(GlmSimulationData* simulationDataIn, GlmFrameDat
 			{
 				float workOri[4];
 			
-				glmMultQuaternion(tr->_boneRestRelativeOrientation[i] , entityTransforms->_restRelativeOri[i], workOri);
+				glmMultQuaternion(entityTransforms->_restRelativeOri[i], tr->_boneRestRelativeOrientation[i], workOri);
 				glmNormalizeQuaternion(workOri);
 				memcpy(entityTransforms->_restRelativeOri[i], workOri, sizeof(float) * 4);
 			}
@@ -4161,26 +5656,26 @@ void glmCreateModifiedFrameData(GlmSimulationData* simulationDataIn, GlmFrameDat
 		float* clothMaxExtentDest;
 
 		uint32_t* clothIndicesDest;
-		uint32_t* clothMeshVertexCountPerClothIndexDest;
+		uint32_t* clothMeshVertexCountDest;
 		float(*clothVerticesDest)[3];
 
 		// allocate cloth
 		glmCreateClothData( simulationDataOut, frameOut, totalClothEntityCount, totalClothTotalIndices, totalClothTotalVertices );
 
 		
-		clothReferenceDest = frameOut->_clothReference;
-		clothMaxExtentDest = frameOut->_clothMaxExtent;
+		clothReferenceDest = frameOut->_clothEntityQuantizationReference;
+		clothMaxExtentDest = frameOut->_clothEntityQuantizationMaxExtent;
 
-		clothIndicesDest = frameOut->_clothIndices;
-		clothMeshVertexCountPerClothIndexDest = frameOut->_clothMeshVertexCountPerClothIndex;
+		clothIndicesDest = frameOut->_clothMeshIndicesInCharAssets;
+		clothMeshVertexCountDest = frameOut->_clothMeshVertexCount;
 		clothVerticesDest = frameOut->_clothVertices;
 
 		// compute cloth reference/extent
 		for (i = 0 ; i < entityTransformCount; ++i)
 		{
 			// patch EntityTransform for cloth
-			frameOut->_clothEntityIndex[i] = entityTransforms[i]._useCloth ? entityTransforms[i]._clothedEntityIndex : -1;
-			if (frameOut->_clothEntityIndex[i] != -1)
+			frameOut->_entityClothIndex[i] = entityTransforms[i]._useCloth ? entityTransforms[i]._clothedEntityIndex : -1;
+			if (frameOut->_entityClothIndex[i] != -1)
 			{
 				float clothMin[] = {FLT_MAX,FLT_MAX,FLT_MAX};
 				float clothMax[] = {-FLT_MAX,-FLT_MAX,-FLT_MAX};
@@ -4192,24 +5687,24 @@ void glmCreateModifiedFrameData(GlmSimulationData* simulationDataIn, GlmFrameDat
 
 				float(*clothVerticesSource)[3] = entityTransforms[i]._clothVerticesSource;
 				uint32_t* clothIndicesSource = entityTransforms[i]._clothIndicesSource;
-				uint32_t* clothMeshVertexCountPerClothIndexSource = entityTransforms[i]._clothMeshVertexCountPerClothIndexSource;
-				
+				uint32_t* clothMeshVertexCountSource = entityTransforms[i]._clothMeshVertexCountSource;
+								
 				// helpers for reading
-				frameOut->_clothMeshIndexOffsetPerClothEntity[clothAv] = (uint32_t)(clothIndicesDest - frameOut->_clothIndices);  // write indices offset when beginning a new cloth entity for helper
-				frameOut->_clothMeshVertexOffsetPerClothEntity[clothAv] = (uint32_t)(clothVerticesDest - frameOut->_clothVertices); // write vertices offset when beginning a new cloth entity for helper
+				frameOut->_clothEntityFirstAssetMeshIndex[clothAv] = (uint32_t)(clothIndicesDest - frameOut->_clothMeshIndicesInCharAssets);  // write indices offset when beginning a new cloth entity for helper
+				frameOut->_clothEntityFirstMeshVertex[clothAv] = (uint32_t)(clothVerticesDest - frameOut->_clothVertices); // write vertices offset when beginning a new cloth entity for helper
 
-				meshIndexCount = frameDataIn->_clothMeshIndexCount[entityTransforms[i]._clothedEntityIndex];
-				frameOut->_clothMeshIndexCount[clothAv] = meshIndexCount;
-				memcpy( clothMeshVertexCountPerClothIndexDest, clothMeshVertexCountPerClothIndexSource, sizeof(uint32_t) * meshIndexCount );
+				meshIndexCount = frameDataIn->_clothEntityMeshCount[entityTransforms[i]._clothedEntityIndex];
+				frameOut->_clothEntityMeshCount[clothAv] = meshIndexCount;
+				memcpy( clothMeshVertexCountDest, clothMeshVertexCountSource, sizeof(uint32_t) * meshIndexCount );
 				memcpy( clothIndicesDest, clothIndicesSource, sizeof(uint32_t) * meshIndexCount );
 
-				clothMeshVertexCountPerClothIndexDest += meshIndexCount;
+				clothMeshVertexCountDest += meshIndexCount;
 				clothIndicesDest += meshIndexCount;
 
 				for (iVertexGroup = 0;iVertexGroup<meshIndexCount;iVertexGroup++)
 				{
-					size_t groupVertexCount = frameOut->_clothMeshVertexCountPerClothIndex[iVertexGroup];
-
+					size_t groupVertexCount = frameOut->_clothMeshVertexCount[iVertexGroup];
+					
 					for (iVertex = 0 ; iVertex< groupVertexCount; iVertex ++)
 					{
 
@@ -4247,11 +5742,17 @@ void glmCreateModifiedFrameData(GlmSimulationData* simulationDataIn, GlmFrameDat
 			}
 		}
 	}
-}
 
-float interpolateFloat(float value1, float value2, float ratio)
-{
-	return value1 + (value2 - value1)*ratio;
+	for (i = 0; i < totalFrameOffsets; i++)
+	{
+		if (framesToLoad[i]._frame && framesToLoad[i]._frameIndex != currentFrame)
+		{
+			glmDestroyFrameData(&framesToLoad[i]._frame, simulationDataIn);
+		}
+	}
+	GLMC_FREE(framesToLoad);
+
+	return GSC_SUCCESS;
 }
 
 void glmInterpolateFrameData(const GlmSimulationData* simulationData, const GlmFrameData* frameData1, const GlmFrameData* frameData2, float ratio, GlmFrameData* result)
@@ -4259,13 +5760,18 @@ void glmInterpolateFrameData(const GlmSimulationData* simulationData, const GlmF
 	uint32_t boneValuesCount;
 	uint32_t snsValuesCount;
 	uint32_t blindDataCount;	
-	float oneMinusRatio;
 	float tempQuat[4];
 	uint32_t iValue;
 	uint16_t iEntityType;
 
 	boneValuesCount = 0;
-	oneMinusRatio = 1.f - ratio;
+
+	if (!frameData2)
+		frameData2 = frameData1;
+	if (!frameData1)
+		frameData1 = frameData2;
+	if (!frameData1)
+		return;
 
 	if (frameData1->_simulationContentHashKey != simulationData->_contentHashKey || frameData1->_simulationContentHashKey != frameData2->_simulationContentHashKey)
 		return; // forbidden, different simu
@@ -4405,6 +5911,18 @@ void glmInterpolateFrameData(const GlmSimulationData* simulationData, const GlmF
 	{
 		glmCreateClothData(simulationData, result, frameData1->_clothEntityCount, frameData1->_clothTotalMeshIndices, frameData1->_clothTotalVertices);
 
+		memcpy(result->_entityClothIndex, frameData1->_entityClothIndex, simulationData->_entityCount * sizeof(int32_t));
+
+		memcpy(result->_clothEntityFirstAssetMeshIndex, frameData1->_clothEntityFirstAssetMeshIndex, result->_clothEntityCount * sizeof(uint32_t));
+		memcpy(result->_clothEntityFirstMeshVertex, frameData1->_clothEntityFirstMeshVertex, result->_clothEntityCount * sizeof(uint32_t));
+		memcpy(result->_clothEntityMeshCount, frameData1->_clothEntityMeshCount, result->_clothEntityCount * sizeof(uint32_t));
+		memcpy(result->_clothEntityQuantizationReference, frameData1->_clothEntityQuantizationReference, result->_clothEntityCount * sizeof(float[3]));
+		memcpy(result->_clothEntityQuantizationMaxExtent, frameData1->_clothEntityQuantizationMaxExtent, result->_clothEntityCount * sizeof(float));
+		
+		memcpy(result->_clothMeshIndicesInCharAssets, frameData1->_clothMeshIndicesInCharAssets, result->_clothAllocatedIndices * sizeof(uint32_t));
+		memcpy(result->_clothMeshVertexCount, frameData1->_clothMeshVertexCount, result->_clothAllocatedIndices * sizeof(uint32_t));
+		//memcpy(result->_clothMeshVertexOffsetPerClothIndex, frameData1->_clothMeshVertexOffsetPerClothIndex, clothIndices * sizeof(uint32_t));
+
 		// interpolate vertex per vertex
 		for (iValue = 0; iValue < frameData1->_clothTotalVertices; iValue++)
 		{
@@ -4415,6 +5933,32 @@ void glmInterpolateFrameData(const GlmSimulationData* simulationData, const GlmF
 	}
 }
 
+uint32_t getClothEntityMeshCount(const GlmFrameData* frameData, int clothEntityIndex)
+{
+	return frameData->_clothEntityMeshCount[clothEntityIndex];
+}
+
+uint32_t getClothEntityIMeshVertexCount(const GlmFrameData* frameData, int clothEntityIndex, int iMesh)
+{
+	int clothMeshIndexInCache = frameData->_clothEntityFirstAssetMeshIndex[clothEntityIndex] + iMesh;
+	return frameData->_clothMeshVertexCount[clothMeshIndexInCache];
+}
+
+void getClothEntityIMeshVerticesPtr(const GlmFrameData* frameData, int clothEntityIndex, int iMesh, float(**outFirstVertexPtr)[3])
+{
+	// skip previous meshes count :
+	int firstMeshInClothIndices = frameData->_clothEntityFirstAssetMeshIndex[clothEntityIndex];
+
+	int previousMeshesVertexOffset = 0;
+	int i = 0;
+	for (; i < iMesh; i++)
+	{
+		previousMeshesVertexOffset += frameData->_clothMeshVertexCount[firstMeshInClothIndices + i];
+	}
+
+	// acces to vertices at clothEntity first vertex + previousMeshesVertexOffset:
+	*outFirstVertexPtr = &frameData->_clothVertices[frameData->_clothEntityFirstMeshVertex[clothEntityIndex] + previousMeshesVertexOffset];
+}
 
 #undef GLMC_IMPLEMENTATION
 #endif // GLMC_IMPLEMENTATION
