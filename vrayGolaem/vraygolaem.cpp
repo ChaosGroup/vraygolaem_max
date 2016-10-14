@@ -704,15 +704,12 @@ void VRayGolaem::readGolaemCache(TimeValue t)
 				if (gsclStatus == GSC_SUCCESS)
 				{
 					// Terrain
-					/*
 					CrowdTerrain::Mesh* terrainMeshSource(NULL), *terrainMeshDestination(NULL);
 					if (srcTerrainFile.Length()) terrainMeshSource = CrowdTerrain::loadTerrainAsset(srcTerrainFile);
 					if (_terrainFile.Length()) terrainMeshDestination = CrowdTerrain::loadTerrainAsset(_terrainFile);
 					if (terrainMeshDestination == NULL) terrainMeshDestination = terrainMeshSource;
-					
 					history->_terrainMeshSource = terrainMeshSource;
 					history->_terrainMeshDestination = terrainMeshDestination;
-					*/
 
 					glmCreateEntityTransforms(simulationData, history, &entityTransforms, &entityTransformCount);
 
@@ -728,10 +725,8 @@ void VRayGolaem::readGolaemCache(TimeValue t)
 					simulationData = simulationDataOut;
 
 					// Delete Terrain
-					/*
 					if (terrainMeshSource && terrainMeshSource != terrainMeshDestination) CrowdTerrain::closeTerrainAsset(terrainMeshSource);
 					if (terrainMeshDestination) CrowdTerrain::closeTerrainAsset(terrainMeshDestination);
-					*/
 				}
 			}
 

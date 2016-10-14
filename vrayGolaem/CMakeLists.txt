@@ -12,11 +12,13 @@ add_library( ${VRAYGOLAEMLIB} SHARED ${LIST_FILES} )
 # Include
 include_directories( ${3DSMAXSDK_INCDIR} )
 include_directories( ${VRAYFOR3DSMAX_INCDIR} )
+include_directories( ${GOLAEMDEVKIT_INCDIR} )
 
 # Link
 target_link_libraries( ${VRAYGOLAEMLIB} "comctl32.lib")
 target_link_libraries( ${VRAYGOLAEMLIB} "${3DSMAXSDK_LIBS}" )
 target_link_libraries( ${VRAYGOLAEMLIB} "${VRAYFOR3DSMAX_LIBS}" )
+target_link_libraries( ${VRAYGOLAEMLIB} "${GOLAEMDEVKIT_LIBS}" )
 
 # Extension dlo
 set_target_properties(${VRAYGOLAEMLIB} PROPERTIES SUFFIX ".dlo")
