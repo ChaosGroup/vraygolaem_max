@@ -1582,53 +1582,55 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 	convertToValidVrsceneName(_cacheName, correctedCacheName);
 
 		// node
+	outputStr << std::endl;
 	outputStr << "Node " << correctedCacheName << nodeName << "@node" << std::endl;
-		outputStr << "{" << std::endl;
-		outputStr << "\t" << "transform=Transform(Matrix(Vector(1, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1)), Vector(0, 0, 0));" << std::endl;
+	outputStr << "{" << std::endl;
+	outputStr << "\t" << "transform=Transform(Matrix(Vector(1, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1)), Vector(0, 0, 0));" << std::endl;
 	outputStr << "\t" << "geometry=" << correctedCacheName << nodeName << "@mesh1;" << std::endl;
-		outputStr << "\t" << "visible=1;" << std::endl;
-		outputStr << "}" << std::endl;
-		outputStr << std::endl;
+	outputStr << "\t" << "visible=1;" << std::endl;
+	outputStr << "}" << std::endl;
+	outputStr << std::endl;
 
 	outputStr << "GolaemCrowd " << correctedCacheName << nodeName << "@mesh1" << std::endl;
-		outputStr << "{" << std::endl;
-		outputStr << "\t" << "glmTransform=Transform(Matrix(Vector("<< transform.GetRow(0)[0] <<", "<< transform.GetRow(0)[1] <<", "<< transform.GetRow(0)[2] <<")," << 
+	outputStr << "{" << std::endl;
+	outputStr << "\t" << "glmTransform=Transform(Matrix(Vector("<< transform.GetRow(0)[0] <<", "<< transform.GetRow(0)[1] <<", "<< transform.GetRow(0)[2] <<")," << 
 														   "Vector("<< transform.GetRow(1)[0] <<", "<< transform.GetRow(1)[1] <<", "<< transform.GetRow(1)[2] <<")," <<
 														   "Vector("<< transform.GetRow(2)[0] <<", "<< transform.GetRow(2)[1] <<", "<< transform.GetRow(2)[2] <<"))," << 
 														   "Vector("<< transform.GetRow(3)[0] <<", "<< transform.GetRow(3)[1] <<", "<< transform.GetRow(3)[2] <<"));" << std::endl;
-		outputStr << "\t" << "glmFrameOffset="<< _frameOffset <<";" << std::endl;
-		outputStr << "\t" << "glmCrowdField=\"" << _crowdFields << "\";" << std::endl;
-		outputStr << "\t" << "glmCacheName=\"" << _cacheName << "\";" << std::endl;
-		outputStr << "\t" << "glmCacheFileDir=\"" << _cacheDir << "\";" << std::endl;
-		outputStr << "\t" << "glmCharacterFiles=\"" << _characterFiles << "\";" << std::endl;
-		// layout
-		outputStr << "\t" << "glmEnableLayout=" << _layoutEnable << ";" << std::endl;
-		outputStr << "\t" << "glmLayoutName=\"" << _layoutName << "\";" << std::endl;
-		outputStr << "\t" << "glmLayoutDir=\"" << _layoutDir << "\";" << std::endl;
-		outputStr << "\t" << "glmTerrainFile=\"" << _terrainFile << "\";" << std::endl;
-		// moblur
-		outputStr << "\t" << "glmMBlurEnabled=" << _mBlurEnable << ";" << std::endl;
-		if (_overMBlurWindowSize) outputStr << "\t" << "glmMBlurWindowSize=" << _mBlurWindowSize << ";" << std::endl;
-		if (_overMBlurSamples) outputStr << "\t" << "glmMBlurSamples=" << _mBlurSamples << ";" << std::endl;
-		// frustum culling
-		outputStr << "\t" << "glmEnableFrustumCulling=" << _frustumEnable << ";" << std::endl;
-		outputStr << "\t" << "glmFrustumMargin=" << _frustumMargin << ";" << std::endl;
-		outputStr << "\t" << "glmCameraMargin=" << _cameraMargin << ";" << std::endl;
-		// vray
-		outputStr << "\t" << "glmDefaultMaterial=\""<< _defaultMaterial <<"\";" << std::endl;
-		outputStr << "\t" << "glmObjectIDBase=" << _objectIDBase << ";" << std::endl;
-		outputStr << "\t" << "glmObjectIDMode=" << _objectIDMode << ";" << std::endl;
-		outputStr << "\t" << "glmRenderPercent=" << _displayPercent << ";" << std::endl;
-		outputStr << "\t" << "glmInstancingEnabled=" << _instancingEnable << ";" << std::endl;
-		outputStr << "\t" << "glmCameraVisibility=" << _primaryVisibility << ";" << std::endl;
-		outputStr << "\t" << "glmShadowsVisibility=" << _castsShadows << ";" << std::endl;
-		outputStr << "\t" << "glmReflectionsVisibility=" << _visibleInReflections << ";" << std::endl;
-		outputStr << "\t" << "glmRefractionsVisibility=" << _visibleInRefractions << ";" << std::endl;
+	outputStr << "\t" << "glmFrameOffset="<< _frameOffset <<";" << std::endl;
+	outputStr << "\t" << "glmCrowdField=\"" << _crowdFields << "\";" << std::endl;
+	outputStr << "\t" << "glmCacheName=\"" << _cacheName << "\";" << std::endl;
+	outputStr << "\t" << "glmCacheFileDir=\"" << _cacheDir << "\";" << std::endl;
+	outputStr << "\t" << "glmProxyName=\"" << nodeName << "\";" << std::endl;
+	outputStr << "\t" << "glmCharacterFiles=\"" << _characterFiles << "\";" << std::endl;
+	// layout
+	outputStr << "\t" << "glmEnableLayout=" << _layoutEnable << ";" << std::endl;
+	outputStr << "\t" << "glmLayoutName=\"" << _layoutName << "\";" << std::endl;
+	outputStr << "\t" << "glmLayoutDir=\"" << _layoutDir << "\";" << std::endl;
+	outputStr << "\t" << "glmTerrainFile=\"" << _terrainFile << "\";" << std::endl;
+	// moblur
+	outputStr << "\t" << "glmMBlurEnabled=" << _mBlurEnable << ";" << std::endl;
+	if (_overMBlurWindowSize) outputStr << "\t" << "glmMBlurWindowSize=" << _mBlurWindowSize << ";" << std::endl;
+	if (_overMBlurSamples) outputStr << "\t" << "glmMBlurSamples=" << _mBlurSamples << ";" << std::endl;
+	// frustum culling
+	outputStr << "\t" << "glmEnableFrustumCulling=" << _frustumEnable << ";" << std::endl;
+	outputStr << "\t" << "glmFrustumMargin=" << _frustumMargin << ";" << std::endl;
+	outputStr << "\t" << "glmCameraMargin=" << _cameraMargin << ";" << std::endl;
+	// vray
+	outputStr << "\t" << "glmDefaultMaterial=\""<< _defaultMaterial <<"\";" << std::endl;
+	outputStr << "\t" << "glmObjectIDBase=" << _objectIDBase << ";" << std::endl;
+	outputStr << "\t" << "glmObjectIDMode=" << _objectIDMode << ";" << std::endl;
+	outputStr << "\t" << "glmRenderPercent=" << _displayPercent << ";" << std::endl;
+	outputStr << "\t" << "glmInstancingEnabled=" << _instancingEnable << ";" << std::endl;
+	outputStr << "\t" << "glmCameraVisibility=" << _primaryVisibility << ";" << std::endl;
+	outputStr << "\t" << "glmShadowsVisibility=" << _castsShadows << ";" << std::endl;
+	outputStr << "\t" << "glmReflectionsVisibility=" << _visibleInReflections << ";" << std::endl;
+	outputStr << "\t" << "glmRefractionsVisibility=" << _visibleInRefractions << ";" << std::endl;
 
-		outputStr << "\t" << "glmDccPackage=1;" << std::endl;
+	outputStr << "\t" << "glmDccPackage=1;" << std::endl;
 
-		outputStr << "}" << std::endl;
-		outputStr << std::endl;
+	outputStr << "}" << std::endl;
+	outputStr << std::endl;
 
 	// write in file
 	outputFileStream << outputStr.str();
