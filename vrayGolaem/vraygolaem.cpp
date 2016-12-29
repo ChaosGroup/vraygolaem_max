@@ -211,11 +211,8 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	p_default, TRUE,
 	p_ui, TYPE_SINGLECHEKBOX, ED_LAYOUTENABLE,
 	PB_END,
-	pb_layout_name, _T("layout_file"), TYPE_STRING, P_RESET_DEFAULT, 0,
-	p_ui, TYPE_EDITBOX, ED_LAYOUTNAME,
-	PB_END,
-	pb_layout_dir, _T("layout_directory"), TYPE_STRING, P_RESET_DEFAULT, 0,
-	p_ui, TYPE_EDITBOX, ED_LAYOUTDIR,
+	pb_layout_file, _T("layout_file"), TYPE_STRING, P_RESET_DEFAULT, 0,
+	p_ui, TYPE_EDITBOX, ED_LAYOUTFILE,
 	PB_END,
 	pb_terrain_file, _T("terrain_file"), TYPE_STRING, P_RESET_DEFAULT, 0,
 	p_ui, TYPE_EDITBOX, ED_TERRAINFILE,
@@ -274,7 +271,9 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	pb_visible_in_refractions, _T(""), TYPE_BOOL, 0, 0, PB_END,
 	pb_override_node_properties, _T(""), TYPE_BOOL, 0, 0, PB_END,
 	pb_excluded_entities, _T(""), TYPE_STRING, 0, 0, PB_END,
-
+	pb_layout_name, _T(""), TYPE_STRING, 0, 0, PB_END,
+	pb_layout_dir, _T(""), TYPE_STRING, 0, 0, PB_END,
+	
 PB_END
 );
 
@@ -668,7 +667,7 @@ void VRayGolaem::readGolaemCache(TimeValue t)
 			CStr cacheStream(cachePrefix + "%d.gscf");
 			CStr gscsFileStr(cachePrefix + "gscs");
 			CStr gscfFileStr(cachePrefix + currentFrameStr + ".gscf");
-			CStr gsclFileStr(_layoutDir + "/" + _layoutName + "." + crowdFields[iCf] + ".gscl");
+			CStr gsclFileStr(_layoutFile);
 			CStr srcTerrainFile(cachePrefix + "terrain.fbx");
 
 			// load gscs
@@ -928,8 +927,7 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 
 	// layout attributes
 	_layoutEnable = pblock2->GetInt(pb_layout_enable, t) == 1;
-	_layoutName = getStrParam(pblock2, pb_layout_name, t);
-	_layoutDir = getStrParam(pblock2, pb_layout_dir, t);
+	_layoutFile = getStrParam(pblock2, pb_layout_file, t);
 	_terrainFile = getStrParam(pblock2, pb_terrain_file, t);
 
 	// motion blur attributes
@@ -1421,17 +1419,11 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			// layout
 			currentParam = plugin->getParameter("glmEnableLayout");
 			if (currentParam) pblock2->SetValue(pb_layout_enable, 0, currentParam->getBool() == 1);
-			currentParam = plugin->getParameter("glmLayoutName");
+			currentParam = plugin->getParameter("glmLayoutFilename");
 			if (currentParam)
 			{
 				GET_WSTR(currentParam->getString(), currentParamMbcs)
-				pblock2->SetValue(pb_layout_name, 0, currentParamMbcs, 0);
-			}
-			currentParam = plugin->getParameter("glmLayoutDir");
-			if (currentParam)
-			{
-				GET_WSTR(currentParam->getString(), currentParamMbcs)
-				pblock2->SetValue(pb_layout_dir, 0, currentParamMbcs, 0);
+				pblock2->SetValue(pb_layout_file, 0, currentParamMbcs, 0);
 			}
 			currentParam = plugin->getParameter("glmTerrainFile");
 			if (currentParam)
@@ -1605,8 +1597,7 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 	outputStr << "\t" << "glmCharacterFiles=\"" << _characterFiles << "\";" << std::endl;
 	// layout
 	outputStr << "\t" << "glmEnableLayout=" << _layoutEnable << ";" << std::endl;
-	outputStr << "\t" << "glmLayoutName=\"" << _layoutName << "\";" << std::endl;
-	outputStr << "\t" << "glmLayoutDir=\"" << _layoutDir << "\";" << std::endl;
+	outputStr << "\t" << "glmLayoutFilename=\"" << _layoutFile << "\";" << std::endl;
 	outputStr << "\t" << "glmTerrainFile=\"" << _terrainFile << "\";" << std::endl;
 	// moblur
 	outputStr << "\t" << "glmMBlurEnabled=" << _mBlurEnable << ";" << std::endl;

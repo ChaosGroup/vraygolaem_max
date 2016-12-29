@@ -14,7 +14,7 @@ include_directories( ${3DSMAXSDK_INCDIR} )
 include_directories( ${VRAYFOR3DSMAX_INCDIR} )
 
 # Link
-target_link_libraries( ${VRAYGOLAEMSWITCHLIB} "comctl32.lib")
+target_link_libraries( ${VRAYGOLAEMSWITCHLIB} "${SYSTEM_LIBS}")
 target_link_libraries( ${VRAYGOLAEMSWITCHLIB} "${3DSMAXSDK_LIBS}" )
 target_link_libraries( ${VRAYGOLAEMSWITCHLIB} "${VRAYFOR3DSMAX_LIBS}" )
 

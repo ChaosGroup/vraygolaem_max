@@ -81,8 +81,9 @@ enum {
 	pb_instancing_enable,
 	// layout
 	pb_layout_enable,
-	pb_layout_name,
-	pb_layout_dir,
+	pb_layout_file,
+	pb_layout_name,				// Not used anymore but kept for retrocomp
+	pb_layout_dir,				// Not used anymore but kept for retrocomp
 	pb_terrain_file,
 };
 
@@ -180,8 +181,7 @@ class VRayGolaem: public GeomObject, public VR::VRenderObject, public VR::VRayPl
 
 	// layout attributes
 	bool _layoutEnable;
-	CStr _layoutName;
-	CStr _layoutDir;
+	CStr _layoutFile;
 	CStr _terrainFile;
 
 	// MoBlur attributes
