@@ -240,8 +240,8 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	p_ui, TYPE_SPINNER,  EDITTYPE_INT, ED_FRAMEOFFSET, ED_FRAMEOFFSETSPIN, 1,
 	PB_END,
 	pb_object_id_mode, _T("objectId_mode"), TYPE_INT, P_RESET_DEFAULT, 0,
-    p_ui, TYPE_INT_COMBOBOX, CB_OBJECTIDMODE, 4, CB_OBJECTIDMODE_ITEM1, CB_OBJECTIDMODE_ITEM2, CB_OBJECTIDMODE_ITEM3, CB_OBJECTIDMODE_ITEM4, 
-	p_vals, 0, 1, 2, 3,
+    p_ui, TYPE_INT_COMBOBOX, CB_OBJECTIDMODE, 8, CB_OBJECTIDMODE_ITEM1, CB_OBJECTIDMODE_ITEM2, CB_OBJECTIDMODE_ITEM3, CB_OBJECTIDMODE_ITEM4, CB_OBJECTIDMODE_ITEM5, CB_OBJECTIDMODE_ITEM6, CB_OBJECTIDMODE_ITEM7, CB_OBJECTIDMODE_ITEM8,
+	p_vals, 0, 1, 2, 3, 4, 5, 6, 7,
 	p_default, 0,
 	PB_END,	
 	pb_default_material, _T("default_material"), TYPE_STRING, P_RESET_DEFAULT, 0,
@@ -1419,7 +1419,7 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			// layout
 			currentParam = plugin->getParameter("glmEnableLayout");
 			if (currentParam) pblock2->SetValue(pb_layout_enable, 0, currentParam->getBool() == 1);
-			currentParam = plugin->getParameter("glmLayoutFilename");
+			currentParam = plugin->getParameter("glmLayoutFile");
 			if (currentParam)
 			{
 				GET_WSTR(currentParam->getString(), currentParamMbcs)
@@ -1597,7 +1597,7 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 	outputStr << "\t" << "glmCharacterFiles=\"" << _characterFiles << "\";" << std::endl;
 	// layout
 	outputStr << "\t" << "glmEnableLayout=" << _layoutEnable << ";" << std::endl;
-	outputStr << "\t" << "glmLayoutFilename=\"" << _layoutFile << "\";" << std::endl;
+	outputStr << "\t" << "glmLayoutFile=\"" << _layoutFile << "\";" << std::endl;
 	outputStr << "\t" << "glmTerrainFile=\"" << _terrainFile << "\";" << std::endl;
 	// moblur
 	outputStr << "\t" << "glmMBlurEnabled=" << _mBlurEnable << ";" << std::endl;

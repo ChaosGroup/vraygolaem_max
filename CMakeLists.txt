@@ -56,6 +56,9 @@ endmacro()
 ############################################################
 project (vraygolaem)
 
+# Automatically install
+set( CMAKE_VS_INCLUDE_INSTALL_TO_DEFAULT_BUILD 1 )
+
 # Add dependencies
 set( 3DSMAXSDK_ROOTDIR "3dsMaxSDK Root Dir" CACHE PATH "3dsMaxSDK Root directory" )
 set( 3DSMAXSDK_VERSION 2014 CACHE INT "3dsMaxSDK Version" )
@@ -73,6 +76,8 @@ else()
 endif()
 set( GOLAEMDEVKIT_INCDIR "${GOLAEMDEVKIT_ROOTDIR}/include" )
 set( GOLAEMDEVKIT_LIBDIR "${GOLAEMDEVKIT_ROOTDIR}/lib" )
+
+project( Golaem-Max${3DSMAXSDK_VERSION})
 
 
 list(APPEND 3DSMAXSDK_LIBS "${3DSMAXSDK_LIBDIR}/assetmanagement.lib")
