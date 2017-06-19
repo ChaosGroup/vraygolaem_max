@@ -823,7 +823,7 @@ void VRayGolaem::draw(TimeValue t, INode *node, ViewExp *vpt)
 // VRenderObject
 //************************************************************
 
-#if MAX_RELEASE >= 6000 && MAX_RELEASE < 8900
+/*#if MAX_RELEASE >= 6000 && MAX_RELEASE < 8900
 	#define VRAYRT_MAIN    "VRAY30_RT_FOR_3DSMAX60_MAIN"
 	#define VRAYRT_PLUGINS "VRAY30_RT_FOR_3DSMAX60_PLUGINS"
 #elif MAX_RELEASE >= 8900 && MAX_RELEASE < 10900
@@ -858,7 +858,7 @@ void VRayGolaem::draw(TimeValue t, INode *node, ViewExp *vpt)
 	#define VRAYRT_PLUGINS "VRAY30_RT_FOR_3DSMAX2017_PLUGINS"
 #else
 #error Unsupported version of 3ds Max API
-#endif
+#endif*/
 
 //------------------------------------------------------------
 // init
