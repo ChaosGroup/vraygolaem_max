@@ -15,6 +15,7 @@
 #include "maxscript/maxscript.h"
 
 #include <vrender_plugin_renderer_interface.h>
+#include <vrender_plugin_renderer_brdf_wrapper.h>
 
 #include <fstream>	// std::ofstream
 #include <sstream>	// std::stringstream
@@ -32,9 +33,6 @@
 #define GLMC_NOT_INCLUDE_MINIZ
 #include "glm_crowd.h"	// golaem cache reader
 #include "glm_crowd_io.h"	// golaem cache reader
-
-// V-Ray plugin ID for the 3ds Max material wrapper
-#define MTL_WRAPPER_VRAY_ID LARGE_CONST(0x2015011056)
 
 // no param block script access for VRay free
 #ifdef _FREE_
@@ -913,6 +911,7 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 	_tempVRSceneFileDir = getStrParam(pblock2, pb_temp_vrscene_file_dir, t, "TEMP");
 }
 
+/*
 void VRayGolaem::wrapMaterial(Mtl *mtl) {
 	if (!mtl)
 		return;
@@ -927,17 +926,36 @@ void VRayGolaem::wrapMaterial(Mtl *mtl) {
 
 	wrapper->setMaxMtl(mtl, vrenderMtl, this);
 }
+*/
 
-void VRayGolaem::enumMaterials(Mtl *mtl) {
+void VRayGolaem::wrapMaterial(VUtils::VRayCore *vray, Mtl *mtl)
+{
+	if (!mtl)
+		return;
+
+	VRenderPluginRendererInterface *pluginRenderer = queryInterface<VRenderPluginRendererInterface>(vray, EXT_VRENDER_PLUGIN_RENDERER);
+	vassert(pluginRenderer);
+
+	VUtils::VRenderMtl *vrenderMtl = VUtils::getVRenderMtl(mtl/*, static_cast<VR::VRayRenderer*>(vray)*/);
+	if (!vrenderMtl) return; // Material is not V-Ray compatible, can't do anything.
+
+	GET_MBCS(mtl->GetName(), mtlName);
+	BRDFWrapper *wrapper = static_cast<BRDFWrapper*>(static_cast<PluginBase*>(pluginRenderer->newPlugin(MTL_WRAPPER_VRAY_ID, mtlName)));
+	if (!wrapper) return;
+		
+	wrapper->setMaxMtl(mtl, vrenderMtl, this);
+}
+
+void VRayGolaem::enumMaterials(VUtils::VRayCore *vray, Mtl *mtl) {
 	if (!mtl || mtl->SuperClassID()!=MATERIAL_CLASS_ID)
 		return;
 
-	wrapMaterial(mtl);
+	wrapMaterial(vray, mtl);
 	int numMtls=mtl->NumSubMtls();
 	for (int i=0; i<numMtls; i++) {
 		Mtl *sub=mtl->GetSubMtl(i);
 		if (sub && sub->SuperClassID()==MATERIAL_CLASS_ID) {
-			wrapMaterial(sub);
+			wrapMaterial(vray, sub);
 		}
 	}
 }
@@ -954,7 +972,7 @@ void VRayGolaem::createMaterials(VR::VRayCore *vray) {
 		return;
 	}
 
-	enumMaterials(node->GetMtl());
+	enumMaterials(vray, node->GetMtl());
 }
 
 //------------------------------------------------------------
@@ -969,8 +987,8 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 
 	const VR::VRaySequenceData &sdata=vray->getSequenceData();
 
-	VRenderPluginRendererInterface *pluginRenderer =
-		queryInterface<VRenderPluginRendererInterface>(vray, EXT_VRENDER_PLUGIN_RENDERER);
+	VRenderPluginRendererInterface *pluginRenderer = queryInterface<VRenderPluginRendererInterface>(vray, EXT_VRENDER_PLUGIN_RENDERER);
+	pluginRenderer->registerPlugin(wrapperMaterialDesc);
 	vassert(pluginRenderer);
 
 	PluginManager *plugMan = pluginRenderer->getPluginManager();

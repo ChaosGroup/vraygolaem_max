@@ -314,11 +314,11 @@ private:
 
 	// Enumerate the sub-materials for the given 3ds Max materials and create
 	// wrappers for it.
-	void enumMaterials(Mtl *mtl);
+	void enumMaterials(VUtils::VRayCore *vray, Mtl *mtl);
 
 	// Create a wrapper material in the plugin manager for this 3ds Max material.
 	// Only V-Ray compatible materials are supported.
-	void wrapMaterial(Mtl *mtl);
+	void wrapMaterial(VUtils::VRayCore *vray, Mtl *mtl);
 };
 
 //************************************************************
