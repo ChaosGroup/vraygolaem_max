@@ -691,6 +691,8 @@ void VRayGolaem::readGolaemCache(TimeValue t)
 			GlmHistory* history = NULL;
 			GlmEntityTransform* entityTransforms = NULL;
 			int entityTransformCount(0);
+			int64_t* entityExclusions = NULL;
+			int entityExclusionCount(0);
 
 			if (_layoutEnable)
 			{
@@ -706,6 +708,7 @@ void VRayGolaem::readGolaemCache(TimeValue t)
 					history->_terrainMeshDestination = terrainMeshDestination;
 
 					glmCreateEntityTransforms(simulationData, history, &entityTransforms, &entityTransformCount);
+					glmCreateEntityExclusionList(history, &entityExclusions, &entityExclusionCount);
 
 					GlmSimulationData* simulationDataOut;
 					GlmFrameData* frameDataOut;
@@ -721,11 +724,18 @@ void VRayGolaem::readGolaemCache(TimeValue t)
 					// Delete Terrain
 					if (terrainMeshSource && terrainMeshSource != terrainMeshDestination) CrowdTerrain::closeTerrainAsset(terrainMeshSource);
 					if (terrainMeshDestination) CrowdTerrain::closeTerrainAsset(terrainMeshDestination);
+
+					// fetch exclusion list
+					for (int iExcluded=0; iExcluded<entityExclusionCount;++iExcluded)
+					{
+						_exclusionData.append(entityExclusions[iExcluded]);
+					}
 				}
 			}
 
 			if (history) glmDestroyHistory(&history);
 			if (entityTransforms) glmDestroyEntityTransforms(&entityTransforms, entityTransformCount);
+			if (entityExclusions) glmDestroyEntityExclusionList(&entityExclusions);
 			
 			_simulationData.append(simulationData);
 			_frameData.append(frameData);
@@ -760,6 +770,7 @@ void VRayGolaem::drawEntities(GraphicsWindow *gw, const Matrix3& transform, Time
 		{
 			int64_t entityId = _simulationData[iData]->_entityIds[iEntity];
 			if (entityId == -1) continue;
+			if (_exclusionData.contains(entityId)) continue;
 
 			unsigned int entityType = _simulationData[iData]->_entityTypes[iEntity];
 			float entityRadius = _simulationData[iData]->_entityRadius[iEntity] * transformScale;
