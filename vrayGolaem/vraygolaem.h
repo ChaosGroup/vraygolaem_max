@@ -29,6 +29,8 @@
 #include "vraysceneplugman.h"
 #include "vrender_unicode.h"
 
+#include <vrender_plugin_renderer_brdf_wrapper.h>
+
 //************************************************************
 // #defines
 //************************************************************
@@ -81,8 +83,9 @@ enum {
 	pb_instancing_enable,
 	// layout
 	pb_layout_enable,
-	pb_layout_name,
-	pb_layout_dir,
+	pb_layout_file,
+	pb_layout_name,				// Not used anymore but kept for retrocomp
+	pb_layout_dir,				// Not used anymore but kept for retrocomp
 	pb_terrain_file,
 };
 
@@ -111,43 +114,6 @@ class FindPluginOfTypeCallback : public EnumPluginCallback
 
 class VRayGolaem;
 
-// A wrapper for a 3ds Max material; this is needed because the geometry created by Golaem
-// is implemented in V-Ray Standalone plugins, which cannot work with 3ds Max materials. This is
-// why we create one wrapper material for each 3ds Max material in the scene. This also allows
-// the Golaem plugin to find the materials automatically if they have the correct name in the
-// 3ds Max scene.
-class BRDFWrapper: public Plugin, public VR::MaterialInterface, public VR::BSDFInterface {
-	VR::VRenderMtl *vrayMtl;
-	Mtl *maxMtl;
-	ULONG maxMtlFlags;
-	int mtlID;
-	VRayGolaem *golaemInstance;
-public:
-	BRDFWrapper(void);
-
-	// From PluginBase
-	PluginInterface* newInterface(InterfaceID id) VRAY_OVERRIDE {
-		if (id==EXT_MATERIAL) return static_cast<MaterialInterface*>(this);
-		else if (id==EXT_BSDF) return static_cast<BSDFInterface*>(this);
-		else return PluginBase::newInterface(id);
-	}
-
-	// From PluginInterface
-	PluginBase* getPlugin(void) VRAY_OVERRIDE { return static_cast<PluginBase*>(this); }
-
-	// From MaterialInterface
-	void shade(VR::VRayContext &rc) VRAY_OVERRIDE;
-	int getMaterialRenderID(const VR::VRayContext &rc) VRAY_OVERRIDE;
-	int isOpaque(void) VRAY_OVERRIDE;
-
-	// From BSDFInterface
-	VR::BSDFSampler *newBSDF(const VR::VRayContext &rc, VR::BSDFFlags flags) VRAY_OVERRIDE;
-	void deleteBSDF(const VR::VRayContext &rc, VR::BSDFSampler *bsdf) VRAY_OVERRIDE;
-
-	// Other stuff
-	void setMaxMtl(Mtl *maxMtl, VR::VRenderMtl *vrayMtl, VRayGolaem *golaem);
-};
-
 //************************************************************
 // The VRayGolaem 3dsmax object
 //************************************************************
@@ -158,7 +124,10 @@ typedef GlmSimulationData_v0 GlmSimulationData;
 struct GlmFrameData_v0;
 typedef GlmFrameData_v0 GlmFrameData;
 
-class VRayGolaem: public GeomObject, public VR::VRenderObject, public VR::VRayPluginRendererInterface 
+class VRayGolaem
+	: public GeomObject
+	, public VR::VRenderObject
+	, public ObjectIDWrapperInterface
 {
 	friend class VRayGolaemInstanceBase;
 	friend class VRayGolaemDlgProc;
@@ -180,8 +149,7 @@ class VRayGolaem: public GeomObject, public VR::VRenderObject, public VR::VRayPl
 
 	// layout attributes
 	bool _layoutEnable;
-	CStr _layoutName;
-	CStr _layoutDir;
+	CStr _layoutFile;
 	CStr _terrainFile;
 
 	// MoBlur attributes
@@ -318,7 +286,6 @@ public:
 	//////////////////////////////////////////
 	// From VRayPluginRendererInterface
 	//////////////////////////////////////////
-	PluginManager* getPluginManager(void);
 	PluginBase* getPlugin(void) { return NULL; }
 
 	//////////////////////////////////////////
@@ -332,16 +299,10 @@ public:
 	void frameBegin(TimeValue t, VR::VRayCore *vray);
 	void frameEnd(VR::VRayCore *vray);
 
-	int getObjectID(void) const { return _objectIDBase; }
+	// From ObjectIDWrapperInterface
+	int getObjectID() VRAY_OVERRIDE { return _objectIDBase; }
 
 private:	
-	void callRenderBegin(VR::VRayCore *vray);
-	void callRenderEnd(VR::VRayCore *vray);
-	void callFrameBegin(VR::VRayCore *vray);
-	void callFrameEnd(VR::VRayCore *vray);
-
-	void compileGeometry(VR::VRayCore *vray);
-	void clearGeometry(VR::VRayCore *vray);
 	void updateVRayParams(TimeValue t);
 
 	// Enable or disable some UI controls based on the settings.
@@ -353,11 +314,11 @@ private:
 
 	// Enumerate the sub-materials for the given 3ds Max materials and create
 	// wrappers for it.
-	void enumMaterials(Mtl *mtl);
+	void enumMaterials(VUtils::VRayCore *vray, Mtl *mtl);
 
 	// Create a wrapper material in the plugin manager for this 3ds Max material.
 	// Only V-Ray compatible materials are supported.
-	void wrapMaterial(Mtl *mtl);
+	void wrapMaterial(VUtils::VRayCore *vray, Mtl *mtl);
 };
 
 //************************************************************
@@ -372,8 +333,6 @@ public:
 	int proc(ViewExp *vpt, int msg, int point, int flags, IPoint2 m, Matrix3& mat);
 	void SetObj(VRayGolaem *obj) { sphere=obj; }
 };
-
-extern PluginManager *golaemPlugman; // We need this to store the instance of the Golaem plugin
 
 //************************************************************
 // Inline

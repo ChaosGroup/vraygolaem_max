@@ -11,9 +11,11 @@
 #include "vrender_unicode.h"
 #include "hash_map.h"
 #include "vraytexutils.h"
-#include "pluginenumcallbacks.h"
 #include "resource.h"
 #include "maxscript/maxscript.h"
+
+#include <vrender_plugin_renderer_interface.h>
+#include <vrender_plugin_renderer_brdf_wrapper.h>
 
 #include <fstream>	// std::ofstream
 #include <sstream>	// std::stringstream
@@ -31,9 +33,6 @@
 #define GLMC_NOT_INCLUDE_MINIZ
 #include "glm_crowd.h"	// golaem cache reader
 #include "glm_crowd_io.h"	// golaem cache reader
-
-// V-Ray plugin ID for the 3ds Max material wrapper
-#define MTL_WRAPPER_VRAY_ID LARGE_CONST(0x2015011056)
 
 // no param block script access for VRay free
 #ifdef _FREE_
@@ -118,12 +117,6 @@ __declspec( dllexport ) ULONG LibVersion(void) { return VERSION_3DSMAX; }
 __declspec( dllexport ) int LibInitialize(void) { return TRUE; }
 
 __declspec( dllexport ) int LibShutdown(void) {
-	if (golaemPlugman) {
-		golaemPlugman->deleteAll();
-		golaemPlugman->unloadAll();
-		deleteDefaultPluginManager(golaemPlugman);
-		golaemPlugman=NULL;
-	}
 	return TRUE;
 }
 
@@ -211,11 +204,8 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	p_default, TRUE,
 	p_ui, TYPE_SINGLECHEKBOX, ED_LAYOUTENABLE,
 	PB_END,
-	pb_layout_name, _T("layout_file"), TYPE_STRING, P_RESET_DEFAULT, 0,
-	p_ui, TYPE_EDITBOX, ED_LAYOUTNAME,
-	PB_END,
-	pb_layout_dir, _T("layout_directory"), TYPE_STRING, P_RESET_DEFAULT, 0,
-	p_ui, TYPE_EDITBOX, ED_LAYOUTDIR,
+	pb_layout_file, _T("layout_file"), TYPE_STRING, P_RESET_DEFAULT, 0,
+	p_ui, TYPE_EDITBOX, ED_LAYOUTFILE,
 	PB_END,
 	pb_terrain_file, _T("terrain_file"), TYPE_STRING, P_RESET_DEFAULT, 0,
 	p_ui, TYPE_EDITBOX, ED_TERRAINFILE,
@@ -243,8 +233,8 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	p_ui, TYPE_SPINNER,  EDITTYPE_INT, ED_FRAMEOFFSET, ED_FRAMEOFFSETSPIN, 1,
 	PB_END,
 	pb_object_id_mode, _T("objectId_mode"), TYPE_INT, P_RESET_DEFAULT, 0,
-    p_ui, TYPE_INT_COMBOBOX, CB_OBJECTIDMODE, 4, CB_OBJECTIDMODE_ITEM1, CB_OBJECTIDMODE_ITEM2, CB_OBJECTIDMODE_ITEM3, CB_OBJECTIDMODE_ITEM4, 
-	p_vals, 0, 1, 2, 3,
+    p_ui, TYPE_INT_COMBOBOX, CB_OBJECTIDMODE, 8, CB_OBJECTIDMODE_ITEM1, CB_OBJECTIDMODE_ITEM2, CB_OBJECTIDMODE_ITEM3, CB_OBJECTIDMODE_ITEM4, CB_OBJECTIDMODE_ITEM5, CB_OBJECTIDMODE_ITEM6, CB_OBJECTIDMODE_ITEM7, CB_OBJECTIDMODE_ITEM8,
+	p_vals, 0, 1, 2, 3, 4, 5, 6, 7,
 	p_default, 0,
 	PB_END,	
 	pb_default_material, _T("default_material"), TYPE_STRING, P_RESET_DEFAULT, 0,
@@ -274,7 +264,9 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	pb_visible_in_refractions, _T(""), TYPE_BOOL, 0, 0, PB_END,
 	pb_override_node_properties, _T(""), TYPE_BOOL, 0, 0, PB_END,
 	pb_excluded_entities, _T(""), TYPE_STRING, 0, 0, PB_END,
-
+	pb_layout_name, _T(""), TYPE_STRING, 0, 0, PB_END,
+	pb_layout_dir, _T(""), TYPE_STRING, 0, 0, PB_END,
+	
 PB_END
 );
 
@@ -286,7 +278,9 @@ PB_END
 // VRayGolaem
 //------------------------------------------------------------
 VRayGolaem::VRayGolaem() 
-	: _simulationData(NULL), _frameData(NULL), _updateCacheData(true)
+	: _simulationData(NULL)
+	, _frameData(NULL)
+	, _updateCacheData(true)
 {
 	static int pblockDesc_inited=false;
 	if (!pblockDesc_inited) 
@@ -668,7 +662,7 @@ void VRayGolaem::readGolaemCache(TimeValue t)
 			CStr cacheStream(cachePrefix + "%d.gscf");
 			CStr gscsFileStr(cachePrefix + "gscs");
 			CStr gscfFileStr(cachePrefix + currentFrameStr + ".gscf");
-			CStr gsclFileStr(_layoutDir + "/" + _layoutName + "." + crowdFields[iCf] + ".gscl");
+			CStr gsclFileStr(_layoutFile);
 			CStr srcTerrainFile(cachePrefix + "terrain.fbx");
 
 			// load gscs
@@ -679,7 +673,7 @@ void VRayGolaem::readGolaemCache(TimeValue t)
 			if (status != GSC_SUCCESS)
 			{
 				glmDestroySimulationData(&simulationData);
-				DebugPrint(_T("VRayGolaem: Error loading .gscs file \"%s\""), gscsFileStr);
+				DebugPrint(_T("VRayGolaem: Error loading .gscs file \"%s\"\n"), gscsFileStr.data());
 				return;
 			}
 
@@ -689,7 +683,7 @@ void VRayGolaem::readGolaemCache(TimeValue t)
 			if (status != GSC_SUCCESS)
 			{
 				glmDestroyFrameData(&frameData, simulationData);
-				DebugPrint(_T("VRayGolaem: Error loading .gscf file \"%s\""), gscfFileStr);
+				DebugPrint(_T("VRayGolaem: Error loading .gscf file \"%s\"\n"), gscfFileStr.data());
 				return;
 			}
 
@@ -704,15 +698,12 @@ void VRayGolaem::readGolaemCache(TimeValue t)
 				if (gsclStatus == GSC_SUCCESS)
 				{
 					// Terrain
-					/*
 					CrowdTerrain::Mesh* terrainMeshSource(NULL), *terrainMeshDestination(NULL);
 					if (srcTerrainFile.Length()) terrainMeshSource = CrowdTerrain::loadTerrainAsset(srcTerrainFile);
 					if (_terrainFile.Length()) terrainMeshDestination = CrowdTerrain::loadTerrainAsset(_terrainFile);
 					if (terrainMeshDestination == NULL) terrainMeshDestination = terrainMeshSource;
-					
 					history->_terrainMeshSource = terrainMeshSource;
 					history->_terrainMeshDestination = terrainMeshDestination;
-					*/
 
 					glmCreateEntityTransforms(simulationData, history, &entityTransforms, &entityTransformCount);
 
@@ -728,10 +719,8 @@ void VRayGolaem::readGolaemCache(TimeValue t)
 					simulationData = simulationDataOut;
 
 					// Delete Terrain
-					/*
 					if (terrainMeshSource && terrainMeshSource != terrainMeshDestination) CrowdTerrain::closeTerrainAsset(terrainMeshSource);
 					if (terrainMeshDestination) CrowdTerrain::closeTerrainAsset(terrainMeshDestination);
-					*/
 				}
 			}
 
@@ -829,70 +818,10 @@ void VRayGolaem::draw(TimeValue t, INode *node, ViewExp *vpt)
 // VRenderObject
 //************************************************************
 
-#if MAX_RELEASE >= 6000 && MAX_RELEASE < 8900
-	#define VRAYRT_MAIN    "VRAY30_RT_FOR_3DSMAX60_MAIN"
-	#define VRAYRT_PLUGINS "VRAY30_RT_FOR_3DSMAX60_PLUGINS"
-#elif MAX_RELEASE >= 8900 && MAX_RELEASE < 10900
-	#define VRAYRT_MAIN    "VRAY30_RT_FOR_3DSMAX90_MAIN"
-	#define VRAYRT_PLUGINS "VRAY30_RT_FOR_3DSMAX90_PLUGINS"
-#elif MAX_RELEASE >= 10900 && MAX_RELEASE < 11900
-	#define VRAYRT_MAIN    "VRAY30_RT_FOR_3DSMAX2009_MAIN"
-	#define VRAYRT_PLUGINS "VRAY30_RT_FOR_3DSMAX2009_PLUGINS"
-#elif MAX_RELEASE >= 11900 && MAX_RELEASE < 12900
-	#define VRAYRT_MAIN    "VRAY30_RT_FOR_3DSMAX2010_MAIN"
-	#define VRAYRT_PLUGINS "VRAY30_RT_FOR_3DSMAX2010_PLUGINS"
-#elif MAX_RELEASE >= 12900 && MAX_RELEASE < 13900
-	#define VRAYRT_MAIN    "VRAY30_RT_FOR_3DSMAX2011_MAIN"
-	#define VRAYRT_PLUGINS "VRAY30_RT_FOR_3DSMAX2011_PLUGINS"
-#elif MAX_RELEASE >= 13900 && MAX_RELEASE < 14900
-	#define VRAYRT_MAIN    "VRAY30_RT_FOR_3DSMAX2012_MAIN"
-	#define VRAYRT_PLUGINS "VRAY30_RT_FOR_3DSMAX2012_PLUGINS"
-#elif MAX_RELEASE >= 14850 && MAX_RELEASE < 15900
-	#define VRAYRT_MAIN    "VRAY30_RT_FOR_3DSMAX2013_MAIN"
-	#define VRAYRT_PLUGINS "VRAY30_RT_FOR_3DSMAX2013_PLUGINS"
-#elif MAX_RELEASE >= 15850 && MAX_RELEASE < 16900
-	#define VRAYRT_MAIN    "VRAY30_RT_FOR_3DSMAX2014_MAIN"
-	#define VRAYRT_PLUGINS "VRAY30_RT_FOR_3DSMAX2014_PLUGINS"
-#elif MAX_RELEASE >= 16850 && MAX_RELEASE < 17900
-	#define VRAYRT_MAIN    "VRAY30_RT_FOR_3DSMAX2015_MAIN"
-	#define VRAYRT_PLUGINS "VRAY30_RT_FOR_3DSMAX2015_PLUGINS"
-#elif MAX_RELEASE >= 17850 && MAX_RELEASE < 18900
-	#define VRAYRT_MAIN    "VRAY30_RT_FOR_3DSMAX2016_MAIN"
-	#define VRAYRT_PLUGINS "VRAY30_RT_FOR_3DSMAX2016_PLUGINS"
-#elif MAX_RELEASE >= 18850 && MAX_RELEASE < 19900
-	#define VRAYRT_MAIN    "VRAY30_RT_FOR_3DSMAX2017_MAIN"
-	#define VRAYRT_PLUGINS "VRAY30_RT_FOR_3DSMAX2017_PLUGINS"
-#else
-#error Unsupported version of 3ds Max API
-#endif
-
-//------------------------------------------------------------
-// init
-//------------------------------------------------------------
 int VRayGolaem::init(const ObjectState &os, INode *node, VR::VRayCore *vray) 
 {
 	VRenderObject::init(os, node, vray);
 	return true;
-}
-
-//------------------------------------------------------------
-// Get the path to the V-Ray plugins; use the V-Ray RT environment variable for this
-//------------------------------------------------------------
-const tchar* getVRayPluginPath() 
-{
-	char pluginsDirVar[512];
-	vutils_strcpy(pluginsDirVar, VRAYRT_PLUGINS);
-	vutils_strcat(pluginsDirVar, "_");
-	vutils_strcat(pluginsDirVar, PROCESSOR_ARCHITECTURE);
-
-	const char *s = getenv(pluginsDirVar);
-	if (s == NULL) {
-		tchar str[512];
-		sprintf(str, "Could not read V-Ray environment variable \"%s\"\n", pluginsDirVar);
-		VUtils::debug(str);
-		return ".";
-	}
-	return s;
 }
 
 CStr getStrParam(IParamBlock2* block, ParamID id, TimeValue t, const CStr& defaultStr="")
@@ -933,8 +862,7 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 
 	// layout attributes
 	_layoutEnable = pblock2->GetInt(pb_layout_enable, t) == 1;
-	_layoutName = getStrParam(pblock2, pb_layout_name, t);
-	_layoutDir = getStrParam(pblock2, pb_layout_dir, t);
+	_layoutFile = getStrParam(pblock2, pb_layout_file, t);
 	_terrainFile = getStrParam(pblock2, pb_terrain_file, t);
 
 	// motion blur attributes
@@ -983,6 +911,7 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 	_tempVRSceneFileDir = getStrParam(pblock2, pb_temp_vrscene_file_dir, t, "TEMP");
 }
 
+/*
 void VRayGolaem::wrapMaterial(Mtl *mtl) {
 	if (!mtl)
 		return;
@@ -997,17 +926,36 @@ void VRayGolaem::wrapMaterial(Mtl *mtl) {
 
 	wrapper->setMaxMtl(mtl, vrenderMtl, this);
 }
+*/
 
-void VRayGolaem::enumMaterials(Mtl *mtl) {
+void VRayGolaem::wrapMaterial(VUtils::VRayCore *vray, Mtl *mtl)
+{
+	if (!mtl)
+		return;
+
+	VRenderPluginRendererInterface *pluginRenderer = queryInterface<VRenderPluginRendererInterface>(vray, EXT_VRENDER_PLUGIN_RENDERER);
+	vassert(pluginRenderer);
+
+	VUtils::VRenderMtl *vrenderMtl = VUtils::getVRenderMtl(mtl/*, static_cast<VR::VRayRenderer*>(vray)*/);
+	if (!vrenderMtl) return; // Material is not V-Ray compatible, can't do anything.
+
+	GET_MBCS(mtl->GetName(), mtlName);
+	BRDFWrapper *wrapper = static_cast<BRDFWrapper*>(static_cast<PluginBase*>(pluginRenderer->newPlugin(MTL_WRAPPER_VRAY_ID, mtlName)));
+	if (!wrapper) return;
+		
+	wrapper->setMaxMtl(mtl, vrenderMtl, this);
+}
+
+void VRayGolaem::enumMaterials(VUtils::VRayCore *vray, Mtl *mtl) {
 	if (!mtl || mtl->SuperClassID()!=MATERIAL_CLASS_ID)
 		return;
 
-	wrapMaterial(mtl);
+	wrapMaterial(vray, mtl);
 	int numMtls=mtl->NumSubMtls();
 	for (int i=0; i<numMtls; i++) {
 		Mtl *sub=mtl->GetSubMtl(i);
 		if (sub && sub->SuperClassID()==MATERIAL_CLASS_ID) {
-			wrapMaterial(sub);
+			wrapMaterial(vray, sub);
 		}
 	}
 }
@@ -1024,36 +972,8 @@ void VRayGolaem::createMaterials(VR::VRayCore *vray) {
 		return;
 	}
 
-	enumMaterials(node->GetMtl());
+	enumMaterials(vray, node->GetMtl());
 }
-
-class BRDFMaterialDesc: public PluginDesc {
-public:
-	PluginID getPluginID(void) VRAY_OVERRIDE {
-		return MTL_WRAPPER_VRAY_ID;
-	}
-
-	Plugin* newPlugin(PluginHost *host) VRAY_OVERRIDE {
-		return new BRDFWrapper;
-	}
-
-	void deletePlugin(Plugin *plugin) {
-		delete static_cast<BRDFWrapper*>(plugin);
-	}
-
-	bool supportsInterface(InterfaceID id) {
-		if (id==EXT_MATERIAL) return true;
-		else if (id==EXT_BSDF) return true;
-		else return false;
-	}
-
-	/// Returns the name of the plugin class (human readable name).
-	tchar* getName(void) VRAY_OVERRIDE {
-		return "MtlMaxWrapper";
-	}
-};
-
-static BRDFMaterialDesc wrapperMaterialDesc;
 
 //------------------------------------------------------------
 // renderBegin / renderEnd
@@ -1067,15 +987,12 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 
 	const VR::VRaySequenceData &sdata=vray->getSequenceData();
 
-	if (!golaemPlugman) {
-		golaemPlugman=newDefaultPluginManager();
-		const tchar *vrayPluginPath = getVRayPluginPath();
-		sdata.progress->info("VRayGolaem: Loading V-Ray plugins from \"%s\"", getVRayPluginPath());
-		golaemPlugman->loadLibraryFromPathCollection(vrayPluginPath, "/vray_*.dll", NULL, vray->getSequenceData().progress);
+	VRenderPluginRendererInterface *pluginRenderer = queryInterface<VRenderPluginRendererInterface>(vray, EXT_VRENDER_PLUGIN_RENDERER);
+	pluginRenderer->registerPlugin(wrapperMaterialDesc);
+	vassert(pluginRenderer);
 
-		// Register our wrapper material.
-		golaemPlugman->registerPlugin(&wrapperMaterialDesc);
-	}
+	PluginManager *plugMan = pluginRenderer->getPluginManager();
+	vassert(plugMan);
 
 	// Creates the crowd .vrscene file on the fly if required
 	VR::CharString vrSceneFileToLoad(_vrsceneFile);
@@ -1108,14 +1025,14 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 	}
 
 	// Load the .vrscene into the plugin manager
-	_vrayScene=new VR::VRayScene(golaemPlugman);
-	int prevNbPlugins(_vrayScene->getPluginManager()->enumPlugins(NULL));
+	_vrayScene=new VR::VRayScene(plugMan);
+	int prevNbPlugins(plugMan->enumPlugins(NULL));
 	int newNbPlugins(prevNbPlugins);
 
 	// Create wrapper plugins for all 3ds Max materials in the scene, so that the Golaem plugin can use them, if needed
 	sdata.progress->info("VRayGolaem: Create materials attached to the VRayGolaem node");
 	createMaterials(vray);
-	newNbPlugins=_vrayScene->getPluginManager()->enumPlugins(NULL);
+	newNbPlugins=plugMan->enumPlugins(NULL);
 	sdata.progress->info("VRayGolaem: Materials created successfully, %i materials created", newNbPlugins-prevNbPlugins);
 	prevNbPlugins = newNbPlugins;
 
@@ -1123,7 +1040,7 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 		sdata.progress->warning("VRayGolaem: No .vrscene file specified");
 	} else {
 		VR::ErrorCode errCode=_vrayScene->readFile(vrSceneFileToLoad.ptr());
-		newNbPlugins=_vrayScene->getPluginManager()->enumPlugins(NULL);
+		newNbPlugins=plugMan->enumPlugins(NULL);
 		if (errCode.error()) {
 			VR::CharString errMsg=errCode.getErrorString();
 			sdata.progress->warning("VRayGolaem: Error loading .vrscene file \"%s\": %s", vrSceneFileToLoad.ptr(), errMsg.ptr());
@@ -1137,7 +1054,7 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 		sdata.progress->warning("VRayGolaem: No shaders .vrscene file specified");
 	} else {
 		VR::ErrorCode errCode=_vrayScene->readFile(_shadersFile.ptr());
-		newNbPlugins=_vrayScene->getPluginManager()->enumPlugins(NULL);
+		newNbPlugins=plugMan->enumPlugins(NULL);
 		if (errCode.error()) {
 			VR::CharString errMsg=errCode.getErrorString();
 			sdata.progress->warning("VRayGolaem: Error loading shaders .vrscene file \"%s\": %s", _shadersFile.ptr(), errMsg.ptr());
@@ -1206,8 +1123,6 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 	{
 		sdata.progress->warning("VRayGolaem: No GolaemCrowd node found in the current scene");
 	}
-
-	callRenderBegin(vray);
 }
 
 void VRayGolaem::renderEnd(VR::VRayCore *_vray) 
@@ -1215,9 +1130,7 @@ void VRayGolaem::renderEnd(VR::VRayCore *_vray)
 	VR::VRayRenderer *vray=static_cast<VR::VRayRenderer*>(_vray);
 	VRenderObject::renderEnd(vray);
 	
-	callRenderEnd(vray);
 	if (_vrayScene) {
-		_vrayScene->freeMem();
 		delete _vrayScene;
 		_vrayScene=NULL;
 	}
@@ -1230,14 +1143,12 @@ void VRayGolaem::frameBegin(TimeValue t, VR::VRayCore *_vray)
 {
 	VR::VRayRenderer *vray=static_cast<VR::VRayRenderer*>(_vray);
 	VRenderObject::frameBegin(t, vray);
-	callFrameBegin(vray);
 }
 
 void VRayGolaem::frameEnd(VR::VRayCore *_vray) 
 {
 	VR::VRayRenderer *vray=static_cast<VR::VRayRenderer*>(_vray);
 	VRenderObject::frameEnd(vray);
-	callFrameEnd(vray);
 }
 
 //------------------------------------------------------------
@@ -1260,85 +1171,6 @@ void VRayGolaem::deleteRenderInstance(VR::VRenderInstance *ri) {
 	delete static_cast<VRayGolaemInstanceBase*>(ri);
 }
 
-//------------------------------------------------------------
-// callRenderBegin / callFrameBegin / callRenderEnd / callFrameEnd
-//-----------------------------------------------------------
-void VRayGolaem::callRenderBegin(VR::VRayCore *vray) {
-	PluginRendererInterfaceRAII plgInterface(vray, this);
-
-	PreRenderBeginCB preRenderBeginCb(vray);
-	golaemPlugman->enumPlugins(&preRenderBeginCb);
-
-	RenderBeginCB renderBeginCb(vray, 0.0f);
-	golaemPlugman->enumPlugins(&renderBeginCb);
-}
-
-void VRayGolaem::callFrameBegin(VR::VRayCore *vray) {
-	PluginRendererInterfaceRAII plgInterface(vray, this);
-	TimeConversionRAII timeConversion(vray);
-
-	PreFrameBeginCB preFrameBeginCb(vray);
-	golaemPlugman->enumPlugins(&preFrameBeginCb);
-
-	FrameBeginCB frameBeginCb(vray, vray->getFrameData().t);
-	golaemPlugman->enumPlugins(&frameBeginCb);
-}
-
-void VRayGolaem::callRenderEnd(VR::VRayCore *vray) {
-	PluginRendererInterfaceRAII plgInterface(vray, this);
-
-	RenderEndCB renderEndCb(vray, 0.0f);
-	golaemPlugman->enumPlugins(&renderEndCb);
-
-	PostRenderEndCB postRenderEndCb(vray);
-	golaemPlugman->enumPlugins(&postRenderEndCb);
-}
-
-void VRayGolaem::callFrameEnd(VR::VRayCore *vray) {
-	PluginRendererInterfaceRAII plgInterface(vray, this);
-	TimeConversionRAII timeConversion(vray);
-
-	FrameEndCB frameEndCb(vray, vray->getFrameData().t);
-	golaemPlugman->enumPlugins(&frameEndCb);
-
-	PostFrameEndCB postFrameEndCb(vray);
-	golaemPlugman->enumPlugins(&postFrameEndCb);
-}
-
-//------------------------------------------------------------
-// compileGeometry / clearGeometry
-//-----------------------------------------------------------
-void VRayGolaem::compileGeometry(VR::VRayCore *vray) {
-	TimeConversionRAII timeConversion(vray);
-
-	const VR::VRaySequenceData &sdata=vray->getSequenceData();
-	if (sdata.progress)
-		sdata.progress->debug("VRayGolaem: Compiling geometry");
-
-	CompileGeometryCB compileGeometryCb(vray);
-	int res=golaemPlugman->enumPlugins(&compileGeometryCb);
-
-	if (sdata.progress)
-		sdata.progress->debug("VRayGolaem: %i plugins enumerated for compileGeometry()", res);
-}
-
-void VRayGolaem::clearGeometry(VR::VRayCore *vray) {
-	TimeConversionRAII timeConversion(vray);
-
-	const VR::VRaySequenceData &sdata=vray->getSequenceData();
-	if (sdata.progress)
-		sdata.progress->debug("VRayGolaem: Clearing geometry");
-
-	ClearGeometryCB clearGeometryCb(vray);
-	int res=golaemPlugman->enumPlugins(&clearGeometryCb);
-
-	if (sdata.progress)
-		sdata.progress->debug("VRayGolaem: %i plugins enumerated for clearGeometry()", res);
-}
-
-PluginManager* VRayGolaem::getPluginManager(void) {
-	return golaemPlugman;
-}
 
 //************************************************************
 // Read / Write VRScene
@@ -1358,23 +1190,17 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 		return false;
 	}
 	
-	// create a Vray context
-	PluginManager* tempPlugMan(golaemPlugman);
-	bool deletePlugMan(false);
-	if (tempPlugMan == NULL)
-	{
-		tempPlugMan=newDefaultPluginManager();
-		const tchar *vrayPluginPath = getVRayPluginPath();
-		tempPlugMan->loadLibraryFromPathCollection(vrayPluginPath, "/vray_*.dll", NULL, NULL);
-		deletePlugMan=true;
-	}
-	VR::VRayScene* tmpVrayScene=new VR::VRayScene(tempPlugMan);
+    PluginManager* tempPlugMan=newDefaultPluginManager();
+    const VUtils::CharString &vrayPluginPath = getVRayPluginsPath();
+    tempPlugMan->loadLibraryFromPathCollection(vrayPluginPath.ptr(), "/vray_*.dll", NULL, NULL);
+
+	VR::VRayScene *tmpVrayScene = new VR::VRayScene(tempPlugMan);
 	VR::ErrorCode errCode=tmpVrayScene->readFile(file.ptr());
 	if (!errCode.error())
 	{				
 		// find the nodes
 		FindPluginOfTypeCallback pluginCallback(CROWDVRAYPLUGINID);
-		tempPlugMan->enumPlugins(&pluginCallback);
+		tmpVrayScene->enumPlugins(&pluginCallback);
 
 		// read attributes
 		if (pluginCallback._foundPlugins.length())
@@ -1387,7 +1213,7 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			currentParam = plugin->getParameter("glmTransform");
 			if (currentParam)
 			{
-				VR::Transform t = currentParam->getTransform();
+				VR::TraceTransform t = currentParam->getTransform();
 				Matrix3 transform(Point3(1, 0, 0), Point3(0, 1, 0), Point3(0, 0, 1), Point3(t.offs[0], t.offs[1], t.offs[2]));
 				transform = transform * golaemToMax();
 
@@ -1426,17 +1252,11 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			// layout
 			currentParam = plugin->getParameter("glmEnableLayout");
 			if (currentParam) pblock2->SetValue(pb_layout_enable, 0, currentParam->getBool() == 1);
-			currentParam = plugin->getParameter("glmLayoutName");
+			currentParam = plugin->getParameter("glmLayoutFile");
 			if (currentParam)
 			{
 				GET_WSTR(currentParam->getString(), currentParamMbcs)
-				pblock2->SetValue(pb_layout_name, 0, currentParamMbcs, 0);
-			}
-			currentParam = plugin->getParameter("glmLayoutDir");
-			if (currentParam)
-			{
-				GET_WSTR(currentParam->getString(), currentParamMbcs)
-				pblock2->SetValue(pb_layout_dir, 0, currentParamMbcs, 0);
+				pblock2->SetValue(pb_layout_file, 0, currentParamMbcs, 0);
 			}
 			currentParam = plugin->getParameter("glmTerrainFile");
 			if (currentParam)
@@ -1535,7 +1355,7 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 		{
 			// CROWDVRAYPLUGINID not found = not loaded or env not configured
 			CStr vrayEnvVar = CStr(VRAYRT_PLUGINS) + CStr("_") + CStr(PROCESSOR_ARCHITECTURE);
-			CStr logMessage = CStr("VRayGolaem: Error loading .vrscene file \"") + CStr(file.ptr()) + CStr("\". vray_glmCrowdVRayPlugin.dll plugin was not found in environment variable \"") + vrayEnvVar + CStr("\" (")+ CStr(getVRayPluginPath()) + CStr(").\n");
+			CStr logMessage = CStr("VRayGolaem: Error loading .vrscene file \"") + CStr(file.ptr()) + CStr("\". vray_glmCrowdVRayPlugin.dll plugin was not found in environment variable \"") + vrayEnvVar + CStr("\" (")+ CStr(getVRayPluginsPath().ptr()) + CStr(").\n");
 			mprintf(logMessage.ToBSTR());
 		}
 		
@@ -1545,17 +1365,9 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 		CStr logMessage = CStr("VRayGolaem: Success loading .vrscene file \"") + CStr(file.ptr()) + CStr("\". Vrscene file is invalid.\n");
 		mprintf(logMessage.ToBSTR());
 	}
-	
-	// delete the Vray context
-	tmpVrayScene->freeMem();
-	delete tmpVrayScene;
 
-	if (deletePlugMan)
-	{
-		tempPlugMan->deleteAll();
-		tempPlugMan->unloadAll();
-		deleteDefaultPluginManager(tempPlugMan);
-	}
+	delete tmpVrayScene;
+	delete tempPlugMan;
 
 	return true;
 }
@@ -1587,53 +1399,54 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 	convertToValidVrsceneName(_cacheName, correctedCacheName);
 
 		// node
+	outputStr << std::endl;
 	outputStr << "Node " << correctedCacheName << nodeName << "@node" << std::endl;
-		outputStr << "{" << std::endl;
-		outputStr << "\t" << "transform=Transform(Matrix(Vector(1, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1)), Vector(0, 0, 0));" << std::endl;
+	outputStr << "{" << std::endl;
+	outputStr << "\t" << "transform=Transform(Matrix(Vector(1, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1)), Vector(0, 0, 0));" << std::endl;
 	outputStr << "\t" << "geometry=" << correctedCacheName << nodeName << "@mesh1;" << std::endl;
-		outputStr << "\t" << "visible=1;" << std::endl;
-		outputStr << "}" << std::endl;
-		outputStr << std::endl;
+	outputStr << "\t" << "visible=1;" << std::endl;
+	outputStr << "}" << std::endl;
+	outputStr << std::endl;
 
 	outputStr << "GolaemCrowd " << correctedCacheName << nodeName << "@mesh1" << std::endl;
-		outputStr << "{" << std::endl;
-		outputStr << "\t" << "glmTransform=Transform(Matrix(Vector("<< transform.GetRow(0)[0] <<", "<< transform.GetRow(0)[1] <<", "<< transform.GetRow(0)[2] <<")," << 
+	outputStr << "{" << std::endl;
+	outputStr << "\t" << "glmTransform=Transform(Matrix(Vector("<< transform.GetRow(0)[0] <<", "<< transform.GetRow(0)[1] <<", "<< transform.GetRow(0)[2] <<")," << 
 														   "Vector("<< transform.GetRow(1)[0] <<", "<< transform.GetRow(1)[1] <<", "<< transform.GetRow(1)[2] <<")," <<
 														   "Vector("<< transform.GetRow(2)[0] <<", "<< transform.GetRow(2)[1] <<", "<< transform.GetRow(2)[2] <<"))," << 
 														   "Vector("<< transform.GetRow(3)[0] <<", "<< transform.GetRow(3)[1] <<", "<< transform.GetRow(3)[2] <<"));" << std::endl;
-		outputStr << "\t" << "glmFrameOffset="<< _frameOffset <<";" << std::endl;
-		outputStr << "\t" << "glmCrowdField=\"" << _crowdFields << "\";" << std::endl;
-		outputStr << "\t" << "glmCacheName=\"" << _cacheName << "\";" << std::endl;
-		outputStr << "\t" << "glmCacheFileDir=\"" << _cacheDir << "\";" << std::endl;
-		outputStr << "\t" << "glmCharacterFiles=\"" << _characterFiles << "\";" << std::endl;
-		// layout
-		outputStr << "\t" << "glmEnableLayout=" << _layoutEnable << ";" << std::endl;
-		outputStr << "\t" << "glmLayoutName=\"" << _layoutName << "\";" << std::endl;
-		outputStr << "\t" << "glmLayoutDir=\"" << _layoutDir << "\";" << std::endl;
-		outputStr << "\t" << "glmTerrainFile=\"" << _terrainFile << "\";" << std::endl;
-		// moblur
-		outputStr << "\t" << "glmMBlurEnabled=" << _mBlurEnable << ";" << std::endl;
-		if (_overMBlurWindowSize) outputStr << "\t" << "glmMBlurWindowSize=" << _mBlurWindowSize << ";" << std::endl;
-		if (_overMBlurSamples) outputStr << "\t" << "glmMBlurSamples=" << _mBlurSamples << ";" << std::endl;
-		// frustum culling
-		outputStr << "\t" << "glmEnableFrustumCulling=" << _frustumEnable << ";" << std::endl;
-		outputStr << "\t" << "glmFrustumMargin=" << _frustumMargin << ";" << std::endl;
-		outputStr << "\t" << "glmCameraMargin=" << _cameraMargin << ";" << std::endl;
-		// vray
-		outputStr << "\t" << "glmDefaultMaterial=\""<< _defaultMaterial <<"\";" << std::endl;
-		outputStr << "\t" << "glmObjectIDBase=" << _objectIDBase << ";" << std::endl;
-		outputStr << "\t" << "glmObjectIDMode=" << _objectIDMode << ";" << std::endl;
-		outputStr << "\t" << "glmRenderPercent=" << _displayPercent << ";" << std::endl;
-		outputStr << "\t" << "glmInstancingEnabled=" << _instancingEnable << ";" << std::endl;
-		outputStr << "\t" << "glmCameraVisibility=" << _primaryVisibility << ";" << std::endl;
-		outputStr << "\t" << "glmShadowsVisibility=" << _castsShadows << ";" << std::endl;
-		outputStr << "\t" << "glmReflectionsVisibility=" << _visibleInReflections << ";" << std::endl;
-		outputStr << "\t" << "glmRefractionsVisibility=" << _visibleInRefractions << ";" << std::endl;
+	outputStr << "\t" << "glmFrameOffset="<< _frameOffset <<";" << std::endl;
+	outputStr << "\t" << "glmCrowdField=\"" << _crowdFields << "\";" << std::endl;
+	outputStr << "\t" << "glmCacheName=\"" << _cacheName << "\";" << std::endl;
+	outputStr << "\t" << "glmCacheFileDir=\"" << _cacheDir << "\";" << std::endl;
+	outputStr << "\t" << "glmProxyName=\"" << nodeName << "\";" << std::endl;
+	outputStr << "\t" << "glmCharacterFiles=\"" << _characterFiles << "\";" << std::endl;
+	// layout
+	outputStr << "\t" << "glmEnableLayout=" << _layoutEnable << ";" << std::endl;
+	outputStr << "\t" << "glmLayoutFile=\"" << _layoutFile << "\";" << std::endl;
+	outputStr << "\t" << "glmTerrainFile=\"" << _terrainFile << "\";" << std::endl;
+	// moblur
+	outputStr << "\t" << "glmMBlurEnabled=" << _mBlurEnable << ";" << std::endl;
+	if (_overMBlurWindowSize) outputStr << "\t" << "glmMBlurWindowSize=" << _mBlurWindowSize << ";" << std::endl;
+	if (_overMBlurSamples) outputStr << "\t" << "glmMBlurSamples=" << _mBlurSamples << ";" << std::endl;
+	// frustum culling
+	outputStr << "\t" << "glmEnableFrustumCulling=" << _frustumEnable << ";" << std::endl;
+	outputStr << "\t" << "glmFrustumMargin=" << _frustumMargin << ";" << std::endl;
+	outputStr << "\t" << "glmCameraMargin=" << _cameraMargin << ";" << std::endl;
+	// vray
+	outputStr << "\t" << "glmDefaultMaterial=\""<< _defaultMaterial <<"\";" << std::endl;
+	outputStr << "\t" << "glmObjectIDBase=" << _objectIDBase << ";" << std::endl;
+	outputStr << "\t" << "glmObjectIDMode=" << _objectIDMode << ";" << std::endl;
+	outputStr << "\t" << "glmRenderPercent=" << _displayPercent << ";" << std::endl;
+	outputStr << "\t" << "glmInstancingEnabled=" << _instancingEnable << ";" << std::endl;
+	outputStr << "\t" << "glmCameraVisibility=" << _primaryVisibility << ";" << std::endl;
+	outputStr << "\t" << "glmShadowsVisibility=" << _castsShadows << ";" << std::endl;
+	outputStr << "\t" << "glmReflectionsVisibility=" << _visibleInReflections << ";" << std::endl;
+	outputStr << "\t" << "glmRefractionsVisibility=" << _visibleInRefractions << ";" << std::endl;
 
-		outputStr << "\t" << "glmDccPackage=1;" << std::endl;
+	outputStr << "\t" << "glmDccPackage=1;" << std::endl;
 
-		outputStr << "}" << std::endl;
-		outputStr << std::endl;
+	outputStr << "}" << std::endl;
+	outputStr << std::endl;
 
 	// write in file
 	outputFileStream << outputStr.str();
@@ -1821,176 +1634,4 @@ inline Matrix3 golaemToMax()
 inline Matrix3 maxToGolaem()
 {
 	return RotateXMatrix(-(float)pi/2);
-}
-
-// V-Ray materials expect rc.rayresult.sd to derive from VR::ShadeData, but this is not true for
-// the geometry from Standalone plugins, so wrap the original shade data with this class. This also
-// allows us to remap the texture mapping channels on the fly (in 3ds Max, they start from 1, but
-// in the standalone plugins, they start from 0).
-struct MtlShadeData: VR::ShadeData {
-	MtlShadeData(VR::VRayContext &rc, VR::SurfaceProperties *surfaceProps, int mtlID, int rID, int objID) {
-		renderID=rID;
-		gbufID=mtlID;
-		objectID=objID;
-		orig_rc=&rc;
-		orig_sd=rc.rayresult.sd;
-		orig_sp=rc.rayresult.surfaceProps;
-		rc.rayresult.sd=static_cast<VR::VRayShadeData*>(this);
-		rc.rayresult.surfaceProps=surfaceProps;
-		lastMapChannelIndex=-3;
-	}
-	~MtlShadeData(void) {
-		orig_rc->rayresult.sd=orig_sd;
-		orig_rc->rayresult.surfaceProps=orig_sp;
-	}
-
-	VR::Vector getUVWcoords(const VR::VRayContext &rc, int channel) {
-		if (!initMapChannel(rc, channel))
-			return VR::Vector(0.0f, 0.0f, 0.0f);
-		return lastMapChannelTransform.offs;
-	}
-
-	void getUVWderivs(const VR::VRayContext &rc, int channel, VR::Vector derivs[2]) {
-		if (!initMapChannel(rc, channel)) {
-			derivs[0].makeZero();
-			derivs[1].makeZero();
-		} else {
-			derivs[0]=rc.rayresult.dPdx*lastMapChannelTransform.m;
-			derivs[1]=rc.rayresult.dPdy*lastMapChannelTransform.m;
-		}
-	}
-
-	void getUVWbases(const VR::VRayContext &rc, int channel, VR::Vector bases[3]) {
-		if (!initMapChannel(rc, channel)) {
-			bases[0].makeZero();
-			bases[1].makeZero();
-			bases[2].makeZero();
-		} else {
-			bases[0]=lastMapChannelTransform.m[0];
-			bases[1]=lastMapChannelTransform.m[1];
-			bases[2]=lastMapChannelTransform.m[2];
-		}
-	}
-
-	VR::Vector getUVWnormal(const VR::VRayContext &rc, int channel) {
-		if (!initMapChannel(rc, channel)) {
-			return VR::Vector(0.0f, 0.0f, 1.0f);
-		} else {
-			return crossf(lastMapChannelTransform.m[0], lastMapChannelTransform.m[1]);
-		}
-	}
-
-	int getMtlID(const VR::VRayContext &rc) {
-		VR::SurfaceInfoInterface *surfaceInfo=static_cast<VR::SurfaceInfoInterface*>(GET_INTERFACE(orig_sd, EXT_SURFACE_INFO));
-		if (surfaceInfo)
-			return surfaceInfo->getFaceID(rc);
-		return 0;
-	}
-	int getGBufID(void) { return objectID; }
-	int getSmoothingGroup(const VR::VRayContext &rc) { return 0; }
-	int getEdgeVisibility(const VR::VRayContext &rc) { return 7; }
-
-	int getSurfaceRenderID(const VR::VRayContext &rc) { return renderID; }
-	int getMaterialRenderID(const VR::VRayContext &rc) { return gbufID; }
-
-	PluginInterface* newInterface(InterfaceID id) {
-		PluginInterface *res=orig_sd->newInterface(id);
-		if (res)
-			return res;
-		return VR::ShadeData::newInterface(id);
-	}
-protected:
-	int initMapChannel(const VR::VRayContext &rc, int channelIndex) {
-		if (lastMapChannelIndex==channelIndex)
-			return true;
-		if (-2==lastMapChannelIndex)
-			return false;
-		VR::MappedSurface *mappedSurface=static_cast<VR::MappedSurface*>(GET_INTERFACE(orig_sd, EXT_MAPPED_SURFACE));
-		if (!mappedSurface) {
-			lastMapChannelIndex=-2;
-			return false;
-		}
-
-		// In 3ds Max, mapping channels start from 1, so that's why we subtract 1 from the channelIndex here.
-		lastMapChannelTransform=mappedSurface->getLocalUVWTransform(rc, channelIndex-1);
-		lastMapChannelIndex=channelIndex;
-		return true;
-	}
-
-	VR::VRayContext *orig_rc;
-	VR::VRayShadeData *orig_sd;
-	VR::VRaySurfaceProperties *orig_sp;
-	int lastMapChannelIndex;
-	VR::Transform lastMapChannelTransform;
-	int gbufID, renderID, objectID;
-};
-
-void BRDFWrapper::shade(VR::VRayContext &rc) {
-	// 3ds Max materials for V-Ray expect rc.rayresult.sd to be ShadeData, so create a wrapper here
-	MtlShadeData shadeData(rc, NULL, mtlID, 0 /* renderID */, golaemInstance->getObjectID());
-	VR::VRayInterface &vri=static_cast<VR::VRayInterface&>(rc);
-
-	// Just call the original 3ds Max material to shade itself.
-	vrayMtl->shade(vri, mtlID);
-
-	// Handle alpha contribution - there's no one to do it for us since we don't go through VRayInstance::fullShade().
-	if (rc.rayresult.surfaceProps && 0!=(rc.rayparams.localRayType & VR::RT_GBUFFER)) {
-		float alphaContrib=static_cast<VR::SurfaceProperties*>(rc.rayresult.surfaceProps)->alphaContribution;
-		if (alphaContrib>=0.0f) {
-			rc.mtlresult.alpha*=alphaContrib;
-			rc.mtlresult.alphaTransp=VR::Color(1.0f, 1.0f, 1.0f)*(1.0f-alphaContrib)+rc.mtlresult.alphaTransp*alphaContrib;
-		} else {
-			rc.mtlresult.alpha.makeZero();
-			rc.mtlresult.alphaTransp=VR::Color(1.0f, 1.0f, 1.0f)*(1.0f+alphaContrib)-rc.mtlresult.alphaTransp*alphaContrib;
-		}
-	}
-}
-
-int BRDFWrapper::getMaterialRenderID(const VR::VRayContext &rc) {
-	return mtlID;
-}
-
-int BRDFWrapper::isOpaque(void) {
-#ifdef VRAY_MTLREQ_OPAQUE_SHADOWS
-	return (maxMtlFlags & (VRAY_MTLREQ_OPAQUE_SHADOWS | MTLREQ_TRANSP))==VRAY_MTLREQ_OPAQUE_SHADOWS;
-#else
-	return false;
-#endif
-}
-
-VR::BSDFSampler* BRDFWrapper::newBSDF(const VR::VRayContext &rc, VR::BSDFFlags flags) {
-	if (!vrayMtl)
-		return NULL;
-
-	VR::VRenderMtlFlags mtlFlags;
-	mtlFlags.force1sided=flags.force1sided;
-	return vrayMtl->newBSDF(rc, mtlFlags);
-}
-
-void BRDFWrapper::deleteBSDF(const VR::VRayContext &rc, VR::BSDFSampler *bsdf) {
-	if (!bsdf)
-		return;
-
-	vrayMtl->deleteBSDF(rc, bsdf);
-}
-
-void BRDFWrapper::setMaxMtl(Mtl *maxMtl, VR::VRenderMtl *vrayMtl, VRayGolaem *golaem) {
-	this->maxMtl=maxMtl;
-	this->vrayMtl=vrayMtl;
-	this->golaemInstance=golaem;
-
-	GET_MBCS(maxMtl->GetName(), mtlName);
-	setPluginName(mtlName); // Set the name to be the same as the Max name, so that the Golaem plugin can find it.
-
-	maxMtlFlags=maxMtl->Requirements(-1);
-	mtlID=maxMtl->gbufID;
-}
-
-BRDFWrapper::BRDFWrapper(void):
-	maxMtl(NULL),
-	vrayMtl(NULL),
-	maxMtlFlags(0),
-	mtlID(0),
-	golaemInstance(NULL)
-{
 }

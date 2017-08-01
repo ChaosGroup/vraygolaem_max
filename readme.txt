@@ -3,12 +3,12 @@ Compilation
 
 *) Open the .vcproj file in Visual Studio and let it convert if needed;
 *) Adjust paths to the V-Ray SDK and the 3ds Max SDK and the output file name as needed;
-*) For 3ds Max 2013 and later, make sure the character set is set to "Unicode".
+*) Make sure the character set is set to "Unicode".
 
 Installation
 ============
 
-*) For 3ds Max 2015 and later, copy the file scripts\vraygolaem.py to [3dsMaxRoot]\scripts\Python
+*) Copy the file scripts\vraygolaem.py to [3dsMaxRoot]\scripts\Python
 
 *) Copy the file vrayplugins\vraygolaemNNNN.dlo for the respective 3ds Max version into the "[3dsMaxRoot]\plugins\vrayplugins" folder (or whereever the V-Ray plugins for 3ds Max are)
 
@@ -16,7 +16,7 @@ Installation
 
 *) Set the PATH environment variable to also contain the path to the Golaem "bin" folder so that the various Golaem DLLs can be found.
 
-*) Make sure that the environment variables needed for V-Ray RT are set up correctly (i.e. VRAY30_RT_FOR_3DSMAX2014_PLUGINS etc).
+*) Make sure that the environment variables needed for V-Ray RT are set up correctly (i.e. VRAY30_RT_FOR_3DSMAX2015_PLUGINS etc).
 
 Usage
 =====
