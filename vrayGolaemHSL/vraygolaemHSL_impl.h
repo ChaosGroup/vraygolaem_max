@@ -52,6 +52,8 @@ public:
 	}
 };
 
+#pragma warning (push)
+#pragma warning (disable: 4512)
 
 // The occlusion sampler.
 struct VRayGolaemHSLSampler: VR::AdaptiveColorSampler 
@@ -181,7 +183,7 @@ public:
 		float occlusion=0.0f;
 		float transp=1.0f;
 		float step=0.0f;
-		bool bGetTexture = false;
+		//bool bGetTexture = false;
 
 		int maxLevels=bAllTranspLevels ? nrc.vray->getSequenceData().params.options.mtl_transpMaxLevels : 1;
 		for (int i=0; i<maxLevels; i++) 
@@ -289,3 +291,5 @@ public:
 
 	float getOcclusion(void) { return finalOcclusion; }
 };
+
+#pragma warning (pop)

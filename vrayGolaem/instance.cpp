@@ -5,11 +5,8 @@
 ***************************************************************************/
 
 #include "instance.h"
-#include "tomax.h"
-#include "misc_ray.h"
-#include "plugman.h"
-#include "factory.h"
-#include "vrayplugins.h"
+
+#include "vraygolaem.h"
 
 using namespace VR;
 
@@ -42,6 +39,6 @@ void VRayGolaemInstanceBase::frameEnd(VRayCore *vray) {
 	if (!renderObject) return;
 }
 
-void VRayGolaemInstanceBase::compileGeometry(VR::VRayCore *vray) {
+void VRayGolaemInstanceBase::compileGeometry(VR::VRayCore* /*vray*/) {
 	if (!renderObject) return;
 }

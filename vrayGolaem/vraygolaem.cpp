@@ -3,23 +3,22 @@
 *  Copyright (C) Chaos Group & Golaem S.A. - All Rights Reserved.          *
 *                                                                          *
 ***************************************************************************/
-
 #include "vraygolaem.h"
+
 #include "instance.h"
-#include "pb2template_generator.h"
-#include "defrayserver.h"
-#include "vrender_unicode.h"
-#include "hash_map.h"
-#include "vraytexutils.h"
+
 #include "resource.h"
+
+#pragma warning (push)
+#pragma warning (disable: 4535)
+
 #include "maxscript/maxscript.h"
 
-#include <vrender_plugin_renderer_interface.h>
-#include <vrender_plugin_renderer_brdf_wrapper.h>
+#pragma warning (pop)
+
 
 #include <fstream>	// std::ofstream
 #include <sstream>	// std::stringstream
-#include <io.h>		// _access
 
 #if GET_MAX_RELEASE(VERSION_3DSMAX) >= 9000
 #include "IPathConfigMgr.h"
@@ -50,7 +49,7 @@
 class VRayGolaemClassDesc: public ClassDesc2 {
 public:
 	int IsPublic(void) { return IS_PUBLIC; }
-	void *Create(BOOL loading) { return new VRayGolaem; }
+	void *Create(BOOL /*loading*/) { return new VRayGolaem; }
 	const TCHAR *ClassName(void) { return STR_CLASSNAME; }
 	SClass_ID SuperClassID(void) { return GEOMOBJECT_CLASS_ID; }
 	Class_ID ClassID(void) { return PLUGIN_CLASSID; }
@@ -90,7 +89,7 @@ static VRayGolaemClassDesc vrayGolaemClassDesc;
 HINSTANCE hInstance;
 int controlsInit=FALSE;
 
-BOOL WINAPI DllMain(HINSTANCE hinstDLL,ULONG fdwReason,LPVOID lpvReserved) {
+BOOL WINAPI DllMain(HINSTANCE hinstDLL,ULONG /*fdwReason*/,LPVOID /*lpvReserved*/) {
 	hInstance=hinstDLL;
 
 	if (!controlsInit) {
@@ -128,7 +127,7 @@ public:
 	INT_PTR DlgProc(TimeValue t, IParamMap2 *map, HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 	void DeleteThis() { }
 
-	void SetThing(ReferenceTarget *m) {}
+	void SetThing(ReferenceTarget * /*m*/) {}
 };
 
 static VRayGolaemDlgProc vrayGolaemDlgProc;
@@ -146,6 +145,31 @@ INode *getNode(VRayGolaem *golaem) {
 bool fileExists(const CStr& pathname)
 {
 	return ( _waccess( pathname.ToWStr(), 0 ) == 0 ) ;
+}
+
+CStr getEnvironmentVariable(const CStr& envVarName)
+{
+	CStr envVarValue("");
+
+#ifdef _MSC_VER
+	size_t requiredSize;
+	getenv_s(&requiredSize, NULL, 0, envVarName.data());
+	if (requiredSize != 0)
+	{
+		char* envVariable(new char[requiredSize]);
+		getenv_s(&requiredSize, envVariable, requiredSize, envVarName.data());
+		envVarValue = CStr(envVariable);
+		delete[] envVariable;
+	}
+#else
+	char* envVariable(getenv(envVarName.c_str()));
+	if (envVariable != NULL)
+	{
+		envVarValue = (*envVariable);
+	}
+#endif
+
+	return envVarValue;
 }
 
 //************************************************************
@@ -314,6 +338,17 @@ void VRayGolaem::EndEditParams(IObjParam *ip, ULONG flags, Animatable *next) {
 	vrayGolaemClassDesc.EndEditParams(ip, this, flags, next);
 }
 
+RefTargetHandle VRayGolaem::Clone()
+{
+#if GET_MAX_RELEASE(VERSION_3DSMAX) < 8900
+	NoRemap defaultRemap;
+#else
+	DefaultRemapDir defaultRemap;
+#endif
+	RemapDir& remap = defaultRemap;
+	return Clone(remap);
+}
+
 RefTargetHandle VRayGolaem::Clone(RemapDir& remap) {
 	VRayGolaem* newob=new VRayGolaem();	
 	BaseClone(this, newob, remap);
@@ -349,6 +384,9 @@ void VRayGolaem::SetReference(int i, RefTargetHandle rtarg) {
 }
 
 RefResult VRayGolaem::NotifyRefChanged(NOTIFY_REF_CHANGED_ARGS) {
+	(void)changeInt;
+	(void)partID;
+	(void)propagate;
 	switch (message) {
 		case REFMSG_CHANGE:
 			if (hTarget==pblock2) {
@@ -372,7 +410,7 @@ Interval VRayGolaem::ObjectValidity(TimeValue t) {
 //------------------------------------------------------------
 // proc
 //------------------------------------------------------------
-int VRayGolaemCreateCallBack::proc(ViewExp *vpt, int msg, int point, int flags, IPoint2 m, Matrix3& mat) {
+int VRayGolaemCreateCallBack::proc(ViewExp *vpt, int msg, int point, int /*flags*/, IPoint2 m, Matrix3& mat) {
 	if (!sphere) return CREATE_ABORT;
 
 	Point3 np=vpt->SnapPoint(m,m,NULL,SNAP_IN_PLANE);
@@ -407,10 +445,10 @@ CreateMouseCallBack* VRayGolaem::GetCreateMouseCallBack() {
 	return &createCB;
 }
 
-void VRayGolaem::SetExtendedDisplay(int flags) {
+void VRayGolaem::SetExtendedDisplay(int /*flags*/) {
 }
 
-void VRayGolaem::GetLocalBoundBox(TimeValue t, INode* inode, ViewExp* vpt, Box3& box) 
+void VRayGolaem::GetLocalBoundBox(TimeValue /*t*/, INode* /*inode*/, ViewExp* /*vpt*/, Box3& box) 
 {
 	float radius=ICON_RADIUS; 
 	_nodeBbox+=Point3(-radius, -radius, -radius);
@@ -425,7 +463,7 @@ void VRayGolaem::GetWorldBoundBox(TimeValue t, INode* inode, ViewExp* vpt, Box3&
 	box=localBox*(inode->GetObjectTM(t));
 }
 
-void VRayGolaem::GetDeformBBox(TimeValue t, Box3 &b, Matrix3 *tm, BOOL useSel) {
+void VRayGolaem::GetDeformBBox(TimeValue t, Box3 &b, Matrix3 *tm, BOOL /*useSel*/) {
 	if (!tm) GetLocalBoundBox(t, NULL, NULL, b);
 	else {
 		Box3 bbox;
@@ -435,12 +473,12 @@ void VRayGolaem::GetDeformBBox(TimeValue t, Box3 &b, Matrix3 *tm, BOOL useSel) {
 	}
 }
 
-int VRayGolaem::HitTest(TimeValue t, INode *node, int type, int crossing, int flags, IPoint2 *p, ViewExp *vpt) {
+int VRayGolaem::HitTest(TimeValue t, INode *node, int type, int crossing, int /*flags*/, IPoint2 *p, ViewExp *vpt) {
 	static HitRegion hitRegion;
 	DWORD	savedLimits;
 
 	GraphicsWindow *gw=vpt->getGW();	
-	Material *mtl=gw->getMaterial();
+	//Material *mtl=gw->getMaterial();
 	MakeHitRegion(hitRegion, type, crossing, 4, p);
 
 	gw->setRndLimits(((savedLimits = gw->getRndLimits())|GW_PICK)&~GW_ILLUM);
@@ -455,19 +493,19 @@ int VRayGolaem::HitTest(TimeValue t, INode *node, int type, int crossing, int fl
 	return gw->checkHitCode();
 }
 
-void VRayGolaem::Snap(TimeValue t, INode* inode, SnapInfo *snap, IPoint2 *p, ViewExp *vpt) {
+void VRayGolaem::Snap(TimeValue /*t*/, INode* /*inode*/, SnapInfo* /*snap*/, IPoint2* /*p*/, ViewExp* /*vpt*/) {
 	if (suspendSnap) return;
 }
 
 //------------------------------------------------------------
 // Display
 //------------------------------------------------------------
-int VRayGolaem::Display(TimeValue t, INode* node, ViewExp *vpt, int flags) {
+int VRayGolaem::Display(TimeValue t, INode* node, ViewExp *vpt, int /*flags*/) {
 	draw(t, node, vpt);
 	return 0;
 }
 
-ObjectState VRayGolaem::Eval(TimeValue time) 
+ObjectState VRayGolaem::Eval(TimeValue /*time*/) 
 {
 	_updateCacheData = true; // time has changed, we should re-read the cache
 	return ObjectState(this);
@@ -483,13 +521,13 @@ void VRayGolaem::ReleaseInterface(ULONG id, void *ip) {
 	GeomObject::ReleaseInterface(id, ip);
 }
 
-Mesh* VRayGolaem::GetRenderMesh(TimeValue t, INode *inode, View& view, BOOL& needDelete) {
+Mesh* VRayGolaem::GetRenderMesh(TimeValue /*t*/, INode* /*inode*/, View& /*view*/, BOOL& needDelete) {
 	needDelete=false;
 	return &_mesh;
 }
 
-INT_PTR VRayGolaemDlgProc::DlgProc(TimeValue t, IParamMap2 *map, HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-	int id=LOWORD(wParam);
+INT_PTR VRayGolaemDlgProc::DlgProc(TimeValue t, IParamMap2 *map, HWND /*hWnd*/, UINT msg, WPARAM wParam, LPARAM /*lParam*/) {
+	//int id=LOWORD(wParam);
 
 	IParamBlock2 *pblock=NULL;
 	VRayGolaem *vrayGolaem=NULL;
@@ -507,7 +545,7 @@ INT_PTR VRayGolaemDlgProc::DlgProc(TimeValue t, IParamMap2 *map, HWND hWnd, UINT
 		case WM_COMMAND: {
 			int ctrlID=LOWORD(wParam);
 			int notifyCode=HIWORD(wParam);
-			HWND ctrlHWnd=(HWND) lParam;
+			//HWND ctrlHWnd=(HWND) lParam;
 
 			if (notifyCode==BN_CLICKED) {
 				if (ctrlID==BN_GOLAEMBROWSE && vrayGolaem) {
@@ -888,7 +926,7 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 	
 	// object properties
 	_objectIDBase=node->GetGBufID();
-	_objectIDMode = pblock2->GetInt(pb_object_id_mode, t);
+	_objectIDMode = (short) pblock2->GetInt(pb_object_id_mode, t);
 	_primaryVisibility=node->GetPrimaryVisibility()==1;
 	_castsShadows=node->CastShadows()==1;
 
@@ -996,7 +1034,7 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 
 	// Creates the crowd .vrscene file on the fly if required
 	VR::CharString vrSceneFileToLoad(_vrsceneFile);
-	CStr outputDir(getenv (_tempVRSceneFileDir));
+	CStr outputDir(getEnvironmentVariable (_tempVRSceneFileDir));
 	if (outputDir!=NULL) 
 	{
 		if (outputDir.Length() != 0 && _cacheName.Length() != 0 && _crowdFields.length() != 0)

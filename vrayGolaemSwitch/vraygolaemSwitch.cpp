@@ -1,35 +1,37 @@
+/***************************************************************************
+*                                                                          *
+*  Copyright (C) Chaos Group & Golaem S.A. - All Rights Reserved.          *
+*                                                                          *
+***************************************************************************/
 
-#pragma warning( push )
-#pragma warning( disable : 4100 4251 4273 4275 4996 )
+#include "vraygolaemSwitch.h"
 
-#include "max.h"
-#include "imtl.h"
-#include "texutil.h"
-#include "iparamm2.h"
-#if GET_MAX_RELEASE(VERSION_3DSMAX) >= 6000
-#include "IMtlRender_Compatibility.h"
-#endif
-#if GET_MAX_RELEASE(VERSION_3DSMAX) >= 13900
-#include <IMaterialBrowserEntryInfo.h>
-#endif
-
-#include "pb2template_generator.h"
-
-#include "vrayinterface.h"
-#include "shadedata_new.h"
-#include "vrayrenderer.h"
-#include "vraydmcsampler.h"
-#include "vrayplugins.h"
-#include "vraytexutils.h"
-#include "tomax.h"
-#include "vrender_unicode.h"
+//#pragma warning( push )
+//#pragma warning( disable : 4100 4251 4273 4275 4996 )
+//
+//#include "max.h"
+//#include "imtl.h"
+//#include "texutil.h"
+//#include "iparamm2.h"
+//
+//
+//#include "pb2template_generator.h"
+//
+//#include "vrayinterface.h"
+//#include "shadedata_new.h"
+//#include "vrayrenderer.h"
+//#include "vraydmcsampler.h"
+//#include "vrayplugins.h"
+//#include "vraytexutils.h"
+//#include "tomax.h"
+//#include "vrender_unicode.h"
 
 #include "resource.h"
 
 #include "vraygolaemSwitch_impl.h"
-//Class_ID and paramblock enum moved to that file ... 
-#include "vraygolaemSwitch.h"
 
+#pragma warning( push )
+#pragma warning( disable : 4535)
 
 #if MAX_RELEASE<13900
 #include "maxscrpt/maxscrpt.h"
@@ -37,6 +39,13 @@
 #else
 #include "maxscript/maxscript.h"
 #include "maxscript/kernel/value.h"
+#endif
+
+#if GET_MAX_RELEASE(VERSION_3DSMAX) >= 6000
+#include "IMtlRender_Compatibility.h"
+#endif
+#if GET_MAX_RELEASE(VERSION_3DSMAX) >= 13900
+#include <IMaterialBrowserEntryInfo.h>
 #endif
 
 using namespace VRayGolaemSwitch;
@@ -68,7 +77,7 @@ class SkeletonTexmapClassDesc:public ClassDesc2
 
 public:
 	int IsPublic() { return IS_PUBLIC; }
-	void* Create(BOOL loading) { return new SkeletonTexmap; }
+	void* Create(BOOL /*loading*/) { return new SkeletonTexmap; }
 	const TCHAR* ClassName() { return STR_CLASSNAME; }
 	SClass_ID SuperClassID() { return TEXMAP_CLASS_ID; }
 	Class_ID ClassID() { return VRAYGOLAEMSWITCH_CLASS_ID; }
@@ -148,7 +157,7 @@ static SkeletonTexmapClassDesc SkelTexmapCD;
 HINSTANCE hInstance;
 int controlsInit=false;
 
-bool WINAPI DllMain(HINSTANCE hinstDLL,ULONG fdwReason,LPVOID lpvReserved) {
+bool WINAPI DllMain(HINSTANCE hinstDLL,ULONG fdwReason,LPVOID /*lpvReserved*/) {
 	hInstance = hinstDLL;
 
 	if (!controlsInit) {
@@ -294,24 +303,27 @@ ParamDlg* SkeletonTexmap::CreateParamDlg(HWND hwMtlEdit, IMtlParams *imp) {
 |	Subanim & References support
 \*===========================================================================*/
 
-RefTargetHandle SkeletonTexmap::GetReference(int i) {
+RefTargetHandle SkeletonTexmap::GetReference(int /*i*/) {
 	return pblock;
 }
 
-void SkeletonTexmap::SetReference(int i, RefTargetHandle rtarg) {
+void SkeletonTexmap::SetReference(int /*i*/, RefTargetHandle rtarg) {
 	pblock=(IParamBlock2*) rtarg;
 }
 
-TSTR SkeletonTexmap::SubAnimName(int i) {
+TSTR SkeletonTexmap::SubAnimName(int /*i*/) {
 	return STR_DLGTITLE;
 }
 
-Animatable* SkeletonTexmap::SubAnim(int i) {
+Animatable* SkeletonTexmap::SubAnim(int /*i*/) {
 	return pblock;
 }
 
 RefResult SkeletonTexmap::NotifyRefChanged(NOTIFY_REF_CHANGED_ARGS) 
 {
+	(void)changeInt;
+	(void)partID;
+	(void)propagate;
 	switch (message) {
 	case REFMSG_CHANGE:
 		_ivalid.SetEmpty();
@@ -336,6 +348,17 @@ RefResult SkeletonTexmap::NotifyRefChanged(NOTIFY_REF_CHANGED_ARGS)
 /*===========================================================================*\
 |	Updating and cloning
 \*===========================================================================*/
+
+RefTargetHandle SkeletonTexmap::Clone()
+{
+#if GET_MAX_RELEASE(VERSION_3DSMAX) < 8900
+	NoRemap defaultRemap;
+#else
+	DefaultRemapDir defaultRemap;
+#endif
+	RemapDir& remap = defaultRemap;
+	return Clone(remap);
+}
 
 RefTargetHandle SkeletonTexmap::Clone(RemapDir &remap) {
 	SkeletonTexmap *mnew = new SkeletonTexmap();
@@ -393,8 +416,8 @@ void SkeletonTexmap::Update(TimeValue t, Interval& valid) {
 |	Dlg Definition
 \*===========================================================================*/
 
-INT_PTR SkelTexDlgProc::DlgProc(TimeValue t, IParamMap2 *map, HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-	int id=LOWORD(wParam);
+INT_PTR SkelTexDlgProc::DlgProc(TimeValue /*t*/, IParamMap2 *map, HWND /*hWnd*/, UINT msg, WPARAM /*wParam*/, LPARAM /*lParam*/) {
+	//int id=LOWORD(wParam);
 	switch (msg) {
 	case WM_INITDIALOG: {
 		SkeletonTexmap *texmap=(SkeletonTexmap*) (map->GetParamBlock()->GetOwner());
