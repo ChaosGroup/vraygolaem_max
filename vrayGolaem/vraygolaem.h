@@ -272,7 +272,7 @@ public:
 	//////////////////////////////////////////
 	// Draw
 	//////////////////////////////////////////
-	void readGolaemCache(TimeValue t);
+	void readGolaemCache(const Matrix3& transform, TimeValue t);
 	void draw(TimeValue t, INode *node, ViewExp *vpt);
 	void drawEntities(GraphicsWindow *gw, const Matrix3& transform, TimeValue t);
 
@@ -350,6 +350,7 @@ void drawText(GraphicsWindow *gw, const MCHAR*  text, const Point3& pos);
 
 Matrix3 golaemToMax();
 Matrix3 maxToGolaem();
+void maxToGolaem(const Matrix3& matrix, float* outArray);
 
 INode* FindNodeRef(ReferenceTarget *rt );
 INode* GetNodeRef(ReferenceMaker *rm);

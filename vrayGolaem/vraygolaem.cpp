@@ -632,7 +632,7 @@ void VRayGolaemDlgProc::chooseFileName(IParamBlock2 *pblock2, ParamID paramID, c
 //------------------------------------------------------------
 // readGolaemCache
 //------------------------------------------------------------
-void VRayGolaem::readGolaemCache(TimeValue t)
+void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
 {
 	if (!_updateCacheData) return;
 	
@@ -663,7 +663,8 @@ void VRayGolaem::readGolaemCache(TimeValue t)
 			CStr gscsFileStr(cachePrefix + "gscs");
 			CStr gscfFileStr(cachePrefix + currentFrameStr + ".gscf");
 			CStr gsclFileStr(_layoutFile);
-			CStr srcTerrainFile(cachePrefix + "terrain.fbx");
+			CStr srcTerrainFile(cachePrefix + "terrain.gtg");
+			if (!fileExists(srcTerrainFile)) srcTerrainFile = cachePrefix + "terrain.fbx";
 
 			// load gscs
 			GlmSimulationCacheStatus status;
@@ -706,7 +707,17 @@ void VRayGolaem::readGolaemCache(TimeValue t)
 					if (terrainMeshDestination == NULL) terrainMeshDestination = terrainMeshSource;
 					history->_terrainMeshSource = terrainMeshSource;
 					history->_terrainMeshDestination = terrainMeshDestination;
+					glmRaycastClosest = RaycastClosest;
+					glmTerrainSetFrame = TerrainSetFrame;
 
+					// Proxy Matrix
+					Matrix3 nodeTransformNoRot = transform * maxToGolaem();
+					float proxyArray[16];
+					maxToGolaem(nodeTransformNoRot, proxyArray);
+					memcpy(simulationData->_proxyMatrix, proxyArray, 16 * sizeof(float));
+					maxToGolaem(Inverse(nodeTransformNoRot), proxyArray);
+					memcpy(simulationData->_proxyMatrixInverse, proxyArray, 16 * sizeof(float));
+					
 					glmCreateEntityTransforms(simulationData, history, &entityTransforms, &entityTransformCount);
 					glmCreateEntityExclusionList(history, &entityExclusions, &entityExclusionCount);
 
@@ -756,7 +767,7 @@ void VRayGolaem::drawEntities(GraphicsWindow *gw, const Matrix3& transform, Time
 	if (!displayEnable) return;
 
 	// update cache if required
-	readGolaemCache(t);
+	readGolaemCache(transform, t);
 	if (_simulationData.length() == 0 || _frameData.length() == 0 || _simulationData.length() != _frameData.length()) return;
 
 	// draw
@@ -1226,11 +1237,13 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			{
 				VR::TraceTransform t = currentParam->getTransform();
 				Matrix3 transform(Point3(1, 0, 0), Point3(0, 1, 0), Point3(0, 0, 1), Point3(t.offs[0], t.offs[1], t.offs[2]));
-				transform = transform * golaemToMax();
-
+				
 				// scale according to scene unit
 				double scaleRatio (1. / GetMasterScale (UNITS_CENTIMETERS));
 				transform.Scale(Point3(scaleRatio, scaleRatio, scaleRatio), true);
+
+				// axis change between max and maya
+				transform = transform * golaemToMax();
 
 				node->SetNodeTM(0, transform);
 			}
@@ -1645,4 +1658,24 @@ inline Matrix3 golaemToMax()
 inline Matrix3 maxToGolaem()
 {
 	return RotateXMatrix(-(float)pi/2);
+}
+
+inline void maxToGolaem(const Matrix3& matrix, float* outArray)
+{
+	outArray[0] = matrix[0][0];
+	outArray[1] = matrix[0][1];
+	outArray[2] = matrix[0][2];
+	outArray[3] = 0.f;
+	outArray[4] = matrix[1][0];
+	outArray[5] = matrix[1][1];
+	outArray[6] = matrix[1][2];
+	outArray[7] = 0.f;
+	outArray[8] = matrix[2][0];
+	outArray[9] = matrix[2][1];
+	outArray[10] = matrix[2][2];
+	outArray[11] = 0.f;
+	outArray[12] = matrix[3][0];
+	outArray[13] = matrix[3][1];
+	outArray[14] = matrix[3][2];
+	outArray[15] = 1.f;
 }
