@@ -4,14 +4,30 @@
 *                                                                          *
 ***************************************************************************/
 
-#ifndef __VRAYGOLAEMHSL_H__
-#define __VRAYGOLAEMHSL_H__
+#pragma once
 
 #pragma warning( push )
-#pragma warning( disable : 4100 4251 4273 4275 4996 )
+#pragma warning( disable : 4840)
 
-#include "vrenderdll.h"
 #include "max.h"
+
+#pragma warning ( pop )
+
+#pragma warning( push )
+#pragma warning( disable : 4201 4100 4996 4244 4512 4389 4189 4127 4458)
+
+#include "utils.h"
+#include "vraydmcsampler.h"
+#include "vrayplugins.h"
+#include "vrenderdll.h"
+#include "vraytexutils.h"
+#include "vrender_unicode.h"
+#include "iparamm2.h"
+
+#include "shadedata_new.h"
+#include "pb2template_generator.h"
+
+#pragma warning( pop )
 
 //************************************************************
 // #defines
@@ -109,21 +125,19 @@ public:
 	RefTargetHandle GetReference(int i);
 	void SetReference(int i, RefTargetHandle rtarg);
 
-#if GET_MAX_RELEASE(VERSION_3DSMAX) < 8900
-	RefTargetHandle Clone(RemapDir& remap=NoRemap());
-#else
-	RefTargetHandle Clone(RemapDir& remap=DefaultRemapDir());
-#endif
+	RefTargetHandle Clone(RemapDir& remap);
+	RefTargetHandle Clone();
+
 	RefResult NotifyRefChanged(NOTIFY_REF_CHANGED_ARGS);
 
 	// Parameter blocks
 	int	NumParamBlocks() { return 1; }				
-	IParamBlock2* GetParamBlock(int i) { return pblock; }
+	IParamBlock2* GetParamBlock(int /*i*/) { return pblock; }
 	IParamBlock2* GetParamBlockByID(BlockID id) { return (pblock->ID() == id) ? pblock : NULL; } 
 
 	// From Animatable
-	int RenderBegin(TimeValue t, ULONG flags) { _cacheInit=false; return true; }
-	int RenderEnd(TimeValue t) { _cacheInit=false; return true; }	
+	int RenderBegin(TimeValue /*t*/, ULONG /*flags*/) { _cacheInit=false; return true; }
+	int RenderEnd(TimeValue /*t*/) { _cacheInit=false; return true; }	
 
 	// Other methods
 	void greyDlgControls(IParamMap2 *map);
@@ -153,10 +167,8 @@ public:
 	Class_ID ClassID(void) { return VRAYGOLAEMHSL_CLASS_ID; }
 	void SetThing(ReferenceTarget *m) { texmap=(SkeletonTexmap*) m; pmap->SetParamBlock(texmap->pblock); }
 	ReferenceTarget* GetThing(void) { return texmap; }
-	void SetTime(TimeValue t) {}
+	void SetTime(TimeValue /*t*/) {}
 	void ReloadDialog(void) {}
-	void ActivateDlg(BOOL onOff) {}
+	void ActivateDlg(BOOL /*onOff*/) {}
 	void DeleteThis(void);
 };
-
-#endif

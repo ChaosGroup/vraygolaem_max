@@ -4,32 +4,31 @@
 *                                                                          *
 ***************************************************************************/
 
-#ifndef __VRAYGOLAEM_H__
-#define __VRAYGOLAEM_H__
+#pragma once
 
 #pragma warning( push )
-#pragma warning( disable : 4100 4251 4275 4996 )
+#pragma warning( disable : 4840)
 
 #include "max.h"
-#include <bmmlib.h>
-#include "iparamm2.h"
-#include "render.h"  
-#include "texutil.h"
-#include "gizmo.h"
-#include "gizmoimp.h"
-#include "istdplug.h"
+
+#pragma warning ( pop )
+
+#pragma warning( push )
+#pragma warning( disable : 4100 4251 4275 4996 4512 4201 4244 4189 4389 4245 4127 4458 4457)
 
 #include "utils.h"
-#include "vraygeom.h"
 #include "rayserver.h"
 #include "plugman.h"
 #include "vrayplugins.h"
-#include "defparams.h"
-#include "factory.h"
-#include "vraysceneplugman.h"
-#include "vrender_unicode.h"
+#include "vraygeom.h"
 
 #include <vrender_plugin_renderer_brdf_wrapper.h>
+
+#include "vraysceneplugman.h"
+#include <vrender_plugin_renderer_interface.h>
+#include "pb2template_generator.h"
+
+#pragma warning ( pop )
 
 //************************************************************
 // #defines
@@ -43,7 +42,7 @@
 #define REFNO_PBLOCK 0
 
 // Paramblock2 parameter list
-enum {
+enum param_list{
 	pb_file,
 	pb_shaders_file,
 	pb_use_node_attributes,		// Not used anymore but kept for retrocomp
@@ -217,12 +216,12 @@ public:
 	ObjectState Eval(TimeValue time);
 
 	void InitNodeName(TSTR& s) { s=STR_CLASSNAME; }
-	ObjectHandle ApplyTransform(Matrix3& matrix) { return this; }
+	ObjectHandle ApplyTransform(Matrix3& /*matrix*/) { return this; }
 	Interval ObjectValidity(TimeValue t);
 
 	// We don't convert to anything
-	int CanConvertToType(Class_ID obtype) { return FALSE; }
-	Object* ConvertToType(TimeValue t, Class_ID obtype) { assert(0);return NULL; }
+	int CanConvertToType(Class_ID /*obtype*/) { return FALSE; }
+	Object* ConvertToType(TimeValue /*t*/, Class_ID /*obtype*/) { assert(0);return NULL; }
 	
 	void GetWorldBoundBox(TimeValue t, INode *mat, ViewExp *vpt, Box3& box);
 	void GetLocalBoundBox(TimeValue t, INode *mat, ViewExp *vpt, Box3& box);
@@ -248,7 +247,7 @@ public:
 	// Direct paramblock access
 	//////////////////////////////////////////
 	int	NumParamBlocks() { return 1; }	
-	IParamBlock2* GetParamBlock(int i) { return pblock2; }
+	IParamBlock2* GetParamBlock(int /*i*/) { return pblock2; }
 	IParamBlock2* GetParamBlockByID(BlockID id) { return (pblock2->ID() == id) ? pblock2 : NULL; }
 
 	int NumSubs() { return 1; }  
@@ -262,11 +261,9 @@ public:
 	RefTargetHandle GetReference(int i);
 	void SetReference(int i, RefTargetHandle rtarg);
 
-#if GET_MAX_RELEASE(VERSION_3DSMAX) < 8900
-	RefTargetHandle Clone(RemapDir& remap=NoRemap());
-#else
-	RefTargetHandle Clone(RemapDir& remap=DefaultRemapDir());
-#endif
+	RefTargetHandle Clone(RemapDir& remap);
+	RefTargetHandle Clone();
+
 	RefResult NotifyRefChanged(NOTIFY_REF_CHANGED_ARGS);
 
 	//////////////////////////////////////////
@@ -354,6 +351,3 @@ void maxToGolaem(const Matrix3& matrix, float* outArray);
 
 INode* FindNodeRef(ReferenceTarget *rt );
 INode* GetNodeRef(ReferenceMaker *rm);
-
-
-#endif // __VRAYGOLAEM_H__
