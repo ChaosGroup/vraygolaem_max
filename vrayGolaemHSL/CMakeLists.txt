@@ -22,6 +22,10 @@ if(NOT VRAYGOLAEM_STANDALONE_BUILD)
 
     set_target_extension( ${TARGET_CROWD3DSMAXVRAYHSL} CUSTOM ".dlt" )
 
+	if( MAYA_VERSION GREATER_EQUAL 2018 )
+		target_compile_options(${TARGET_CROWD3DSMAXVRAYHSL} PUBLIC -MD -U_DEBUG)
+    endif()
+
     CROWD_INSTALL_RUNTIME_LIBRARY( ${TARGET_CROWD3DSMAXVRAYHSL} "crowd3dsMaxVray" "vrayGolaemHSL${MAYA_VERSION}")
     crowd_install_dependencies()
 else()

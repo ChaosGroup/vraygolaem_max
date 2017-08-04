@@ -6,10 +6,15 @@
 
 #pragma once
 
+#pragma warning( push )
+#pragma warning( disable : 4840)
+
 #include "max.h"
 
+#pragma warning ( pop )
+
 #pragma warning( push )
-#pragma warning( disable : 4201 4100 4996 4244 4512 4389 4189 4127)
+#pragma warning( disable : 4201 4100 4996 4244 4512 4389 4189 4127 4458)
 
 #include "utils.h"
 #include "vraydmcsampler.h"

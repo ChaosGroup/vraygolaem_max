@@ -89,7 +89,7 @@ public:
 	~VRayGolaemHSLSampler(){}
 
 	void init(const VR::VRayContext &rc, VR::Vector &normal, float rad, float distr, int sameOnly, float fall, float csm, 
-		int workWithTransparency, const VR::Vector &p, const VR::Color &_occludedColor, const VR::Color &_unoccludedColor,
+		int workWithTransparencyParam, const VR::Vector &p, const VR::Color &_occludedColor, const VR::Color &_unoccludedColor,
 		bool AllTranspLevels = true, int _ignoreSelfOcclusion=false, int _mode=0, int _sampleEnvironment=false, int _excludedObjectsTransparent=false)
 	{
 		radius=rad;
@@ -104,7 +104,7 @@ public:
 			VR::makeNormalMatrix(reflectDir, nm);
 		}
 		cosMult=csm;
-		this->workWithTransparency=workWithTransparency;
+		this->workWithTransparency=workWithTransparencyParam;
 		startPoint=p;
 		bAllTranspLevels = AllTranspLevels;
 		ignoreSelfOcclusion = _ignoreSelfOcclusion;
@@ -117,15 +117,15 @@ public:
 		finalOcclusion=0.0f;
 	}
 
-	VR::Vector getSpecularDir(float u, float v, float n) {
+	VR::Vector getSpecularDir(float pu, float pv, float pn) {
 		float thetaSin;
-		if (n>=0.0f) {
-			thetaSin=powf(u, 1.0f/(n+1.0f));
+		if (pn>=0.0f) {
+			thetaSin=powf(pu, 1.0f/(pn+1.0f));
 		} else {
-			thetaSin=1.0f-powf(1.0f-u, 1.0f/(1.0f-n)); 
+			thetaSin=1.0f-powf(1.0f-pu, 1.0f/(1.0f-pn)); 
 		}
 		float thetaCos=sqrtf(VR::Max(0.0f, 1.0f-thetaSin*thetaSin));
-		float phi=2.0f*VR::pi()*v;
+		float phi=2.0f*VR::pi()*pv;
 		return VR::Vector(cosf(phi)*thetaCos, sinf(phi)*thetaCos, thetaSin);
 	}
 

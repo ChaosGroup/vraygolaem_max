@@ -330,12 +330,12 @@ void VRayGolaem::InvalidateUI() {
 
 static Pb2TemplateGenerator templateGenerator;
 
-void VRayGolaem::BeginEditParams(IObjParam *ip, ULONG flags, Animatable *prev) {
-	vrayGolaemClassDesc.BeginEditParams(ip, this, flags, prev);
+void VRayGolaem::BeginEditParams(IObjParam *ip, ULONG uflags, Animatable *prev) {
+	vrayGolaemClassDesc.BeginEditParams(ip, this, uflags, prev);
 }
 
-void VRayGolaem::EndEditParams(IObjParam *ip, ULONG flags, Animatable *next) {
-	vrayGolaemClassDesc.EndEditParams(ip, this, flags, next);
+void VRayGolaem::EndEditParams(IObjParam *ip, ULONG uflags, Animatable *next) {
+	vrayGolaemClassDesc.EndEditParams(ip, this, uflags, next);
 }
 
 RefTargetHandle VRayGolaem::Clone()
@@ -473,7 +473,7 @@ void VRayGolaem::GetDeformBBox(TimeValue t, Box3 &b, Matrix3 *tm, BOOL /*useSel*
 	}
 }
 
-int VRayGolaem::HitTest(TimeValue t, INode *node, int type, int crossing, int /*flags*/, IPoint2 *p, ViewExp *vpt) {
+int VRayGolaem::HitTest(TimeValue t, INode* inode, int type, int crossing, int /*flags*/, IPoint2 *p, ViewExp *vpt) {
 	static HitRegion hitRegion;
 	DWORD	savedLimits;
 
@@ -485,7 +485,7 @@ int VRayGolaem::HitTest(TimeValue t, INode *node, int type, int crossing, int /*
 	gw->setHitRegion(&hitRegion);
 	gw->clearHitCode();
 
-	draw(t, node, vpt);
+	draw(t, inode, vpt);
 
 	gw->setRndLimits(savedLimits);
 	
@@ -500,8 +500,8 @@ void VRayGolaem::Snap(TimeValue /*t*/, INode* /*inode*/, SnapInfo* /*snap*/, IPo
 //------------------------------------------------------------
 // Display
 //------------------------------------------------------------
-int VRayGolaem::Display(TimeValue t, INode* node, ViewExp *vpt, int /*flags*/) {
-	draw(t, node, vpt);
+int VRayGolaem::Display(TimeValue t, INode* inode, ViewExp *vpt, int /*flags*/) {
+	draw(t, inode, vpt);
 	return 0;
 }
 
@@ -827,15 +827,15 @@ void VRayGolaem::drawEntities(GraphicsWindow *gw, const Matrix3& transform, Time
 //------------------------------------------------------------
 // draw
 //------------------------------------------------------------
-void VRayGolaem::draw(TimeValue t, INode *node, ViewExp *vpt) 
+void VRayGolaem::draw(TimeValue t, INode* inode, ViewExp *vpt) 
 {
 	GraphicsWindow *gw=vpt->getGW();
-	Matrix3 tm=node->GetObjectTM(t);
+	Matrix3 tm=inode->GetObjectTM(t);
 	gw->setTransform(tm);
 
-	Color color=Color(node->GetWireColor());
-	if (node->IsFrozen()) color=GetUIColor(COLOR_FREEZE);
-	else if (node->Selected()) color=GetUIColor(COLOR_SELECTION);
+	Color color=Color(inode->GetWireColor());
+	if (inode->IsFrozen()) color=GetUIColor(COLOR_FREEZE);
+	else if (inode->Selected()) color=GetUIColor(COLOR_SELECTION);
 	gw->setColor(LINE_COLOR, color);
 
 	// locator
@@ -856,9 +856,9 @@ void VRayGolaem::draw(TimeValue t, INode *node, ViewExp *vpt)
 // VRenderObject
 //************************************************************
 
-int VRayGolaem::init(const ObjectState &os, INode *node, VR::VRayCore *vray) 
+int VRayGolaem::init(const ObjectState &os, INode* inode, VR::VRayCore *vray) 
 {
-	VRenderObject::init(os, node, vray);
+	VRenderObject::init(os, inode, vray);
 	return true;
 }
 
@@ -880,8 +880,8 @@ CStr getStrParam(IParamBlock2* block, ParamID id, TimeValue t, const CStr& defau
 void VRayGolaem::updateVRayParams(TimeValue t) 
 {
 	// check if this object is not an instance (then it has no max node to query)
-	INode* node=getNode(this);
-	if (node == NULL)
+	INode* inode=getNode(this);
+	if (inode == NULL)
 	{
 		CStr logMessage = CStr("VRayGolaem: This object is an 3ds Max instance and is not supported. Please create a copy.");
 		mprintf(logMessage.ToBSTR());
@@ -905,12 +905,12 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 
 	// motion blur attributes
 	BOOL overrideValue;
-	node->GetUserPropBool(PROP_MOBLUR_OVERRIDEDURATION, overrideValue);
+	inode->GetUserPropBool(PROP_MOBLUR_OVERRIDEDURATION, overrideValue);
 	_overMBlurWindowSize = overrideValue == 1;
-	node->GetUserPropFloat(PROP_MOBLUR_DURATION, _mBlurWindowSize);
-	node->GetUserPropBool(PROP_MOBLUR_USEDEFAULTGEOMSAMPLES, overrideValue);
+	inode->GetUserPropFloat(PROP_MOBLUR_DURATION, _mBlurWindowSize);
+	inode->GetUserPropBool(PROP_MOBLUR_USEDEFAULTGEOMSAMPLES, overrideValue);
 	_overMBlurSamples = overrideValue == 0;
-	node->GetUserPropInt(PROP_MOBLUR_GEOMSAMPLES, _mBlurSamples);
+	inode->GetUserPropInt(PROP_MOBLUR_GEOMSAMPLES, _mBlurSamples);
 	_mBlurEnable = !(_overMBlurSamples && _mBlurSamples == 1); // moblur is disabled if the object geo samples == 1
 
 	// culling attributes
@@ -925,22 +925,22 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 	_instancingEnable = pblock2->GetInt(pb_instancing_enable, t) == 1;
 	
 	// object properties
-	_objectIDBase=node->GetGBufID();
+	_objectIDBase=inode->GetGBufID();
 	_objectIDMode = (short) pblock2->GetInt(pb_object_id_mode, t);
-	_primaryVisibility=node->GetPrimaryVisibility()==1;
-	_castsShadows=node->CastShadows()==1;
+	_primaryVisibility=inode->GetPrimaryVisibility()==1;
+	_castsShadows=inode->CastShadows()==1;
 
 	// Get secondary visibility from the 3ds Max object properties
 	_visibleInReflections=true;
 	_visibleInRefractions=true;
-	int nodeSecondaryVisibility=node->GetSecondaryVisibility();
+	int nodeSecondaryVisibility=inode->GetSecondaryVisibility();
 	if (0==nodeSecondaryVisibility) _visibleInReflections=false;
 	if (0==nodeSecondaryVisibility) _visibleInRefractions=false;
 
 	// Check secondary visibility in the V-Ray object properties
 	int vrayReflVisibility=true, vrayRefrVisibility=true;
-	node->GetUserPropBool(PROP_GI_VISIBLETOREFL, vrayReflVisibility);
-	node->GetUserPropBool(PROP_GI_VISIBLETOREFR, vrayRefrVisibility);
+	inode->GetUserPropBool(PROP_GI_VISIBLETOREFL, vrayReflVisibility);
+	inode->GetUserPropBool(PROP_GI_VISIBLETOREFR, vrayRefrVisibility);
 
 	if (!vrayReflVisibility) _visibleInReflections=false;
 	if (!vrayRefrVisibility) _visibleInRefractions=false;
@@ -974,7 +974,11 @@ void VRayGolaem::wrapMaterial(VUtils::VRayCore *vray, Mtl *mtl)
 	VRenderPluginRendererInterface *pluginRenderer = queryInterface<VRenderPluginRendererInterface>(vray, EXT_VRENDER_PLUGIN_RENDERER);
 	vassert(pluginRenderer);
 
+#pragma warning( push )
+#pragma warning( disable : 4996) // avoid deprecated warning
 	VUtils::VRenderMtl *vrenderMtl = VUtils::getVRenderMtl(mtl/*, static_cast<VR::VRayRenderer*>(vray)*/);
+#pragma warning( pop )
+
 	if (!vrenderMtl) return; // Material is not V-Ray compatible, can't do anything.
 
 	GET_MBCS(mtl->GetName(), mtlName);
@@ -999,8 +1003,8 @@ void VRayGolaem::enumMaterials(VUtils::VRayCore *vray, Mtl *mtl) {
 }
 
 void VRayGolaem::createMaterials(VR::VRayCore *vray) {
-	INode* node=getNode(this);
-	if (NULL==node) {
+	INode* inode=getNode(this);
+	if (NULL==inode) {
 		const VR::VRaySequenceData &sdata=vray->getSequenceData();
 		if (sdata.progress) {
 			const TCHAR *name_wstr=GetObjectName();
@@ -1010,7 +1014,7 @@ void VRayGolaem::createMaterials(VR::VRayCore *vray) {
 		return;
 	}
 
-	enumMaterials(vray, node->GetMtl());
+	enumMaterials(vray, inode->GetMtl());
 }
 
 //------------------------------------------------------------
@@ -1059,7 +1063,7 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 	}
 	else
 	{
-		sdata.progress->warning("VRayGolaem: Error finding environment variable for .vrscene output \"%s\"", _tempVRSceneFileDir);
+		sdata.progress->warning("VRayGolaem: Error finding environment variable for .vrscene output \"%s\"", _tempVRSceneFileDir.data());
 	}
 
 	// Load the .vrscene into the plugin manager
@@ -1133,18 +1137,18 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 			{
 			// caa
 				CStr caaName (cacheDir + "/" + cacheName + "." + crowdFields[iCf] + ".caa");
-			if (!fileExists(caaName)) sdata.progress->warning("VRayGolaem: Error loading Crowd Assets Association file \"%s\"", caaName);
-			else sdata.progress->info("VRayGolaem: Crowd Assets Association file \"%s\" loaded successfully.", caaName);
+			if (!fileExists(caaName)) sdata.progress->warning("VRayGolaem: Error loading Crowd Assets Association file \"%s\"", caaName.data());
+			else sdata.progress->info("VRayGolaem: Crowd Assets Association file \"%s\" loaded successfully.", caaName.data());
 
 			// gscs
 				CStr gscsName (cacheDir + "/" + cacheName + "." + crowdFields[iCf] + ".gscs");
-			if (!fileExists(gscsName)) sdata.progress->warning("VRayGolaem: Error loading Simulation Cache file \"%s\"", gscsName);
-			else sdata.progress->info("VRayGolaem: Simulation Cache file \"%s\" loaded successfully.", gscsName);
+			if (!fileExists(gscsName)) sdata.progress->warning("VRayGolaem: Error loading Simulation Cache file \"%s\"", gscsName.data());
+			else sdata.progress->info("VRayGolaem: Simulation Cache file \"%s\" loaded successfully.", gscsName.data());
 
 			// gscf
 				CStr gscfName (cacheDir + "/" + cacheName + "." + crowdFields[iCf] + "." + currentFrameStr +".gscf");
-			if (!fileExists(gscfName)) sdata.progress->warning("VRayGolaem: Error loading Simulation Cache file \"%s\"", gscfName);
-			else sdata.progress->info("VRayGolaem: Simulation Cache file \"%s\" loaded successfully.", gscfName);
+			if (!fileExists(gscfName)) sdata.progress->warning("VRayGolaem: Error loading Simulation Cache file \"%s\"", gscfName.data());
+			else sdata.progress->info("VRayGolaem: Simulation Cache file \"%s\" loaded successfully.", gscfName.data());
 			}
 
 			// character files
@@ -1152,8 +1156,8 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 			splitStr(characterFiles, ';', characters);
 			for (size_t iCh = 0, nbCh = characters.length(); iCh<nbCh; ++iCh)
 			{
-				if (!fileExists(characters[iCh])) sdata.progress->warning("VRayGolaem: Error loading Character file \"%s\"", characters[iCh]);
-				else sdata.progress->info("VRayGolaem: Character file file \"%s\" loaded successfully.", characters[iCh]);
+				if (!fileExists(characters[iCh])) sdata.progress->warning("VRayGolaem: Error loading Character file \"%s\"", characters[iCh].data());
+				else sdata.progress->info("VRayGolaem: Character file file \"%s\" loaded successfully.", characters[iCh].data());
 			}
 		}
 	}
@@ -1192,16 +1196,16 @@ void VRayGolaem::frameEnd(VR::VRayCore *_vray)
 //------------------------------------------------------------
 // newRenderInstance / deleteRenderInstance
 //------------------------------------------------------------
-VR::VRenderInstance* VRayGolaem::newRenderInstance(INode *node, VR::VRayCore *vray, int renderID) {
+VR::VRenderInstance* VRayGolaem::newRenderInstance(INode* inode, VR::VRayCore *vray, int renderID) {
 	if (vray) {
 		const VR::VRaySequenceData &sdata=vray->getSequenceData();
 		if (sdata.progress) {
-			const TCHAR *nodeName=node? node->GetName() : _T("");
+			const TCHAR *nodeName=inode? inode->GetName() : _T("");
 			GET_MBCS(nodeName, nodeName_mbcs);
 			sdata.progress->debug("VRayGolaem: newRenderInstance() for node \"%s\"", nodeName_mbcs);
 		}
 	}
-	VRayGolaemInstanceBase *golaemInstance=new VRayGolaemInstanceBase(this, node, vray, renderID);
+	VRayGolaemInstanceBase *golaemInstance=new VRayGolaemInstanceBase(this, inode, vray, renderID);
 	return golaemInstance;
 }
 
@@ -1220,8 +1224,8 @@ void VRayGolaem::deleteRenderInstance(VR::VRenderInstance *ri) {
 bool VRayGolaem::readCrowdVRScene(const VR::CharString& file) 
 {	
 	// check if this object is not an instance (then it has no max node to query)
-	INode* node=getNode(this);
-	if (node == NULL)
+	INode* inode=getNode(this);
+	if (inode == NULL)
 	{
 		CStr logMessage = CStr("VRayGolaem: This object is an 3ds Max instance and is not supported. Please create a copy.");
 		mprintf(logMessage.ToBSTR());
@@ -1259,7 +1263,7 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 				double scaleRatio (1. / GetMasterScale (UNITS_CENTIMETERS));
 				transform.Scale(Point3(scaleRatio, scaleRatio, scaleRatio), true);
 
-				node->SetNodeTM(0, transform);
+				inode->SetNodeTM(0, transform);
 			}
 
 			// cache attributes
@@ -1307,14 +1311,14 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			currentParam = plugin->getParameter("glmMBlurWindowSize");
 			if (currentParam) 
 			{
-				node->SetUserPropBool(PROP_MOBLUR_OVERRIDEDURATION, true);
-				node->SetUserPropFloat(PROP_MOBLUR_DURATION, currentParam->getFloat());
+				inode->SetUserPropBool(PROP_MOBLUR_OVERRIDEDURATION, true);
+				inode->SetUserPropFloat(PROP_MOBLUR_DURATION, currentParam->getFloat());
 			}
 			currentParam = plugin->getParameter("glmMBlurSamples");
 			if (currentParam) 
 			{
-				node->SetUserPropBool(PROP_MOBLUR_USEDEFAULTGEOMSAMPLES, false);
-				node->SetUserPropInt(PROP_MOBLUR_GEOMSAMPLES, currentParam->getInt());
+				inode->SetUserPropBool(PROP_MOBLUR_USEDEFAULTGEOMSAMPLES, false);
+				inode->SetUserPropInt(PROP_MOBLUR_GEOMSAMPLES, currentParam->getInt());
 			}
 			// if motion blur is off, override geometry samples value with 1
 			currentParam = plugin->getParameter("glmMBlurEnabled");
@@ -1322,8 +1326,8 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			{
 				if (currentParam->getInt() == 0)
 				{
-					node->SetUserPropBool(PROP_MOBLUR_USEDEFAULTGEOMSAMPLES, false);
-					node->SetUserPropInt(PROP_MOBLUR_GEOMSAMPLES, 1);
+					inode->SetUserPropBool(PROP_MOBLUR_USEDEFAULTGEOMSAMPLES, false);
+					inode->SetUserPropInt(PROP_MOBLUR_GEOMSAMPLES, 1);
 				}
 			}
 		
@@ -1365,14 +1369,14 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			currentParam = plugin->getParameter("glmRefractionsVisibility");
 			if (currentParam) inRefractions = currentParam->getBool() == 1;
 
-			node->SetGBufID(objectIDBase);
-			node->SetPrimaryVisibility(primaryVisibility);
-			node->SetCastShadows(castShadows);
-			node->SetSecondaryVisibility(inReflections && inRefractions);
+			inode->SetGBufID(objectIDBase);
+			inode->SetPrimaryVisibility(primaryVisibility);
+			inode->SetCastShadows(castShadows);
+			inode->SetSecondaryVisibility(inReflections && inRefractions);
 
 			int visibleInRefl((int) inReflections), visibleInRefr((int) inRefractions);
-			node->SetUserPropBool(PROP_GI_VISIBLETOREFL, visibleInRefl);
-			node->SetUserPropBool(PROP_GI_VISIBLETOREFR, visibleInRefr);
+			inode->SetUserPropBool(PROP_GI_VISIBLETOREFL, visibleInRefl);
+			inode->SetUserPropBool(PROP_GI_VISIBLETOREFR, visibleInRefr);
 			
 			// other crowdFields?
 			for (size_t iPlugin=1; iPlugin<pluginCallback._foundPlugins.length(); ++iPlugin)
@@ -1416,15 +1420,15 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file) 
 {
 	// check if this object is not an instance (then it has no max node to query)
-	INode* node=getNode(this);
-	if (node == NULL)
+	INode* inode=getNode(this);
+	if (inode == NULL)
 	{
 		CStr logMessage = CStr("VRayGolaem: This object is an 3ds Max instance and is not supported. Please create a copy.");
 		mprintf(logMessage.ToBSTR());
 		return false;
 	}
-	GET_MBCS(node->GetName(), nodeName);
-	Matrix3 transform = node->GetObjectTM(0) * maxToGolaem();
+	GET_MBCS(inode->GetName(), nodeName);
+	Matrix3 transform = inode->GetObjectTM(0) * maxToGolaem();
 	
 	// check file path
 	std::stringstream outputStr;

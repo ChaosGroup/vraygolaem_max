@@ -6,11 +6,15 @@
 
 #pragma once
 
+#pragma warning( push )
+#pragma warning( disable : 4840)
 
 #include "max.h"
 
+#pragma warning ( pop )
+
 #pragma warning( push )
-#pragma warning( disable : 4127 4996 4201 4100 4244 4389 4512)
+#pragma warning( disable : 4127 4996 4201 4100 4244 4389 4512 4458 4189 4457)
 
 #include "vraygeom.h"
 

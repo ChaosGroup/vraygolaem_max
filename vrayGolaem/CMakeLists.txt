@@ -22,6 +22,10 @@ if(NOT VRAYGOLAEM_STANDALONE_BUILD)
 
     set_target_extension( ${TARGET_CROWD3DSMAXVRAY} CUSTOM ".dlo" )
 
+	if( MAYA_VERSION GREATER_EQUAL 2018 )
+		target_compile_options(${TARGET_CROWD3DSMAXVRAY} PUBLIC -MD -U_DEBUG)
+    endif()
+
     CROWD_INSTALL_RUNTIME_LIBRARY( ${TARGET_CROWD3DSMAXVRAY} "crowd3dsMaxVray" "vrayGolaem${MAYA_VERSION}")
     crowd_install_dependencies()
     install( FILES "${CMAKE_CURRENT_SOURCE_DIR}/vraygolaem.py" CONFIGURATIONS Debug DESTINATION "${CROWD_INSTALL_PATH_Debug}/crowd3dsMaxVray/scripts" )
