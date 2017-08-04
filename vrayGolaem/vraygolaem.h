@@ -182,6 +182,7 @@ class VRayGolaem
 	// Internal attributes
 	MaxSDK::Array<GlmSimulationData*> _simulationData;
 	MaxSDK::Array<GlmFrameData*> _frameData;
+	MaxSDK::Array<int64_t> _exclusionData;
 	bool _updateCacheData;
 	Box3 _nodeBbox;					//!< Node bbox
 
@@ -271,7 +272,7 @@ public:
 	//////////////////////////////////////////
 	// Draw
 	//////////////////////////////////////////
-	void readGolaemCache(TimeValue t);
+	void readGolaemCache(const Matrix3& transform, TimeValue t);
 	void draw(TimeValue t, INode *node, ViewExp *vpt);
 	void drawEntities(GraphicsWindow *gw, const Matrix3& transform, TimeValue t);
 
@@ -349,6 +350,7 @@ void drawText(GraphicsWindow *gw, const MCHAR*  text, const Point3& pos);
 
 Matrix3 golaemToMax();
 Matrix3 maxToGolaem();
+void maxToGolaem(const Matrix3& matrix, float* outArray);
 
 INode* FindNodeRef(ReferenceTarget *rt );
 INode* GetNodeRef(ReferenceMaker *rm);
