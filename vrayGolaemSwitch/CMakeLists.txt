@@ -22,9 +22,7 @@ if(NOT VRAYGOLAEM_STANDALONE_BUILD)
 
     set_target_extension( ${TARGET_CROWD3DSMAXVRAYSWITCH} CUSTOM ".dlt" )
 
-	if( MAYA_VERSION GREATER_EQUAL 2018 )
-		target_compile_options(${TARGET_CROWD3DSMAXVRAYSWITCH} PUBLIC -MD -U_DEBUG)
-    endif()
+	target_compile_options(${TARGET_CROWD3DSMAXVRAYSWITCH} PUBLIC -MD -U_DEBUG)
 
     CROWD_INSTALL_RUNTIME_LIBRARY( ${TARGET_CROWD3DSMAXVRAYSWITCH} "crowd3dsMaxVray" "vrayGolaemSwitch${MAYA_VERSION}")
     crowd_install_dependencies()

@@ -5,7 +5,7 @@
 project(${TARGET_CROWD3DSMAXVRAY})
 
 # List Files
-list_files( "." "h;cpp;c;def;rc" )
+list_files( "." "h;cpp;c;def;rc;py" )
 
 # Create a library
 add_library( ${TARGET_CROWD3DSMAXVRAY} SHARED ${LIST_FILES} )
@@ -22,9 +22,7 @@ if(NOT VRAYGOLAEM_STANDALONE_BUILD)
 
     set_target_extension( ${TARGET_CROWD3DSMAXVRAY} CUSTOM ".dlo" )
 
-	if( MAYA_VERSION GREATER_EQUAL 2018 )
-		target_compile_options(${TARGET_CROWD3DSMAXVRAY} PUBLIC -MD -U_DEBUG)
-    endif()
+	target_compile_options(${TARGET_CROWD3DSMAXVRAY} PUBLIC -MD -U_DEBUG)
 
     CROWD_INSTALL_RUNTIME_LIBRARY( ${TARGET_CROWD3DSMAXVRAY} "crowd3dsMaxVray" "vrayGolaem${MAYA_VERSION}")
     crowd_install_dependencies()
