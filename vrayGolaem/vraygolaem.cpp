@@ -16,6 +16,8 @@
 
 #pragma warning (pop)
 
+// V-Ray plugin ID for the 3ds Max material wrapper
+#define GLM_MTL_WRAPPER_VRAY_ID LARGE_CONST(0x2015080783)
 
 #include <fstream>	// std::ofstream
 #include <sstream>	// std::stringstream
@@ -971,8 +973,8 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 	_tempVRSceneFileDir = getStrParam(pblock2, pb_temp_vrscene_file_dir, t, "TEMP");
 }
 
-/*
-void VRayGolaem::wrapMaterial(Mtl *mtl) {
+
+void VRayGolaem::wrapMaterial(VUtils::VRayCore *vray, Mtl *mtl) {
 	if (!mtl)
 		return;
 
@@ -980,14 +982,14 @@ void VRayGolaem::wrapMaterial(Mtl *mtl) {
 	if (!vrenderMtl)
 		return; // Material is not V-Ray compatible, can't do anything.
 
-	BRDFWrapper *wrapper=static_cast<BRDFWrapper*>(_vrayScene->newPluginWithoutParams(MTL_WRAPPER_VRAY_ID, NULL));
+	BRDFWrapper *wrapper=static_cast<BRDFWrapper*>(_vrayScene->newPluginWithoutParams(GLM_MTL_WRAPPER_VRAY_ID, NULL));
 	if (!wrapper)
 		return;
 
 	wrapper->setMaxMtl(mtl, vrenderMtl, this);
 }
-*/
 
+/*
 void VRayGolaem::wrapMaterial(VUtils::VRayCore *vray, Mtl *mtl)
 {
 	if (!mtl)
@@ -999,16 +1001,18 @@ void VRayGolaem::wrapMaterial(VUtils::VRayCore *vray, Mtl *mtl)
 #pragma warning( push )
 #pragma warning( disable : 4996) // avoid deprecated warning
 	VUtils::VRenderMtl *vrenderMtl = VUtils::getVRenderMtl(mtl/*, static_cast<VR::VRayRenderer*>(vray)*/);
+	VUtils::VRenderMtl *vrenderMtl = VUtils::getVRenderMtl(mtl);
 #pragma warning( pop )
 
 	if (!vrenderMtl) return; // Material is not V-Ray compatible, can't do anything.
 
 	GET_MBCS(mtl->GetName(), mtlName);
-	GolaemBRDFWrapper *wrapper = static_cast<GolaemBRDFWrapper*>(static_cast<PluginBase*>(pluginRenderer->newPlugin(MTL_WRAPPER_VRAY_ID, mtlName)));
+	BRDFWrapper *wrapper = static_cast<BRDFWrapper*>(static_cast<PluginBase*>(pluginRenderer->newPlugin(MTL_WRAPPER_VRAY_ID, mtlName)));
 	if (!wrapper) return;
 		
 	wrapper->setMaxMtl(mtl, vrenderMtl, this);
 }
+*/
 
 void VRayGolaem::enumMaterials(VUtils::VRayCore *vray, Mtl *mtl) {
 	if (!mtl || mtl->SuperClassID()!=MATERIAL_CLASS_ID)
@@ -1039,6 +1043,34 @@ void VRayGolaem::createMaterials(VR::VRayCore *vray) {
 	enumMaterials(vray, inode->GetMtl());
 }
 
+class GolaemBRDFMaterialDesc : public PluginDesc {
+public:
+	PluginID getPluginID(void) VRAY_OVERRIDE {
+		return GLM_MTL_WRAPPER_VRAY_ID;
+	}
+
+	Plugin* newPlugin(PluginHost *host) VRAY_OVERRIDE {
+		return new GolaemBRDFWrapper;
+	}
+
+	void deletePlugin(Plugin *plugin) {
+		delete static_cast<GolaemBRDFWrapper*>(plugin);
+	}
+
+	bool supportsInterface(InterfaceID id) {
+		if (id == EXT_MATERIAL) return true;
+		else if (id == EXT_BSDF) return true;
+		else return false;
+	}
+
+	/// Returns the name of the plugin class (human readable name).
+	tchar* getName(void) VRAY_OVERRIDE {
+		return "GolaemMtlMaxWrapper";
+	}
+};
+
+static GolaemBRDFMaterialDesc golaemWrapperMaterialDesc;
+
 //------------------------------------------------------------
 // renderBegin / renderEnd
 //------------------------------------------------------------
@@ -1053,6 +1085,7 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 
 	VRenderPluginRendererInterface *pluginRenderer = queryInterface<VRenderPluginRendererInterface>(vray, EXT_VRENDER_PLUGIN_RENDERER);
 	pluginRenderer->registerPlugin(wrapperMaterialDesc);
+	pluginRenderer->registerPlugin(golaemWrapperMaterialDesc);
 	vassert(pluginRenderer);
 
 	PluginManager *plugMan = pluginRenderer->getPluginManager();
@@ -1897,3 +1930,4 @@ GolaemBRDFWrapper::GolaemBRDFWrapper(void) :
 	golaemInstance(NULL)
 {
 }
+
