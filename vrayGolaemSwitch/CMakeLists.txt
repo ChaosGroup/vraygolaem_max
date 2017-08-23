@@ -24,7 +24,7 @@ if(NOT VRAYGOLAEM_STANDALONE_BUILD)
 
 	target_compile_options(${TARGET_CROWD3DSMAXVRAYSWITCH} PUBLIC -MD -U_DEBUG)
 
-    CROWD_INSTALL_RUNTIME_LIBRARY( ${TARGET_CROWD3DSMAXVRAYSWITCH} "crowd3dsMaxVray" "vrayGolaemSwitch${MAYA_VERSION}")
+    CROWD_INSTALL_RUNTIME_LIBRARY( ${TARGET_CROWD3DSMAXVRAYSWITCH} "procedurals/3dsmax" "vrayGolaemSwitch${MAYA_VERSION}")
     crowd_install_dependencies()
 else()
     # Include
