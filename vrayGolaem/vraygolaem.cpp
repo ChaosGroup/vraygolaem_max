@@ -978,7 +978,7 @@ void VRayGolaem::wrapMaterial(VUtils::VRayCore *vray, Mtl *mtl) {
 	if (!mtl)
 		return;
 
-	VR::VRenderMtl *vrenderMtl=VR::getVRenderMtl(mtl);
+	VR::VRenderMtl *vrenderMtl=VR::getVRenderMtl(mtl, static_cast<VR::VRayRenderer*>(vray));
 	if (!vrenderMtl)
 		return; // Material is not V-Ray compatible, can't do anything.
 
@@ -1000,8 +1000,7 @@ void VRayGolaem::wrapMaterial(VUtils::VRayCore *vray, Mtl *mtl)
 
 #pragma warning( push )
 #pragma warning( disable : 4996) // avoid deprecated warning
-	VUtils::VRenderMtl *vrenderMtl = VUtils::getVRenderMtl(mtl/*, static_cast<VR::VRayRenderer*>(vray)*/);
-	VUtils::VRenderMtl *vrenderMtl = VUtils::getVRenderMtl(mtl);
+	VUtils::VRenderMtl *vrenderMtl = VUtils::getVRenderMtl(mtl, static_cast<VR::VRayRenderer*>(vray));
 #pragma warning( pop )
 
 	if (!vrenderMtl) return; // Material is not V-Ray compatible, can't do anything.
