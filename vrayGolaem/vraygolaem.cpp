@@ -1048,7 +1048,7 @@ public:
 		return GLM_MTL_WRAPPER_VRAY_ID;
 	}
 
-	Plugin* newPlugin(PluginHost *host) VRAY_OVERRIDE {
+	Plugin* newPlugin(PluginHost *) VRAY_OVERRIDE {
 		return new GolaemBRDFWrapper;
 	}
 
@@ -1821,11 +1821,11 @@ struct MtlShadeData : VR::ShadeData {
 		return 0;
 	}
 	int getGBufID(void) { return objectID; }
-	int getSmoothingGroup(const VR::VRayContext &rc) { return 0; }
-	int getEdgeVisibility(const VR::VRayContext &rc) { return 7; }
+	int getSmoothingGroup(const VR::VRayContext &) { return 0; }
+	int getEdgeVisibility(const VR::VRayContext &) { return 7; }
 
-	int getSurfaceRenderID(const VR::VRayContext &rc) { return renderID; }
-	int getMaterialRenderID(const VR::VRayContext &rc) { return gbufID; }
+	int getSurfaceRenderID(const VR::VRayContext &) { return renderID; }
+	int getMaterialRenderID(const VR::VRayContext &) { return gbufID; }
 
 	PluginInterface* newInterface(InterfaceID id) {
 		PluginInterface *res = orig_sd->newInterface(id);
@@ -1881,7 +1881,7 @@ void GolaemBRDFWrapper::shade(VR::VRayContext &rc) {
 	}
 }
 
-int GolaemBRDFWrapper::getMaterialRenderID(const VR::VRayContext &rc) {
+int GolaemBRDFWrapper::getMaterialRenderID(const VR::VRayContext &) {
 	return mtlID;
 }
 
