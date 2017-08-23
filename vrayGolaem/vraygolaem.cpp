@@ -16,6 +16,8 @@
 
 #pragma warning (pop)
 
+// V-Ray plugin ID for the 3ds Max material wrapper
+#define GLM_MTL_WRAPPER_VRAY_ID LARGE_CONST(0x2015080783)
 
 #include <fstream>	// std::ofstream
 #include <sstream>	// std::stringstream
@@ -971,23 +973,23 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 	_tempVRSceneFileDir = getStrParam(pblock2, pb_temp_vrscene_file_dir, t, "TEMP");
 }
 
-/*
-void VRayGolaem::wrapMaterial(Mtl *mtl) {
+
+void VRayGolaem::wrapMaterial(VUtils::VRayCore *vray, Mtl *mtl) {
 	if (!mtl)
 		return;
 
-	VR::VRenderMtl *vrenderMtl=VR::getVRenderMtl(mtl);
+	VR::VRenderMtl *vrenderMtl=VR::getVRenderMtl(mtl, static_cast<VR::VRayRenderer*>(vray));
 	if (!vrenderMtl)
 		return; // Material is not V-Ray compatible, can't do anything.
 
-	BRDFWrapper *wrapper=static_cast<BRDFWrapper*>(_vrayScene->newPluginWithoutParams(MTL_WRAPPER_VRAY_ID, NULL));
+	GolaemBRDFWrapper *wrapper=static_cast<GolaemBRDFWrapper*>(_vrayScene->newPluginWithoutParams(GLM_MTL_WRAPPER_VRAY_ID, NULL));
 	if (!wrapper)
 		return;
 
 	wrapper->setMaxMtl(mtl, vrenderMtl, this);
 }
-*/
 
+/*
 void VRayGolaem::wrapMaterial(VUtils::VRayCore *vray, Mtl *mtl)
 {
 	if (!mtl)
@@ -998,7 +1000,7 @@ void VRayGolaem::wrapMaterial(VUtils::VRayCore *vray, Mtl *mtl)
 
 #pragma warning( push )
 #pragma warning( disable : 4996) // avoid deprecated warning
-	VUtils::VRenderMtl *vrenderMtl = VUtils::getVRenderMtl(mtl/*, static_cast<VR::VRayRenderer*>(vray)*/);
+	VUtils::VRenderMtl *vrenderMtl = VUtils::getVRenderMtl(mtl, static_cast<VR::VRayRenderer*>(vray));
 #pragma warning( pop )
 
 	if (!vrenderMtl) return; // Material is not V-Ray compatible, can't do anything.
@@ -1009,6 +1011,7 @@ void VRayGolaem::wrapMaterial(VUtils::VRayCore *vray, Mtl *mtl)
 		
 	wrapper->setMaxMtl(mtl, vrenderMtl, this);
 }
+*/
 
 void VRayGolaem::enumMaterials(VUtils::VRayCore *vray, Mtl *mtl) {
 	if (!mtl || mtl->SuperClassID()!=MATERIAL_CLASS_ID)
@@ -1039,6 +1042,34 @@ void VRayGolaem::createMaterials(VR::VRayCore *vray) {
 	enumMaterials(vray, inode->GetMtl());
 }
 
+class GolaemBRDFMaterialDesc : public PluginDesc {
+public:
+	PluginID getPluginID(void) VRAY_OVERRIDE {
+		return GLM_MTL_WRAPPER_VRAY_ID;
+	}
+
+	Plugin* newPlugin(PluginHost *host) VRAY_OVERRIDE {
+		return new GolaemBRDFWrapper;
+	}
+
+	void deletePlugin(Plugin *plugin) {
+		delete static_cast<GolaemBRDFWrapper*>(plugin);
+	}
+
+	bool supportsInterface(InterfaceID id) {
+		if (id == EXT_MATERIAL) return true;
+		else if (id == EXT_BSDF) return true;
+		else return false;
+	}
+
+	/// Returns the name of the plugin class (human readable name).
+	tchar* getName(void) VRAY_OVERRIDE {
+		return "GolaemMtlMaxWrapper";
+	}
+};
+
+static GolaemBRDFMaterialDesc golaemWrapperMaterialDesc;
+
 //------------------------------------------------------------
 // renderBegin / renderEnd
 //------------------------------------------------------------
@@ -1053,6 +1084,7 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 
 	VRenderPluginRendererInterface *pluginRenderer = queryInterface<VRenderPluginRendererInterface>(vray, EXT_VRENDER_PLUGIN_RENDERER);
 	pluginRenderer->registerPlugin(wrapperMaterialDesc);
+	pluginRenderer->registerPlugin(golaemWrapperMaterialDesc);
 	vassert(pluginRenderer);
 
 	PluginManager *plugMan = pluginRenderer->getPluginManager();
@@ -1721,3 +1753,180 @@ inline void maxToGolaem(const Matrix3& matrix, float* outArray)
 	outArray[14] = matrix[3][2];
 	outArray[15] = 1.f;
 }
+
+// V-Ray materials expect rc.rayresult.sd to derive from VR::ShadeData, but this is not true for
+// the geometry from Standalone plugins, so wrap the original shade data with this class. This also
+// allows us to remap the texture mapping channels on the fly (in 3ds Max, they start from 1, but
+// in the standalone plugins, they start from 0).
+struct MtlShadeData : VR::ShadeData {
+	MtlShadeData(VR::VRayContext &rc, VR::SurfaceProperties *surfaceProps, int mtlID, int rID, int objID) {
+		renderID = rID;
+		gbufID = mtlID;
+		objectID = objID;
+		orig_rc = &rc;
+		orig_sd = rc.rayresult.sd;
+		orig_sp = rc.rayresult.surfaceProps;
+		rc.rayresult.sd = static_cast<VR::VRayShadeData*>(this);
+		rc.rayresult.surfaceProps = surfaceProps;
+		lastMapChannelIndex = -3;
+	}
+	~MtlShadeData(void) {
+		orig_rc->rayresult.sd = orig_sd;
+		orig_rc->rayresult.surfaceProps = orig_sp;
+	}
+
+	VR::Vector getUVWcoords(const VR::VRayContext &rc, int channel) {
+		if (!initMapChannel(rc, channel))
+			return VR::Vector(0.0f, 0.0f, 0.0f);
+		return lastMapChannelTransform.offs;
+	}
+
+	void getUVWderivs(const VR::VRayContext &rc, int channel, VR::Vector derivs[2]) {
+		if (!initMapChannel(rc, channel)) {
+			derivs[0].makeZero();
+			derivs[1].makeZero();
+		}
+		else {
+			derivs[0] = rc.rayresult.dPdx*lastMapChannelTransform.m;
+			derivs[1] = rc.rayresult.dPdy*lastMapChannelTransform.m;
+		}
+	}
+
+	void getUVWbases(const VR::VRayContext &rc, int channel, VR::Vector bases[3]) {
+		if (!initMapChannel(rc, channel)) {
+			bases[0].makeZero();
+			bases[1].makeZero();
+			bases[2].makeZero();
+		}
+		else {
+			bases[0] = lastMapChannelTransform.m[0];
+			bases[1] = lastMapChannelTransform.m[1];
+			bases[2] = lastMapChannelTransform.m[2];
+		}
+	}
+
+	VR::Vector getUVWnormal(const VR::VRayContext &rc, int channel) {
+		if (!initMapChannel(rc, channel)) {
+			return VR::Vector(0.0f, 0.0f, 1.0f);
+		}
+		else {
+			return crossf(lastMapChannelTransform.m[0], lastMapChannelTransform.m[1]);
+		}
+	}
+
+	int getMtlID(const VR::VRayContext &rc) {
+		VR::SurfaceInfoInterface *surfaceInfo = static_cast<VR::SurfaceInfoInterface*>(GET_INTERFACE(orig_sd, EXT_SURFACE_INFO));
+		if (surfaceInfo)
+			return surfaceInfo->getFaceID(rc);
+		return 0;
+	}
+	int getGBufID(void) { return objectID; }
+	int getSmoothingGroup(const VR::VRayContext &rc) { return 0; }
+	int getEdgeVisibility(const VR::VRayContext &rc) { return 7; }
+
+	int getSurfaceRenderID(const VR::VRayContext &rc) { return renderID; }
+	int getMaterialRenderID(const VR::VRayContext &rc) { return gbufID; }
+
+	PluginInterface* newInterface(InterfaceID id) {
+		PluginInterface *res = orig_sd->newInterface(id);
+		if (res)
+			return res;
+		return VR::ShadeData::newInterface(id);
+	}
+protected:
+	int initMapChannel(const VR::VRayContext &rc, int channelIndex) {
+		if (lastMapChannelIndex == channelIndex)
+			return true;
+		if (-2 == lastMapChannelIndex)
+			return false;
+		VR::MappedSurface *mappedSurface = static_cast<VR::MappedSurface*>(GET_INTERFACE(orig_sd, EXT_MAPPED_SURFACE));
+		if (!mappedSurface) {
+			lastMapChannelIndex = -2;
+			return false;
+		}
+
+		// In 3ds Max, mapping channels start from 1, so that's why we subtract 1 from the channelIndex here.
+		lastMapChannelTransform = mappedSurface->getLocalUVWTransform(rc, channelIndex - 1);
+		lastMapChannelIndex = channelIndex;
+		return true;
+	}
+
+	VR::VRayContext *orig_rc;
+	VR::VRayShadeData *orig_sd;
+	VR::VRaySurfaceProperties *orig_sp;
+	int lastMapChannelIndex;
+	VR::Transform lastMapChannelTransform;
+	int gbufID, renderID, objectID;
+};
+
+void GolaemBRDFWrapper::shade(VR::VRayContext &rc) {
+	// 3ds Max materials for V-Ray expect rc.rayresult.sd to be ShadeData, so create a wrapper here
+	MtlShadeData shadeData(rc, NULL, mtlID, 0 /* renderID */, golaemInstance->getObjectID());
+	VR::VRayInterface &vri = static_cast<VR::VRayInterface&>(rc);
+
+	// Just call the original 3ds Max material to shade itself.
+	vrayMtl->shade(vri, mtlID);
+
+	// Handle alpha contribution - there's no one to do it for us since we don't go through VRayInstance::fullShade().
+	if (rc.rayresult.surfaceProps && 0 != (rc.rayparams.localRayType & VR::RT_GBUFFER)) {
+		float alphaContrib = static_cast<VR::SurfaceProperties*>(rc.rayresult.surfaceProps)->alphaContribution;
+		if (alphaContrib >= 0.0f) {
+			rc.mtlresult.alpha *= alphaContrib;
+			rc.mtlresult.alphaTransp = VR::Color(1.0f, 1.0f, 1.0f)*(1.0f - alphaContrib) + rc.mtlresult.alphaTransp*alphaContrib;
+		}
+		else {
+			rc.mtlresult.alpha.makeZero();
+			rc.mtlresult.alphaTransp = VR::Color(1.0f, 1.0f, 1.0f)*(1.0f + alphaContrib) - rc.mtlresult.alphaTransp*alphaContrib;
+		}
+	}
+}
+
+int GolaemBRDFWrapper::getMaterialRenderID(const VR::VRayContext &rc) {
+	return mtlID;
+}
+
+int GolaemBRDFWrapper::isOpaque(void) {
+#ifdef VRAY_MTLREQ_OPAQUE_SHADOWS
+	return (maxMtlFlags & (VRAY_MTLREQ_OPAQUE_SHADOWS | MTLREQ_TRANSP)) == VRAY_MTLREQ_OPAQUE_SHADOWS;
+#else
+	return false;
+#endif
+}
+
+VR::BSDFSampler* GolaemBRDFWrapper::newBSDF(const VR::VRayContext &rc, VR::BSDFFlags flags) {
+	if (!vrayMtl)
+		return NULL;
+
+	VR::VRenderMtlFlags mtlFlags;
+	mtlFlags.force1sided = flags.force1sided;
+	return vrayMtl->newBSDF(rc, mtlFlags);
+}
+
+void GolaemBRDFWrapper::deleteBSDF(const VR::VRayContext &rc, VR::BSDFSampler *bsdf) {
+	if (!bsdf)
+		return;
+
+	vrayMtl->deleteBSDF(rc, bsdf);
+}
+
+void GolaemBRDFWrapper::setMaxMtl(Mtl *maxMtl, VR::VRenderMtl *vrayMtl, VRayGolaem *golaem) {
+	this->maxMtl = maxMtl;
+	this->vrayMtl = vrayMtl;
+	this->golaemInstance = golaem;
+
+	GET_MBCS(maxMtl->GetName(), mtlName);
+	setPluginName(mtlName); // Set the name to be the same as the Max name, so that the Golaem plugin can find it.
+
+	maxMtlFlags = maxMtl->Requirements(-1);
+	mtlID = maxMtl->gbufID;
+}
+
+GolaemBRDFWrapper::GolaemBRDFWrapper(void) :
+	maxMtl(NULL),
+	vrayMtl(NULL),
+	maxMtlFlags(0),
+	mtlID(0),
+	golaemInstance(NULL)
+{
+}
+
