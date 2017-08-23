@@ -24,10 +24,10 @@ if(NOT VRAYGOLAEM_STANDALONE_BUILD)
 
 	target_compile_options(${TARGET_CROWD3DSMAXVRAY} PUBLIC -MD -U_DEBUG)
 
-    CROWD_INSTALL_RUNTIME_LIBRARY( ${TARGET_CROWD3DSMAXVRAY} "crowd3dsMaxVray" "vrayGolaem${MAYA_VERSION}")
+    CROWD_INSTALL_RUNTIME_LIBRARY( ${TARGET_CROWD3DSMAXVRAY} "procedurals/3dsmax" "vrayGolaem${MAYA_VERSION}")
     crowd_install_dependencies()
-    install( FILES "${CMAKE_CURRENT_SOURCE_DIR}/vraygolaem.py" CONFIGURATIONS Debug DESTINATION "${CROWD_INSTALL_PATH_Debug}/crowd3dsMaxVray/scripts" )
-    install( FILES "${CMAKE_CURRENT_SOURCE_DIR}/vraygolaem.py" CONFIGURATIONS Release DESTINATION "${CROWD_INSTALL_PATH_Release}/crowd3dsMaxVray/scripts" )
+    install( FILES "${CMAKE_CURRENT_SOURCE_DIR}/vraygolaem.py" CONFIGURATIONS Debug DESTINATION "${CROWD_INSTALL_PATH_Debug}/procedurals/3dsmax/scripts" )
+    install( FILES "${CMAKE_CURRENT_SOURCE_DIR}/vraygolaem.py" CONFIGURATIONS Release DESTINATION "${CROWD_INSTALL_PATH_Release}/procedurals/3dsmax/scripts" )
 
 else()
     # Include
