@@ -119,11 +119,11 @@ class VRayGolaem;
 // the Golaem plugin to find the materials automatically if they have the correct name in the
 // 3ds Max scene.
 class GolaemBRDFWrapper : public Plugin, public VR::MaterialInterface, public VR::BSDFInterface {
-	VR::VRenderMtl *vrayMtl;
-	Mtl *maxMtl;
-	ULONG maxMtlFlags;
-	int mtlID;
-	VRayGolaem *golaemInstance;
+	VR::VRenderMtl *_vrayMtl;
+	Mtl *_maxMtl;
+	ULONG _maxMtlFlags;
+	int _mtlID;
+	VRayGolaem *_golaemInstance;
 public:
 	GolaemBRDFWrapper(void);
 

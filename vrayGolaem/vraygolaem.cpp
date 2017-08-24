@@ -1861,11 +1861,11 @@ protected:
 
 void GolaemBRDFWrapper::shade(VR::VRayContext &rc) {
 	// 3ds Max materials for V-Ray expect rc.rayresult.sd to be ShadeData, so create a wrapper here
-	MtlShadeData shadeData(rc, NULL, mtlID, 0 /* renderID */, golaemInstance->getObjectID());
+	MtlShadeData shadeData(rc, NULL, _mtlID, 0 /* renderID */, _golaemInstance->getObjectID());
 	VR::VRayInterface &vri = static_cast<VR::VRayInterface&>(rc);
 
 	// Just call the original 3ds Max material to shade itself.
-	vrayMtl->shade(vri, mtlID);
+	_vrayMtl->shade(vri, _mtlID);
 
 	// Handle alpha contribution - there's no one to do it for us since we don't go through VRayInstance::fullShade().
 	if (rc.rayresult.surfaceProps && 0 != (rc.rayparams.localRayType & VR::RT_GBUFFER)) {
@@ -1882,51 +1882,51 @@ void GolaemBRDFWrapper::shade(VR::VRayContext &rc) {
 }
 
 int GolaemBRDFWrapper::getMaterialRenderID(const VR::VRayContext &) {
-	return mtlID;
+	return _mtlID;
 }
 
 int GolaemBRDFWrapper::isOpaque(void) {
 #ifdef VRAY_MTLREQ_OPAQUE_SHADOWS
-	return (maxMtlFlags & (VRAY_MTLREQ_OPAQUE_SHADOWS | MTLREQ_TRANSP)) == VRAY_MTLREQ_OPAQUE_SHADOWS;
+	return (_maxMtlFlags & (VRAY_MTLREQ_OPAQUE_SHADOWS | MTLREQ_TRANSP)) == VRAY_MTLREQ_OPAQUE_SHADOWS;
 #else
 	return false;
 #endif
 }
 
 VR::BSDFSampler* GolaemBRDFWrapper::newBSDF(const VR::VRayContext &rc, VR::BSDFFlags flags) {
-	if (!vrayMtl)
+	if (!_vrayMtl)
 		return NULL;
 
 	VR::VRenderMtlFlags mtlFlags;
 	mtlFlags.force1sided = flags.force1sided;
-	return vrayMtl->newBSDF(rc, mtlFlags);
+	return _vrayMtl->newBSDF(rc, mtlFlags);
 }
 
 void GolaemBRDFWrapper::deleteBSDF(const VR::VRayContext &rc, VR::BSDFSampler *bsdf) {
 	if (!bsdf)
 		return;
 
-	vrayMtl->deleteBSDF(rc, bsdf);
+	_vrayMtl->deleteBSDF(rc, bsdf);
 }
 
 void GolaemBRDFWrapper::setMaxMtl(Mtl *maxMtl, VR::VRenderMtl *vrayMtl, VRayGolaem *golaem) {
-	this->maxMtl = maxMtl;
-	this->vrayMtl = vrayMtl;
-	this->golaemInstance = golaem;
+	this->_maxMtl = maxMtl;
+	this->_vrayMtl = vrayMtl;
+	this->_golaemInstance = golaem;
 
 	GET_MBCS(maxMtl->GetName(), mtlName);
 	setPluginName(mtlName); // Set the name to be the same as the Max name, so that the Golaem plugin can find it.
 
-	maxMtlFlags = maxMtl->Requirements(-1);
-	mtlID = maxMtl->gbufID;
+	_maxMtlFlags = maxMtl->Requirements(-1);
+	_mtlID = maxMtl->gbufID;
 }
 
 GolaemBRDFWrapper::GolaemBRDFWrapper(void) :
-	maxMtl(NULL),
-	vrayMtl(NULL),
-	maxMtlFlags(0),
-	mtlID(0),
-	golaemInstance(NULL)
+	_maxMtl(NULL),
+	_vrayMtl(NULL),
+	_maxMtlFlags(0),
+	_mtlID(0),
+	_golaemInstance(NULL)
 {
 }
 
