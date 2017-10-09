@@ -262,7 +262,12 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
     p_ui, TYPE_INT_COMBOBOX, CB_OBJECTIDMODE, 8, CB_OBJECTIDMODE_ITEM1, CB_OBJECTIDMODE_ITEM2, CB_OBJECTIDMODE_ITEM3, CB_OBJECTIDMODE_ITEM4, CB_OBJECTIDMODE_ITEM5, CB_OBJECTIDMODE_ITEM6, CB_OBJECTIDMODE_ITEM7, CB_OBJECTIDMODE_ITEM8,
 	p_vals, 0, 1, 2, 3, 4, 5, 6, 7,
 	p_default, 0,
-	PB_END,	
+	PB_END,
+	pb_geometry_tag, _T("geometry_tag"), TYPE_INT, P_RESET_DEFAULT, 0,
+	p_default, 0,
+	p_range, 0, 9,
+	p_ui, TYPE_SPINNER, EDITTYPE_INT, ED_GEOMETRYTAG, ED_GEOMETRYTAGSPIN, 1,
+	PB_END,
 	pb_default_material, _T("default_material"), TYPE_STRING, P_RESET_DEFAULT, 0,
 	p_ui, TYPE_EDITBOX, ED_DEFAULTMATERIAL,
 	PB_END,
@@ -946,6 +951,7 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 	_frameOffset = pblock2->GetInt(pb_frame_offset, t);
 	_defaultMaterial = getStrParam(pblock2, pb_default_material, t);
 	_displayPercent = pblock2->GetFloat(pb_display_percentage, t);
+	_geometryTag = pblock2->GetInt(pb_geometry_tag, t);
 	_instancingEnable = pblock2->GetInt(pb_instancing_enable, t) == 1;
 	
 	// object properties
@@ -1173,13 +1179,13 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 		for (size_t iPlugin=0; iPlugin<pluginCallback._foundPlugins.length(); ++iPlugin)
 		{
 			VR::VRayPlugin* plugin (pluginCallback._foundPlugins[iPlugin]);
-			currentParam = plugin->getParameter("glmCrowdField");
+			currentParam = plugin->getParameter("crowdField");
 			if (currentParam) crowdField = currentParam->getString();
-			currentParam = plugin->getParameter("glmCacheName");
+			currentParam = plugin->getParameter("cacheName");
 			if (currentParam) cacheName = currentParam->getString();
-			currentParam = plugin->getParameter("glmCacheFileDir");
+			currentParam = plugin->getParameter("cacheFileDir");
 			if (currentParam) cacheDir = currentParam->getString();
-			currentParam = pluginCallback._foundPlugins[0]->getParameter("glmCharacterFiles");
+			currentParam = pluginCallback._foundPlugins[0]->getParameter("characterFiles");
 			if (currentParam) characterFiles = currentParam->getString();
 
 			int currentFrame = (int)((float)t / (float)TIME_TICKSPERSEC * (float)GetFrameRate()) + frameOffset; 
@@ -1306,7 +1312,7 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			CStr crowdFields;
 			
 			// transform
-			currentParam = plugin->getParameter("glmTransform");
+			currentParam = plugin->getParameter("proxyMatrix");
 			if (currentParam)
 			{
 				VR::TraceTransform t = currentParam->getTransform();
@@ -1323,24 +1329,24 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			}
 
 			// cache attributes
-			currentParam = plugin->getParameter("glmCrowdField");
+			currentParam = plugin->getParameter("crowdField");
 			if (currentParam)
 			{
 				crowdFields = currentParam->getString();
 			}
-			currentParam = plugin->getParameter("glmCacheName");
+			currentParam = plugin->getParameter("cacheName");
 			if (currentParam)
 			{
 				GET_WSTR(currentParam->getString(), currentParamMbcs)
 				pblock2->SetValue(pb_cache_name, 0, currentParamMbcs, 0);
 			}
-			currentParam = plugin->getParameter("glmCacheFileDir");
+			currentParam = plugin->getParameter("cacheFileDir");
 			if (currentParam)
 			{
 				GET_WSTR(currentParam->getString(), currentParamMbcs)
 				pblock2->SetValue(pb_cache_dir, 0, currentParamMbcs, 0);
 			}
-			currentParam = plugin->getParameter("glmCharacterFiles");
+			currentParam = plugin->getParameter("characterFiles");
 			if (currentParam)
 			{
 				GET_WSTR(currentParam->getString(), currentParamMbcs)
@@ -1348,15 +1354,15 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			}
 
 			// layout
-			currentParam = plugin->getParameter("glmEnableLayout");
+			currentParam = plugin->getParameter("layoutEnable");
 			if (currentParam) pblock2->SetValue(pb_layout_enable, 0, currentParam->getBool() == 1);
-			currentParam = plugin->getParameter("glmLayoutFile");
+			currentParam = plugin->getParameter("layoutFile");
 			if (currentParam)
 			{
 				GET_WSTR(currentParam->getString(), currentParamMbcs)
 				pblock2->SetValue(pb_layout_file, 0, currentParamMbcs, 0);
 			}
-			currentParam = plugin->getParameter("glmTerrainFile");
+			currentParam = plugin->getParameter("terrainFile");
 			if (currentParam)
 			{
 				GET_WSTR(currentParam->getString(), currentParamMbcs)
@@ -1364,20 +1370,20 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			}
 
 			// motion blur
-			currentParam = plugin->getParameter("glmMBlurWindowSize");
+			currentParam = plugin->getParameter("motionBlurWindowSize");
 			if (currentParam) 
 			{
 				inode->SetUserPropBool(PROP_MOBLUR_OVERRIDEDURATION, true);
 				inode->SetUserPropFloat(PROP_MOBLUR_DURATION, currentParam->getFloat());
 			}
-			currentParam = plugin->getParameter("glmMBlurSamples");
+			currentParam = plugin->getParameter("motionBlurSamples");
 			if (currentParam) 
 			{
 				inode->SetUserPropBool(PROP_MOBLUR_USEDEFAULTGEOMSAMPLES, false);
 				inode->SetUserPropInt(PROP_MOBLUR_GEOMSAMPLES, currentParam->getInt());
 			}
 			// if motion blur is off, override geometry samples value with 1
-			currentParam = plugin->getParameter("glmMBlurEnabled");
+			currentParam = plugin->getParameter("motionBlurEnable");
 			if (currentParam)
 			{
 				if (currentParam->getInt() == 0)
@@ -1388,41 +1394,43 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			}
 		
 			// frustum culling
-			currentParam = plugin->getParameter("glmEnableFrustumCulling");
+			currentParam = plugin->getParameter("frustumCullingEnable");
 			if (currentParam) pblock2->SetValue(pb_frustum_enable, 0, currentParam->getBool() == 1);
-			currentParam = plugin->getParameter("glmFrustumMargin");
+			currentParam = plugin->getParameter("frustumMargin");
 			if (currentParam) pblock2->SetValue(pb_frustum_margin, 0, (float)currentParam->getDouble());
-			currentParam = plugin->getParameter("glmCameraMargin");
+			currentParam = plugin->getParameter("cameraMargin");
 			if (currentParam) pblock2->SetValue(pb_camera_margin, 0, (float)currentParam->getDouble());
 
 			// vray
-			currentParam = plugin->getParameter("glmRenderPercent");
+			currentParam = plugin->getParameter("renderPercent");
 			if (currentParam) pblock2->SetValue(pb_display_percentage, 0, currentParam->getFloat());
-			currentParam = plugin->getParameter("glmFrameOffset");
+			currentParam = plugin->getParameter("geometryTag");
+			if (currentParam) pblock2->SetValue(pb_geometry_tag, 0, currentParam->getInt());
+			currentParam = plugin->getParameter("frameOffset");
 			if (currentParam) pblock2->SetValue(pb_frame_offset, 0, currentParam->getInt());
-			currentParam = plugin->getParameter("glmDefaultMaterial");
+			currentParam = plugin->getParameter("defaultMaterial");
 			if (currentParam)
 			{
 				GET_WSTR(currentParam->getString(), currentParamMbcs)
 				pblock2->SetValue(pb_default_material, 0, currentParamMbcs, 0);
 			}
-			currentParam = plugin->getParameter("glmInstancingEnabled");
+			currentParam = plugin->getParameter("instancingEnable");
 			if (currentParam) pblock2->SetValue(pb_instancing_enable, 0, currentParam->getBool() == 1);
 			
 			// properties (copy them in the max node as well if it exists)
 			int objectIDBase(0);
 			bool primaryVisibility(true), castShadows(true), inReflections(true), inRefractions(true);
-			currentParam = plugin->getParameter("glmObjectIDBase");
+			currentParam = plugin->getParameter("objectIdBase");
 			if (currentParam) objectIDBase = currentParam->getInt(); 
-			currentParam = plugin->getParameter("glmObjectIDMode");
+			currentParam = plugin->getParameter("objectIdMode");
 			if (currentParam) pblock2->SetValue(pb_object_id_mode, 0, currentParam->getInt());
-			currentParam = plugin->getParameter("glmCameraVisibility");
+			currentParam = plugin->getParameter("cameraVisibility");
 			if (currentParam) primaryVisibility = currentParam->getBool() == 1;
-			currentParam = plugin->getParameter("glmShadowsVisibility");
+			currentParam = plugin->getParameter("shadowsVisibility");
 			if (currentParam) castShadows = currentParam->getBool() == 1;
-			currentParam = plugin->getParameter("glmReflectionsVisibility");
+			currentParam = plugin->getParameter("reflectionsVisibility");
 			if (currentParam) inReflections = currentParam->getBool() == 1;
-			currentParam = plugin->getParameter("glmRefractionsVisibility");
+			currentParam = plugin->getParameter("refractionsVisibility");
 			if (currentParam) inRefractions = currentParam->getBool() == 1;
 
 			inode->SetGBufID(objectIDBase);
@@ -1438,7 +1446,7 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			for (size_t iPlugin=1; iPlugin<pluginCallback._foundPlugins.length(); ++iPlugin)
 			{
 				plugin = pluginCallback._foundPlugins[iPlugin];
-				currentParam = plugin->getParameter("glmCrowdField");
+				currentParam = plugin->getParameter("crowdField");
 				if (currentParam)
 					crowdFields += (CStr(";") + CStr(currentParam->getString()));
 			}
@@ -1508,40 +1516,41 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 
 	outputStr << "GolaemCrowd " << correctedCacheName << nodeName << "@mesh1" << std::endl;
 	outputStr << "{" << std::endl;
-	outputStr << "\t" << "glmTransform=Transform(Matrix(Vector("<< transform.GetRow(0)[0] <<", "<< transform.GetRow(0)[1] <<", "<< transform.GetRow(0)[2] <<")," << 
+	outputStr << "\t" << "proxyMatrix=Transform(Matrix(Vector("<< transform.GetRow(0)[0] <<", "<< transform.GetRow(0)[1] <<", "<< transform.GetRow(0)[2] <<")," << 
 														   "Vector("<< transform.GetRow(1)[0] <<", "<< transform.GetRow(1)[1] <<", "<< transform.GetRow(1)[2] <<")," <<
 														   "Vector("<< transform.GetRow(2)[0] <<", "<< transform.GetRow(2)[1] <<", "<< transform.GetRow(2)[2] <<"))," << 
 														   "Vector("<< transform.GetRow(3)[0] <<", "<< transform.GetRow(3)[1] <<", "<< transform.GetRow(3)[2] <<"));" << std::endl;
-	outputStr << "\t" << "glmFrameOffset="<< _frameOffset <<";" << std::endl;
-	outputStr << "\t" << "glmCrowdField=\"" << _crowdFields << "\";" << std::endl;
-	outputStr << "\t" << "glmCacheName=\"" << _cacheName << "\";" << std::endl;
-	outputStr << "\t" << "glmCacheFileDir=\"" << _cacheDir << "\";" << std::endl;
-	outputStr << "\t" << "glmProxyName=\"" << nodeName << "\";" << std::endl;
-	outputStr << "\t" << "glmCharacterFiles=\"" << _characterFiles << "\";" << std::endl;
+	outputStr << "\t" << "frameOffset="<< _frameOffset <<";" << std::endl;
+	outputStr << "\t" << "crowdField=\"" << _crowdFields << "\";" << std::endl;
+	outputStr << "\t" << "cacheName=\"" << _cacheName << "\";" << std::endl;
+	outputStr << "\t" << "cacheFileDir=\"" << _cacheDir << "\";" << std::endl;
+	outputStr << "\t" << "proxyName=\"" << nodeName << "\";" << std::endl;
+	outputStr << "\t" << "characterFiles=\"" << _characterFiles << "\";" << std::endl;
 	// layout
-	outputStr << "\t" << "glmEnableLayout=" << _layoutEnable << ";" << std::endl;
-	outputStr << "\t" << "glmLayoutFile=\"" << _layoutFile << "\";" << std::endl;
-	outputStr << "\t" << "glmTerrainFile=\"" << _terrainFile << "\";" << std::endl;
+	outputStr << "\t" << "layoutEnable=" << _layoutEnable << ";" << std::endl;
+	outputStr << "\t" << "layoutFile=\"" << _layoutFile << "\";" << std::endl;
+	outputStr << "\t" << "terrainFile=\"" << _terrainFile << "\";" << std::endl;
 	// moblur
-	outputStr << "\t" << "glmMBlurEnabled=" << _mBlurEnable << ";" << std::endl;
-	if (_overMBlurWindowSize) outputStr << "\t" << "glmMBlurWindowSize=" << _mBlurWindowSize << ";" << std::endl;
-	if (_overMBlurSamples) outputStr << "\t" << "glmMBlurSamples=" << _mBlurSamples << ";" << std::endl;
+	outputStr << "\t" << "motionBlurEnable=" << _mBlurEnable << ";" << std::endl;
+	if (_overMBlurWindowSize) outputStr << "\t" << "motionBlurWindowSize=" << _mBlurWindowSize << ";" << std::endl;
+	if (_overMBlurSamples) outputStr << "\t" << "motionBlurSamples=" << _mBlurSamples << ";" << std::endl;
 	// frustum culling
-	outputStr << "\t" << "glmEnableFrustumCulling=" << _frustumEnable << ";" << std::endl;
-	outputStr << "\t" << "glmFrustumMargin=" << _frustumMargin << ";" << std::endl;
-	outputStr << "\t" << "glmCameraMargin=" << _cameraMargin << ";" << std::endl;
+	outputStr << "\t" << "frustumCullingEnable=" << _frustumEnable << ";" << std::endl;
+	outputStr << "\t" << "frustumMargin=" << _frustumMargin << ";" << std::endl;
+	outputStr << "\t" << "cameraMargin=" << _cameraMargin << ";" << std::endl;
 	// vray
-	outputStr << "\t" << "glmDefaultMaterial=\""<< _defaultMaterial <<"\";" << std::endl;
-	outputStr << "\t" << "glmObjectIDBase=" << _objectIDBase << ";" << std::endl;
-	outputStr << "\t" << "glmObjectIDMode=" << _objectIDMode << ";" << std::endl;
-	outputStr << "\t" << "glmRenderPercent=" << _displayPercent << ";" << std::endl;
-	outputStr << "\t" << "glmInstancingEnabled=" << _instancingEnable << ";" << std::endl;
-	outputStr << "\t" << "glmCameraVisibility=" << _primaryVisibility << ";" << std::endl;
-	outputStr << "\t" << "glmShadowsVisibility=" << _castsShadows << ";" << std::endl;
-	outputStr << "\t" << "glmReflectionsVisibility=" << _visibleInReflections << ";" << std::endl;
-	outputStr << "\t" << "glmRefractionsVisibility=" << _visibleInRefractions << ";" << std::endl;
+	outputStr << "\t" << "defaultMaterial=\""<< _defaultMaterial <<"\";" << std::endl;
+	outputStr << "\t" << "objectIdBase=" << _objectIDBase << ";" << std::endl;
+	outputStr << "\t" << "objectIdMode=" << _objectIDMode << ";" << std::endl;
+	outputStr << "\t" << "renderPercent=" << _displayPercent << ";" << std::endl;
+	outputStr << "\t" << "geometryTag=" << _geometryTag << ";" << std::endl;
+	outputStr << "\t" << "instancingEnable=" << _instancingEnable << ";" << std::endl;
+	outputStr << "\t" << "cameraVisibility=" << _primaryVisibility << ";" << std::endl;
+	outputStr << "\t" << "shadowsVisibility=" << _castsShadows << ";" << std::endl;
+	outputStr << "\t" << "reflectionsVisibility=" << _visibleInReflections << ";" << std::endl;
+	outputStr << "\t" << "refractionsVisibility=" << _visibleInRefractions << ";" << std::endl;
 
-	outputStr << "\t" << "glmDccPackage=1;" << std::endl;
+	outputStr << "\t" << "dccPackage=1;" << std::endl;
 
 	outputStr << "}" << std::endl;
 	outputStr << std::endl;
