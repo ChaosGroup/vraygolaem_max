@@ -174,6 +174,21 @@ CStr getEnvironmentVariable(const CStr& envVarName)
 	return envVarValue;
 }
 
+short getCrowdUnit()
+{
+	short crowdUnit(UNITS_CENTIMETERS);
+	CStr crowdUnitStr(getEnvironmentVariable("GLMCROWD_UNIT"));
+	if (crowdUnitStr == "0") crowdUnit = UNITS_MILLIMETERS;
+	else if (crowdUnitStr == "1") crowdUnit = UNITS_CENTIMETERS;
+	// else if (crowdUnitStr == "2") crowdUnit = UNITS_DECIMETERS; // not supported
+	else if (crowdUnitStr == "3") crowdUnit = UNITS_METERS;
+	else if (crowdUnitStr == "4") crowdUnit = UNITS_INCHES;
+	else if (crowdUnitStr == "5") crowdUnit = UNITS_FEET;
+	//else if (crowdUnitStr == "6") crowdUnit = UNITS_YARDS; // not supported
+	return crowdUnit;
+}
+
+
 //************************************************************
 // Parameter block
 //************************************************************
@@ -1319,7 +1334,7 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 				Matrix3 transform(Point3(1, 0, 0), Point3(0, 1, 0), Point3(0, 0, 1), Point3(t.offs[0], t.offs[1], t.offs[2]));
 				
 				// scale according to scene unit
-				double scaleRatio (1. / GetMasterScale (UNITS_CENTIMETERS));
+				double scaleRatio (1. / GetMasterScale (getCrowdUnit()));
 				transform.Scale(Point3(scaleRatio, scaleRatio, scaleRatio), true);
 
 				// axis change between max and maya
