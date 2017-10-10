@@ -86,6 +86,7 @@ enum param_list{
 	pb_layout_name,				// Not used anymore but kept for retrocomp
 	pb_layout_dir,				// Not used anymore but kept for retrocomp
 	pb_terrain_file,
+	pb_geometry_tag,
 };
 
 //************************************************************
@@ -205,6 +206,7 @@ class VRayGolaem
 	int _objectIDBase;
 	short _objectIDMode;
 	float _displayPercent;
+	int _geometryTag;
 	bool _instancingEnable;
 	bool _primaryVisibility;
 	bool _castsShadows;
