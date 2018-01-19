@@ -64,8 +64,8 @@ enum param_list{
 	pb_frustum_enable,
 	pb_frustum_margin,
 	pb_camera_margin,
-	// vray 
-	pb_frame_offset,
+	// vray
+	pb_frame_offset,			// Not used anymore but kept for retrocomp
 	pb_scale_transform,			// Not used anymore but kept for retrocomp
 	pb_object_id_base,			// Not used anymore but kept for retrocomp
 	pb_primary_visibility,		// Not used anymore but kept for retrocomp
@@ -87,6 +87,7 @@ enum param_list{
 	pb_layout_dir,				// Not used anymore but kept for retrocomp
 	pb_terrain_file,
 	pb_geometry_tag,
+	pb_fframe_offset,
 };
 
 //************************************************************
@@ -202,7 +203,7 @@ class VRayGolaem
 	float _cameraMargin;
 
 	// Vray attributes
-	int _frameOffset;
+	float _frameOffset;
 	int _objectIDBase;
 	short _objectIDMode;
 	float _displayPercent;
@@ -308,6 +309,7 @@ public:
 	//////////////////////////////////////////
 	// Draw
 	//////////////////////////////////////////
+	void getCurrentFrame(const TimeValue t, float &currentFrame, float& frameMin, float& frameMax, float& factor);
 	void readGolaemCache(const Matrix3& transform, TimeValue t);
 	void draw(TimeValue t, INode *node, ViewExp *vpt);
 	void drawEntities(GraphicsWindow *gw, const Matrix3& transform, TimeValue t);
