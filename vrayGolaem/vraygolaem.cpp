@@ -268,10 +268,10 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	PB_END,
 
 	// vray attributes
-	pb_frame_offset, _T("frame_offset"), TYPE_INT, P_RESET_DEFAULT, 0,
-	p_default, 0,
-	p_range, -BIGINT, BIGINT, 
-	p_ui, TYPE_SPINNER,  EDITTYPE_INT, ED_FRAMEOFFSET, ED_FRAMEOFFSETSPIN, 1,
+	pb_fframe_offset, _T("fframe_offset"), TYPE_FLOAT, P_RESET_DEFAULT, 0.f,
+	p_default, 0.f,
+	p_range, -BIGFLOAT, BIGFLOAT,
+	p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_FFRAMEOFFSET, ED_FFRAMEOFFSETSPIN, 1.f,
 	PB_END,
 	pb_object_id_mode, _T("objectId_mode"), TYPE_INT, P_RESET_DEFAULT, 0,
     p_ui, TYPE_INT_COMBOBOX, CB_OBJECTIDMODE, 8, CB_OBJECTIDMODE_ITEM1, CB_OBJECTIDMODE_ITEM2, CB_OBJECTIDMODE_ITEM3, CB_OBJECTIDMODE_ITEM4, CB_OBJECTIDMODE_ITEM5, CB_OBJECTIDMODE_ITEM6, CB_OBJECTIDMODE_ITEM7, CB_OBJECTIDMODE_ITEM8,
@@ -296,6 +296,7 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	PB_END,
 
 	// not used anymore but kept for retrocomp
+	pb_frame_offset, _T(""), TYPE_INT, 0, 0, PB_END,
 	pb_display_percent, _T(""), TYPE_INT, 0, 0, PB_END,
 	pb_use_node_attributes, _T(""), TYPE_BOOL, 0, 0, PB_END,
 	pb_motion_blur_enable, _T(""), TYPE_BOOL, 0, 0, PB_END,
@@ -689,6 +690,28 @@ void VRayGolaemDlgProc::chooseFileName(IParamBlock2 *pblock2, ParamID paramID, c
 // Draw
 //************************************************************
 
+void VRayGolaem::getCurrentFrame(const TimeValue t, float &currentFrame, float& frameMin, float& frameMax, float& factor)
+{
+	currentFrame = ((float)t / (float)TIME_TICKSPERSEC * (float)GetFrameRate()) + _frameOffset;
+	frameMin = floor(currentFrame);
+	frameMax = ceil(currentFrame);
+	if (fabs(frameMin - currentFrame) <= 0.001f)
+	{
+		currentFrame = frameMin;
+		frameMax = currentFrame;
+	}
+	else if (fabs(frameMax - currentFrame) <= 0.001f)
+	{
+		currentFrame = frameMax;
+		frameMin = currentFrame;
+	}
+	factor = 0.f;
+	if (frameMin != frameMax)
+	{
+		factor = static_cast<float>((currentFrame - frameMin) / (frameMax - frameMin));
+	}
+}
+
 //------------------------------------------------------------
 // readGolaemCache
 //------------------------------------------------------------
@@ -714,22 +737,24 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
 	splitStr(_crowdFields, ';', crowdFields);
 	if (_cacheName.length() != 0 && _cacheDir.length() != 0)
 	{
+		// find the current frame
+		float currentFrame, frameMin, frameMax, interpolateFactor;
+		getCurrentFrame(t, currentFrame, frameMin, frameMax, interpolateFactor);
+		
+		// read caches
 		for (size_t iCf=0, nbCf=crowdFields.length(); iCf<nbCf; ++iCf)
 		{
-			int currentFrame = (int)((float)t / (float)TIME_TICKSPERSEC * (float)GetFrameRate()) + _frameOffset; 
-			CStr currentFrameStr; currentFrameStr.printf("%i", currentFrame);
 			CStr cachePrefix(_cacheDir + "/" + _cacheName + "." + crowdFields[iCf] + ".");
 			CStr cacheStream(cachePrefix + "%d.gscf");
 			CStr gscsFileStr(cachePrefix + "gscs");
-			CStr gscfFileStr(cachePrefix + currentFrameStr + ".gscf");
 			CStr gsclFileStr(_layoutFile);
 			CStr srcTerrainFile(cachePrefix + "terrain.gtg");
 			if (!fileExists(srcTerrainFile)) srcTerrainFile = cachePrefix + "terrain.fbx";
+			bool needInterpolate(false);
 
 			// load gscs
 			GlmSimulationCacheStatus status;
 			GlmSimulationData* simulationData(NULL);
-			GlmFrameData* frameData(NULL);
 			status = glmCreateAndReadSimulationData(&simulationData, gscsFileStr);
 			if (status != GSC_SUCCESS)
 			{
@@ -739,13 +764,50 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
 			}
 
 			// load gscf
-			glmCreateFrameData(&frameData, simulationData);
-			status = glmReadFrameData(frameData, simulationData, gscfFileStr);
-			if (status != GSC_SUCCESS)
+			GlmFrameData* frameDataFloor(NULL), *frameDataCeil(NULL);
+			// no need to interpolate
+			if (frameMin == frameMax)
 			{
-				glmDestroyFrameData(&frameData, simulationData);
-				DebugPrint(_T("VRayGolaem: Error loading .gscf file \"%s\"\n"), gscfFileStr.data());
-				return;
+				CStr currentFrameStr; currentFrameStr.printf("%i", (int)currentFrame);
+				CStr gscfFileStr(cachePrefix + currentFrameStr + ".gscf");
+
+				glmCreateFrameData(&frameDataFloor, simulationData);
+				status = glmReadFrameData(frameDataFloor, simulationData, gscfFileStr);
+				if (status != GSC_SUCCESS)
+				{
+					glmDestroyFrameData(&frameDataFloor, simulationData);
+					DebugPrint(_T("VRayGolaem: Error loading .gscf file \"%s\"\n"), gscfFileStr.data());
+					return;
+				}
+			}
+			else
+			{
+				// frame min
+				CStr currentFrameStr; currentFrameStr.printf("%i", (int)frameMin);
+				CStr gscfFileStr(cachePrefix + currentFrameStr + ".gscf");
+
+				glmCreateFrameData(&frameDataFloor, simulationData);
+				status = glmReadFrameData(frameDataFloor, simulationData, gscfFileStr);
+				if (status != GSC_SUCCESS)
+				{
+					glmDestroyFrameData(&frameDataFloor, simulationData);
+					DebugPrint(_T("VRayGolaem: Error loading .gscf file \"%s\"\n"), gscfFileStr.data());
+					return;
+				}
+
+				// frame max
+				currentFrameStr.printf("%i", (int)frameMax);
+				gscfFileStr = (cachePrefix + currentFrameStr + ".gscf");
+
+				glmCreateFrameData(&frameDataCeil, simulationData);
+				status = glmReadFrameData(frameDataCeil, simulationData, gscfFileStr);
+				if (status != GSC_SUCCESS)
+				{
+					glmDestroyFrameData(&frameDataCeil, simulationData);
+					DebugPrint(_T("VRayGolaem: Error loading .gscf file \"%s\"\n"), gscfFileStr.data());
+					return;
+				}
+				needInterpolate = true;
 			}
 
 			// load gscl
@@ -782,14 +844,27 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
 					glmCreateEntityExclusionList(history, &entityExclusions, &entityExclusionCount);
 
 					GlmSimulationData* simulationDataOut;
-					GlmFrameData* frameDataOut;
 					glmCreateModifiedSimulationData(simulationData, entityTransforms, entityTransformCount, &simulationDataOut);
-					glmCreateModifiedFrameData(simulationData, frameData, entityTransforms, entityTransformCount, history, simulationDataOut, &frameDataOut, currentFrame, cacheStream, _cacheDir);
+					if (frameMin == frameMax)
+					{
+						GlmFrameData* frameDataOut;
+						glmCreateModifiedFrameData(simulationData, frameDataFloor, entityTransforms, entityTransformCount, history, simulationDataOut, &frameDataOut, (int)currentFrame, cacheStream, _cacheDir);
+						glmDestroyFrameData(&frameDataFloor, simulationData);
+						frameDataFloor = frameDataOut;
+					}
+					else
+					{
+						GlmFrameData* frameDataOutFloor, *frameDataOutCeil;
+						glmCreateModifiedFrameData(simulationData, frameDataFloor, entityTransforms, entityTransformCount, history, simulationDataOut, &frameDataOutFloor, (int)frameMin, cacheStream, _cacheDir);
+						glmCreateModifiedFrameData(simulationData, frameDataCeil, entityTransforms, entityTransformCount, history, simulationDataOut, &frameDataOutCeil, (int)frameMax, cacheStream, _cacheDir);
+						glmDestroyFrameData(&frameDataFloor, simulationData);
+						glmDestroyFrameData(&frameDataCeil, simulationData);
+						frameDataFloor = frameDataOutFloor;
+						frameDataCeil = frameDataOutCeil;
+					}
 
 					// replace previous simulation & frame data
-					glmDestroyFrameData(&frameData, simulationData);
 					glmDestroySimulationData(&simulationData);
-					frameData = frameDataOut;
 					simulationData = simulationDataOut;
 
 					// Delete Terrain
@@ -804,12 +879,23 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
 				}
 			}
 
+			// has not been interpolated at layout stage but needed it
+			if (needInterpolate)
+			{
+				GlmFrameData *frameDataOut;
+				glmCreateFrameData(&frameDataOut, simulationData);
+				glmInterpolateFrameData(simulationData, frameDataFloor, frameDataCeil, interpolateFactor, frameDataOut);
+				glmDestroyFrameData(&frameDataFloor, simulationData);
+				glmDestroyFrameData(&frameDataCeil, simulationData);
+				frameDataFloor = frameDataOut;
+			}
+
 			if (history) glmDestroyHistory(&history);
 			if (entityTransforms) glmDestroyEntityTransforms(&entityTransforms, entityTransformCount);
 			if (entityExclusions) glmDestroyEntityExclusionList(&entityExclusions);
 			
 			_simulationData.append(simulationData);
-			_frameData.append(frameData);
+			_frameData.append(frameDataFloor);
 			
 		}
 	}
@@ -963,7 +1049,7 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 	_cameraMargin = pblock2->GetFloat(pb_camera_margin, t);
 
 	// vray
-	_frameOffset = pblock2->GetInt(pb_frame_offset, t);
+	_frameOffset = pblock2->GetFloat(pb_fframe_offset, t);
 	_defaultMaterial = getStrParam(pblock2, pb_default_material, t);
 	_displayPercent = pblock2->GetFloat(pb_display_percentage, t);
 	_geometryTag = pblock2->GetInt(pb_geometry_tag, t);
@@ -1182,12 +1268,13 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 	}
 
 	// check dependency files
+	float currentFrame, frameMin, frameMax, interpolateFactor;
+	getCurrentFrame(t, currentFrame, frameMin, frameMax, interpolateFactor);
+
 	FindPluginOfTypeCallback pluginCallback(CROWDVRAYPLUGINID);
 	_vrayScene->enumPlugins(&pluginCallback);
 	if (pluginCallback._foundPlugins.length())
 	{
-		int frameOffset(0); // Todo
-		
 		// per crowdField
 		VR::VRayPluginParameter* currentParam = NULL;
 		CStr crowdField, cacheName, cacheDir, characterFiles;
@@ -1203,27 +1290,41 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 			currentParam = pluginCallback._foundPlugins[0]->getParameter("characterFiles");
 			if (currentParam) characterFiles = currentParam->getString();
 
-			int currentFrame = (int)((float)t / (float)TIME_TICKSPERSEC * (float)GetFrameRate()) + frameOffset; 
-			CStr currentFrameStr; currentFrameStr.printf("%i", currentFrame);
 			
 			MaxSDK::Array<CStr> crowdFields;
 			splitStr(crowdField, ';', crowdFields);
 			for (size_t iCf=0, nbCf=crowdFields.length(); iCf<nbCf; ++iCf)
 			{
-			// caa
+				// caa
 				CStr caaName (cacheDir + "/" + cacheName + "." + crowdFields[iCf] + ".caa");
-			if (!fileExists(caaName)) sdata.progress->warning("VRayGolaem: Error loading Crowd Assets Association file \"%s\"", caaName.data());
-			else sdata.progress->info("VRayGolaem: Crowd Assets Association file \"%s\" loaded successfully.", caaName.data());
+				if (!fileExists(caaName)) sdata.progress->warning("VRayGolaem: Error loading Crowd Assets Association file \"%s\"", caaName.data());
+				else sdata.progress->info("VRayGolaem: Crowd Assets Association file \"%s\" loaded successfully.", caaName.data());
 
-			// gscs
+				// gscs
 				CStr gscsName (cacheDir + "/" + cacheName + "." + crowdFields[iCf] + ".gscs");
-			if (!fileExists(gscsName)) sdata.progress->warning("VRayGolaem: Error loading Simulation Cache file \"%s\"", gscsName.data());
-			else sdata.progress->info("VRayGolaem: Simulation Cache file \"%s\" loaded successfully.", gscsName.data());
+				if (!fileExists(gscsName)) sdata.progress->warning("VRayGolaem: Error loading Simulation Cache file \"%s\"", gscsName.data());
+				else sdata.progress->info("VRayGolaem: Simulation Cache file \"%s\" loaded successfully.", gscsName.data());
 
-			// gscf
-				CStr gscfName (cacheDir + "/" + cacheName + "." + crowdFields[iCf] + "." + currentFrameStr +".gscf");
-			if (!fileExists(gscfName)) sdata.progress->warning("VRayGolaem: Error loading Simulation Cache file \"%s\"", gscfName.data());
-			else sdata.progress->info("VRayGolaem: Simulation Cache file \"%s\" loaded successfully.", gscfName.data());
+				// gscf
+				if (frameMin == frameMax)
+				{
+					CStr currentFrameStr; currentFrameStr.printf("%i", (int)currentFrame);
+					CStr gscfName(cacheDir + "/" + cacheName + "." + crowdFields[iCf] + "." + currentFrameStr + ".gscf");
+					if (!fileExists(gscfName)) sdata.progress->warning("VRayGolaem: Error loading Simulation Cache file \"%s\"", gscfName.data());
+					else sdata.progress->info("VRayGolaem: Simulation Cache file \"%s\" loaded successfully.", gscfName.data());
+				}
+				else
+				{
+					CStr currentFrameStr; currentFrameStr.printf("%i", (int)frameMin);
+					CStr gscfName(cacheDir + "/" + cacheName + "." + crowdFields[iCf] + "." + currentFrameStr + ".gscf");
+					if (!fileExists(gscfName)) sdata.progress->warning("VRayGolaem: Error loading Simulation Cache file \"%s\"", gscfName.data());
+					else sdata.progress->info("VRayGolaem: Simulation Cache file \"%s\" loaded successfully.", gscfName.data());
+
+					currentFrameStr.printf("%i", (int)frameMin);
+					gscfName = (cacheDir + "/" + cacheName + "." + crowdFields[iCf] + "." + currentFrameStr + ".gscf");
+					if (!fileExists(gscfName)) sdata.progress->warning("VRayGolaem: Error loading Simulation Cache file \"%s\"", gscfName.data());
+					else sdata.progress->info("VRayGolaem: Simulation Cache file \"%s\" loaded successfully.", gscfName.data());
+				}
 			}
 
 			// character files
@@ -1422,7 +1523,7 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			currentParam = plugin->getParameter("geometryTag");
 			if (currentParam) pblock2->SetValue(pb_geometry_tag, 0, currentParam->getInt());
 			currentParam = plugin->getParameter("frameOffset");
-			if (currentParam) pblock2->SetValue(pb_frame_offset, 0, currentParam->getInt());
+			if (currentParam) pblock2->SetValue(pb_fframe_offset, 0, currentParam->getFloat());
 			currentParam = plugin->getParameter("defaultMaterial");
 			if (currentParam)
 			{
