@@ -295,6 +295,17 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE,  0, &vrayGolaemClassDesc,
 	p_ui, TYPE_SINGLECHEKBOX, ED_INSTANCINGENABLE,
 	PB_END,
 
+	// time override attributes
+	pb_frame_override_enable, _T("frame_override_enable"), TYPE_BOOL, P_RESET_DEFAULT, 0,
+	p_default, FALSE,
+	p_ui, TYPE_SINGLECHEKBOX, ED_FRAMEOVERRIDEENABLE,
+	PB_END,
+	pb_frame_override, _T("frame_override"), TYPE_FLOAT, P_RESET_DEFAULT + P_ANIMATABLE, 0,
+	p_default, 0.f,
+	p_range, -BIGFLOAT, BIGFLOAT,
+	p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_FRAMEOVERRIDE, ED_FRAMEOVERRIDESPIN, 1.f,
+	PB_END,
+
 	// not used anymore but kept for retrocomp
 	pb_frame_offset, _T(""), TYPE_INT, 0, 0, PB_END,
 	pb_display_percent, _T(""), TYPE_INT, 0, 0, PB_END,
@@ -416,6 +427,7 @@ RefResult VRayGolaem::NotifyRefChanged(NOTIFY_REF_CHANGED_ARGS) {
 				ParamID paramID=pblock2->LastNotifyParamID();
 				switch (paramID) {
 					case pb_frustum_enable:
+					case pb_frame_override_enable:
 						grayDlgControls();
 						break;
 				}
@@ -620,6 +632,9 @@ void VRayGolaem::grayDlgControls(void) {
 	map->Enable(pb_frustum_margin, fcull);
 	map->Enable(pb_camera_margin, fcull);
 
+	int foverride = pblock2->GetInt(pb_frame_override_enable);
+	map->Enable(pb_frame_override, foverride);
+
 	EnableWindow(GetDlgItem(hWnd, ST_CULLFRUSTUM), fcull);
 	EnableWindow(GetDlgItem(hWnd, ST_CULLCAMERA), fcull);
 }
@@ -687,12 +702,34 @@ void VRayGolaemDlgProc::chooseFileName(IParamBlock2 *pblock2, ParamID paramID, c
 }
 
 //************************************************************
-// Draw
+// Time
 //************************************************************
 
-void VRayGolaem::getCurrentFrame(const TimeValue t, float &currentFrame, float& frameMin, float& frameMax, float& factor)
+//------------------------------------------------------------
+// getCurrentFrame
+//------------------------------------------------------------
+float VRayGolaem::getCurrentFrame(const TimeValue t) const
 {
-	currentFrame = ((float)t / (float)TIME_TICKSPERSEC * (float)GetFrameRate()) + _frameOffset;
+	return ((float)t / (float)TIME_TICKSPERSEC * (float)GetFrameRate());
+}
+
+//------------------------------------------------------------
+// getCurrentFrameOffset
+//------------------------------------------------------------
+float VRayGolaem::getCurrentFrameOffset(const TimeValue t) const
+{
+	float frameOffset = _frameOffset;
+	if (_frameOverrideEnable) frameOffset += _frameOverride - getCurrentFrame(t);
+	return frameOffset;
+}
+
+//------------------------------------------------------------
+// getNodeCurrentFrame
+//------------------------------------------------------------
+void VRayGolaem::getNodeCurrentFrame(const TimeValue t, float &currentFrame, float& frameMin, float& frameMax, float& factor) const
+{
+	currentFrame = getCurrentFrame(t) + getCurrentFrameOffset(t);
+
 	frameMin = floor(currentFrame);
 	frameMax = ceil(currentFrame);
 	if (fabs(frameMin - currentFrame) <= 0.001f)
@@ -727,6 +764,7 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
 	}
 	_simulationData.removeAll();
 	_frameData.removeAll();
+	_exclusionData.removeAll();
 
 	// update params
 	updateVRayParams(t);
@@ -739,7 +777,7 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
 	{
 		// find the current frame
 		float currentFrame, frameMin, frameMax, interpolateFactor;
-		getCurrentFrame(t, currentFrame, frameMin, frameMax, interpolateFactor);
+		getNodeCurrentFrame(t, currentFrame, frameMin, frameMax, interpolateFactor);
 		
 		// read caches
 		for (size_t iCf=0, nbCf=crowdFields.length(); iCf<nbCf; ++iCf)
@@ -1050,6 +1088,8 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 
 	// vray
 	_frameOffset = pblock2->GetFloat(pb_fframe_offset, t);
+	_frameOverrideEnable = pblock2->GetInt(pb_frame_override_enable, t) == 1;
+	_frameOverride = pblock2->GetFloat(pb_frame_override, t);
 	_defaultMaterial = getStrParam(pblock2, pb_default_material, t);
 	_displayPercent = pblock2->GetFloat(pb_display_percentage, t);
 	_geometryTag = pblock2->GetInt(pb_geometry_tag, t);
@@ -1207,7 +1247,7 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 			GET_MBCS(node->GetName(), nodeName);
 			CStr outputPathStr(outputDir + "/" + _cacheName + "." + nodeName + ".vrscene");
 			VR::CharString vrSceneExportPath(outputPathStr); // TODO
-			if (!writeCrowdVRScene(vrSceneExportPath)) 
+			if (!writeCrowdVRScene(t, vrSceneExportPath)) 
 			{
 				sdata.progress->warning("VRayGolaem: Error writing .vrscene file \"%s\"", vrSceneExportPath.ptr());
 			}
@@ -1269,7 +1309,7 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 
 	// check dependency files
 	float currentFrame, frameMin, frameMax, interpolateFactor;
-	getCurrentFrame(t, currentFrame, frameMin, frameMax, interpolateFactor);
+	getNodeCurrentFrame(t, currentFrame, frameMin, frameMax, interpolateFactor);
 
 	FindPluginOfTypeCallback pluginCallback(CROWDVRAYPLUGINID);
 	_vrayScene->enumPlugins(&pluginCallback);
@@ -1597,7 +1637,7 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 //------------------------------------------------------------
 // writeCrowdVRScene: get the node attributes to create a crowd .vrscene
 //------------------------------------------------------------
-bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file) 
+bool VRayGolaem::writeCrowdVRScene(TimeValue t, const VR::CharString& file)
 {
 	// check if this object is not an instance (then it has no max node to query)
 	INode* inode=getNode(this);
@@ -1608,7 +1648,7 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 		return false;
 	}
 	GET_MBCS(inode->GetName(), nodeName);
-	Matrix3 transform = inode->GetObjectTM(0) * maxToGolaem();
+	Matrix3 transform = inode->GetObjectTM(t) * maxToGolaem();
 	
 	// check file path
 	std::stringstream outputStr;
@@ -1620,7 +1660,7 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 	CStr correctedCacheName(_cacheName);
 	convertToValidVrsceneName(_cacheName, correctedCacheName);
 
-		// node
+	// node
 	outputStr << std::endl;
 	outputStr << "Node " << correctedCacheName << nodeName << "@node" << std::endl;
 	outputStr << "{" << std::endl;
@@ -1636,7 +1676,7 @@ bool VRayGolaem::writeCrowdVRScene(const VR::CharString& file)
 														   "Vector("<< transform.GetRow(1)[0] <<", "<< transform.GetRow(1)[1] <<", "<< transform.GetRow(1)[2] <<")," <<
 														   "Vector("<< transform.GetRow(2)[0] <<", "<< transform.GetRow(2)[1] <<", "<< transform.GetRow(2)[2] <<"))," << 
 														   "Vector("<< transform.GetRow(3)[0] <<", "<< transform.GetRow(3)[1] <<", "<< transform.GetRow(3)[2] <<"));" << std::endl;
-	outputStr << "\t" << "frameOffset="<< _frameOffset <<";" << std::endl;
+	outputStr << "\t" << "frameOffset="<< getCurrentFrameOffset(t) <<";" << std::endl;
 	outputStr << "\t" << "crowdField=\"" << _crowdFields << "\";" << std::endl;
 	outputStr << "\t" << "cacheName=\"" << _cacheName << "\";" << std::endl;
 	outputStr << "\t" << "cacheFileDir=\"" << _cacheDir << "\";" << std::endl;

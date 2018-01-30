@@ -88,6 +88,9 @@ enum param_list{
 	pb_terrain_file,
 	pb_geometry_tag,
 	pb_fframe_offset,
+	// time override
+	pb_frame_override_enable,
+	pb_frame_override,
 };
 
 //************************************************************
@@ -204,6 +207,8 @@ class VRayGolaem
 
 	// Vray attributes
 	float _frameOffset;
+	bool _frameOverrideEnable;
+	float _frameOverride;
 	int _objectIDBase;
 	short _objectIDMode;
 	float _displayPercent;
@@ -309,7 +314,9 @@ public:
 	//////////////////////////////////////////
 	// Draw
 	//////////////////////////////////////////
-	void getCurrentFrame(const TimeValue t, float &currentFrame, float& frameMin, float& frameMax, float& factor);
+	float getCurrentFrame(const TimeValue t) const;
+	float getCurrentFrameOffset(const TimeValue t) const;
+	void getNodeCurrentFrame(const TimeValue t, float &currentFrame, float& frameMin, float& frameMax, float& factor) const;
 	void readGolaemCache(const Matrix3& transform, TimeValue t);
 	void draw(TimeValue t, INode *node, ViewExp *vpt);
 	void drawEntities(GraphicsWindow *gw, const Matrix3& transform, TimeValue t);
@@ -319,7 +326,7 @@ public:
 	//////////////////////////////////////////
 protected:
 	bool readCrowdVRScene(const VR::CharString& file);
-	bool writeCrowdVRScene(const VR::CharString& file);
+	bool writeCrowdVRScene(TimeValue t, const VR::CharString& file);
 
 public:
 	//////////////////////////////////////////
