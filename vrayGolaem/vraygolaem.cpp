@@ -1225,17 +1225,20 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 	VR::VRayRenderer *vray=static_cast<VR::VRayRenderer*>(_vray);
 	VRenderObject::renderBegin(t, vray);
 
-	updateVRayParams(t);
-
-	const VR::VRaySequenceData &sdata=vray->getSequenceData();
-
-	VRenderPluginRendererInterface *pluginRenderer = queryInterface<VRenderPluginRendererInterface>(vray, EXT_VRENDER_PLUGIN_RENDERER);
-	pluginRenderer->registerPlugin(wrapperMaterialDesc);
-	pluginRenderer->registerPlugin(golaemWrapperMaterialDesc);
+	VRenderPluginRendererInterface *pluginRenderer =
+		queryInterface<VRenderPluginRendererInterface>(vray, EXT_VRENDER_PLUGIN_RENDERER);
 	vassert(pluginRenderer);
 
+	pluginRenderer->registerPlugin(wrapperMaterialDesc);
+	pluginRenderer->registerPlugin(golaemWrapperMaterialDesc);
+
+	updateVRayParams(t);
+
+#if 0
 	PluginManager *plugMan = pluginRenderer->getPluginManager();
 	vassert(plugMan);
+
+	const VR::VRaySequenceData &sdata=vray->getSequenceData();
 
 	// Creates the crowd .vrscene file on the fly if required
 	VR::CharString vrSceneFileToLoad(_vrsceneFile);
@@ -1381,6 +1384,7 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 	{
 		sdata.progress->warning("VRayGolaem: No GolaemCrowd node found in the current scene");
 	}
+#endif
 }
 
 void VRayGolaem::renderEnd(VR::VRayCore *_vray) 
@@ -1421,7 +1425,10 @@ VR::VRenderInstance* VRayGolaem::newRenderInstance(INode* inode, VR::VRayCore *v
 			sdata.progress->debug("VRayGolaem: newRenderInstance() for node \"%s\"", nodeName_mbcs);
 		}
 	}
+
 	VRayGolaemInstanceBase *golaemInstance=new VRayGolaemInstanceBase(this, inode, vray, renderID);
+	golaemInstance->newVRayPlugin(*vray);
+
 	return golaemInstance;
 }
 
