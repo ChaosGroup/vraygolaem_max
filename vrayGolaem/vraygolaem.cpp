@@ -1234,11 +1234,18 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 
 	updateVRayParams(t);
 
+	const VR::VRaySequenceData &sdata=vray->getSequenceData();
+
+	// Create wrapper plugins for all 3ds Max materials in the scene, so that the Golaem plugin can use them, if needed
+	if (sdata.progress) {
+		sdata.progress->info("VRayGolaem: Create materials attached to the VRayGolaem node");
+	}
+
+	createMaterials(vray);
+
 #if 0
 	PluginManager *plugMan = pluginRenderer->getPluginManager();
 	vassert(plugMan);
-
-	const VR::VRaySequenceData &sdata=vray->getSequenceData();
 
 	// Creates the crowd .vrscene file on the fly if required
 	VR::CharString vrSceneFileToLoad(_vrsceneFile);
@@ -1275,9 +1282,6 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *_vray)
 	int prevNbPlugins(plugMan->enumPlugins(NULL));
 	int newNbPlugins(prevNbPlugins);
 
-	// Create wrapper plugins for all 3ds Max materials in the scene, so that the Golaem plugin can use them, if needed
-	sdata.progress->info("VRayGolaem: Create materials attached to the VRayGolaem node");
-	createMaterials(vray);
 	newNbPlugins=plugMan->enumPlugins(NULL);
 	sdata.progress->info("VRayGolaem: Materials created successfully, %i materials created", newNbPlugins-prevNbPlugins);
 	prevNbPlugins = newNbPlugins;
