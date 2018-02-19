@@ -1125,7 +1125,7 @@ void VRayGolaem::wrapMaterial(VUtils::VRayCore *vray, Mtl *mtl) {
 	if (!mtl)
 		return;
 
-	VR::VRenderMtl *vrenderMtl=VR::getVRenderMtl(mtl, static_cast<VR::VRayRenderer*>(vray));
+	VR::VRenderMtl *vrenderMtl=VR::getVRenderMtl(mtl);
 	if (!vrenderMtl)
 		return; // Material is not V-Ray compatible, can't do anything.
 
