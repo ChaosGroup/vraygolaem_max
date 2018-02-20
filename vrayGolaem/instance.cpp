@@ -11,7 +11,7 @@
 
 using namespace VUtils;
 
-static const PluginID GolaemMeshInstance_PluginID(LARGE_CONST(2016071298));
+static const PluginID GolaemMeshInstance_PluginID(LARGE_CONST(2011070866));
 static Interval validForever(FOREVER);
 
 VRayGolaemInstance::VRayGolaemInstance(VRayGolaem &vrayGolaem, INode *node, VRayCore *vray, int renderID)
@@ -33,14 +33,13 @@ static Transform getTransform(INode *inode, TimeValue t)
 
 void VRayGolaemInstance::frameBegin(TimeValue t, VRayCore *vray)
 {
-	vassert(vrayGolaem);
-
 	VRenderInstance::frameBegin(t, vray);
-	vrayGolaem.updateVRayParams(t);
 
 	// Could be NULL if plugin DSO was not found.
 	if (!paramTransform || !paramFrameOffset)
 		return;
+
+	vrayGolaem.updateVRayParams(t);
 
 	TimeConversionRAII timeConversion(*vray);
 	const double time = vray->getFrameData().t;
@@ -62,6 +61,8 @@ void VRayGolaemInstance::frameBegin(TimeValue t, VRayCore *vray)
 
 void VRayGolaemInstance::newVRayPlugin(VRayCore &vray)
 {
+	const VRaySequenceData &sdata = vray.getSequenceData();
+
 	VRenderPluginRendererInterface *pluginRenderer =
 		queryInterface<VRenderPluginRendererInterface>(vray, EXT_VRENDER_PLUGIN_RENDERER);
 	vassert(pluginRenderer);
@@ -80,7 +81,9 @@ void VRayGolaemInstance::newVRayPlugin(VRayCore &vray)
 	VRayPlugin *vrayGolaemPlugin =
 		pluginRenderer->newPlugin(GolaemMeshInstance_PluginID, correctedCacheName.data());
 	if (!vrayGolaemPlugin) {
-		// XXX: Print some error.
+		if (sdata.progress) {
+			sdata.progress->error("VRayGolaemInstance: Failed to create GolaemCrowd plugin instance!");
+		}
 		return;
 	}
 
