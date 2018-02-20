@@ -170,7 +170,7 @@ class VRayGolaem
 	, public VR::VRenderObject
 	, public ObjectIDWrapperInterface
 {
-	friend class VRayGolaemInstanceBase;
+	friend class VRayGolaemInstance;
 	friend class VRayGolaemDlgProc;
 
 	//////////////////////////////////////////

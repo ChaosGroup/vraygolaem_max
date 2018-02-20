@@ -14,7 +14,7 @@ using namespace VUtils;
 static const PluginID GolaemMeshInstance_PluginID(LARGE_CONST(2016071298));
 static Interval validForever(FOREVER);
 
-VRayGolaemInstanceBase::VRayGolaemInstanceBase(VRayGolaem *vrayGolaem, INode *node, VRayCore *vray, int renderID)
+VRayGolaemInstance::VRayGolaemInstance(VRayGolaem *vrayGolaem, INode *node, VRayCore *vray, int renderID)
 	: vrayGolaem(vrayGolaem)
 	, animatedTransform(NULL)
 	, animatedFrameOffset(NULL)
@@ -31,7 +31,7 @@ static Transform getTransform(INode *inode, TimeValue t)
 	return toTransform(inode->GetObjectTM(t, &validForever) * maxToGolaem());
 }
 
-void VRayGolaemInstanceBase::frameBegin(TimeValue t, VRayCore *vray)
+void VRayGolaemInstance::frameBegin(TimeValue t, VRayCore *vray)
 {
 	vassert(vrayGolaem);
 
@@ -60,7 +60,7 @@ void VRayGolaemInstanceBase::frameBegin(TimeValue t, VRayCore *vray)
 	settableFrameOffset->setFloat(frameOffset, 0, time);
 }
 
-void VRayGolaemInstanceBase::newVRayPlugin(VRayCore &vray)
+void VRayGolaemInstance::newVRayPlugin(VRayCore &vray)
 {
 	VRenderPluginRendererInterface *pluginRenderer =
 		queryInterface<VRenderPluginRendererInterface>(vray, EXT_VRENDER_PLUGIN_RENDERER);

@@ -2,7 +2,8 @@
 // Copyright (C) Chaos Group & Golaem S.A. - All Rights Reserved.
 //
 
-#pragma once
+#ifndef __VRAY_GOLAEM_INSTANCE_H__
+#define __VRAY_GOLAEM_INSTANCE_H__
 
 #pragma warning(push)
 #pragma warning(disable: 4840)
@@ -17,11 +18,11 @@
 
 class VRayGolaem;
 
-struct VRayGolaemInstanceBase
+struct VRayGolaemInstance
 	: VUtils::VRenderInstance
 {
-	VRayGolaemInstanceBase(VRayGolaem *vrayGolaem, INode *node, VUtils::VRayCore *vray, int renderID);
-	virtual ~VRayGolaemInstanceBase() {}
+	VRayGolaemInstance(VRayGolaem *vrayGolaem, INode *node, VUtils::VRayCore *vray, int renderID);
+	virtual ~VRayGolaemInstance() {}
 
 	/// Adds new GolaemCrowd plugin instance.
 	/// @param vray V-Ray renderer instance for getting EXT_VRENDER_PLUGIN_RENDERER.
@@ -48,3 +49,5 @@ private:
 	/// Dummy 3dsmax mesh.
 	Mesh dummyMesh;
 };
+
+#endif // __VRAY_GOLAEM_INSTANCE_H__
