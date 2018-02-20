@@ -1466,7 +1466,7 @@ VR::VRenderInstance* VRayGolaem::newRenderInstance(INode* inode, VR::VRayCore *v
 		sdata.progress->debug("VRayGolaem: newRenderInstance() for node \"%s\"", nodeName_mbcs);
 	}
 
-	VRayGolaemInstance *golaemInstance=new VRayGolaemInstance(this, inode, vray, renderID);
+	VRayGolaemInstance *golaemInstance=new VRayGolaemInstance(*this, inode, vray, renderID);
 	golaemInstance->newVRayPlugin(*vray);
 
 	return golaemInstance;

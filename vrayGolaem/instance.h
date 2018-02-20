@@ -21,7 +21,7 @@ class VRayGolaem;
 struct VRayGolaemInstance
 	: VUtils::VRenderInstance
 {
-	VRayGolaemInstance(VRayGolaem *vrayGolaem, INode *node, VUtils::VRayCore *vray, int renderID);
+	VRayGolaemInstance(VRayGolaem &vrayGolaem, INode *node, VUtils::VRayCore *vray, int renderID);
 	virtual ~VRayGolaemInstance() {}
 
 	/// Adds new GolaemCrowd plugin instance.
@@ -42,9 +42,12 @@ struct VRayGolaemInstance
 	void GetCamVerts(int /*fnum*/, Point3 /*cp*/[3]) VRAY_OVERRIDE {}
 
 private:
-	VRayGolaem *vrayGolaem;
-	VUtils::VRayPluginParameter *animatedTransform;
-	VUtils::VRayPluginParameter *animatedFrameOffset;
+	/// Object ref.
+	VRayGolaem &vrayGolaem;
+
+	/// Plugin parameters for update in frameBegin()
+	VUtils::VRayPluginParameter *paramTransform;
+	VUtils::VRayPluginParameter *paramFrameOffset;
 
 	/// Dummy 3dsmax mesh.
 	Mesh dummyMesh;
