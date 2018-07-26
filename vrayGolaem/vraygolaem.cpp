@@ -1093,7 +1093,12 @@ void VRayGolaem::drawEntities(GraphicsWindow* gw, const Matrix3& transform, Time
     // draw
     _nodeBbox.Init();
 
-    float transformScale(transform.GetRow(0).Length());
+    // rescale the display according to unit because cache is in golaem units
+    double unitScale = 1 / GetMasterScale(getCrowdUnit());
+    Matrix3 displayTransform = transform;
+    displayTransform.Scale(Point3(unitScale, unitScale, unitScale), TRUE);
+
+    float transformScale(displayTransform.GetRow(0).Length());
     for (size_t iData = 0, nbData = _simulationData.length(); iData < nbData; ++iData)
     {
         int maxDisplayedEntity = (int)(_simulationData[iData]->_entityCount * displayPercent / 100.f);
@@ -1106,15 +1111,15 @@ void VRayGolaem::drawEntities(GraphicsWindow* gw, const Matrix3& transform, Time
                 continue;
 
             unsigned int entityType = _simulationData[iData]->_entityTypes[iEntity];
-            float entityRadius = _simulationData[iData]->_entityRadius[iEntity] * transformScale;
-            float entityHeight = _simulationData[iData]->_entityHeight[iEntity] * transformScale;
-            if (_simulationData[iData]->_boneCount[entityType])
+            if (_simulationData[iData]->_boneCount[entityType] > 0)
             {
+                float entityRadius = _simulationData[iData]->_entityRadius[iEntity] * transformScale;
+                float entityHeight = _simulationData[iData]->_entityHeight[iEntity] * transformScale;
                 // draw bbox
                 unsigned int iBoneIndex = _simulationData[iData]->_iBoneOffsetPerEntityType[entityType] + _simulationData[iData]->_indexInEntityType[iEntity] * _simulationData[iData]->_boneCount[entityType];
                 Point3 entityPosition(_frameData[iData]->_bonePositions[iBoneIndex][0], _frameData[iData]->_bonePositions[iBoneIndex][1], _frameData[iData]->_bonePositions[iBoneIndex][2]);
                 // axis transformation for max
-                entityPosition = entityPosition * transform;
+                entityPosition = entityPosition * displayTransform;
                 Box3 entityBbox(Point3(entityPosition[0] - entityRadius, entityPosition[1] - entityRadius, entityPosition[2]), Point3(entityPosition[0] + entityRadius, entityPosition[1] + entityRadius, entityPosition[2] + entityHeight));
                 drawBBox(gw, entityBbox); // update node bbox
                 _nodeBbox += entityBbox;
@@ -1667,10 +1672,6 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
                 VR::TraceTransform t = currentParam->getTransform();
                 Matrix3 transform(Point3(1, 0, 0), Point3(0, 1, 0), Point3(0, 0, 1), Point3(t.offs[0], t.offs[1], t.offs[2]));
 
-                // scale according to scene unit
-                double scaleRatio(1. / GetMasterScale(getCrowdUnit()));
-                transform.Scale(Point3(scaleRatio, scaleRatio, scaleRatio), true);
-
                 // axis change between max and maya
                 transform = transform * golaemToMax();
 
@@ -1867,6 +1868,8 @@ bool VRayGolaem::writeCrowdVRScene(TimeValue t, const VR::CharString& file)
     CStr correctedCacheName(_cacheName);
     convertToValidVrsceneName(_cacheName, correctedCacheName);
 
+    double unitScale = 1 / GetMasterScale(getCrowdUnit());
+
     // node
     outputStr << std::endl;
     outputStr << "Node " << correctedCacheName << nodeName << "@node" << std::endl;
@@ -1882,6 +1885,8 @@ bool VRayGolaem::writeCrowdVRScene(TimeValue t, const VR::CharString& file)
 
     outputStr << "GolaemCrowd " << correctedCacheName << nodeName << "@mesh1" << std::endl;
     outputStr << "{" << std::endl;
+    outputStr << "\t"
+              << "geoScale=" << unitScale << ";" << std::endl;
     outputStr << "\t"
               << "proxyMatrix=Transform(Matrix(Vector(" << transform.GetRow(0)[0] << ", " << transform.GetRow(0)[1] << ", " << transform.GetRow(0)[2] << "),"
               << "Vector(" << transform.GetRow(1)[0] << ", " << transform.GetRow(1)[1] << ", " << transform.GetRow(1)[2] << "),"
