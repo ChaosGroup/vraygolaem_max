@@ -205,6 +205,9 @@ class VRayGolaem
 	float _frustumMargin;
 	float _cameraMargin;
 
+	// transform attributes
+	float _geoScale;
+
 	// Vray attributes
 	float _frameOffset;
 	bool _frameOverrideEnable;
@@ -219,9 +222,6 @@ class VRayGolaem
 	bool _visibleInReflections;
 	bool _visibleInRefractions;
 	CStr _defaultMaterial;
-
-	// Output attributes
-	CStr _tempVRSceneFileDir;
 
 	// Internal attributes
 	MaxSDK::Array<GlmSimulationData*> _simulationData;
@@ -326,7 +326,6 @@ public:
 	//////////////////////////////////////////
 protected:
 	bool readCrowdVRScene(const VR::CharString& file);
-	bool writeCrowdVRScene(TimeValue t, const VR::CharString& file);
 
 public:
 	//////////////////////////////////////////

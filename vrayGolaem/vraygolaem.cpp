@@ -957,7 +957,12 @@ void VRayGolaem::drawEntities(GraphicsWindow *gw, const Matrix3& transform, Time
 	// draw
 	_nodeBbox.Init();
 	
-	float transformScale(transform.GetRow(0).Length());
+	// rescale the display according to unit because cache is in golaem units
+	double unitScale = 1 / GetMasterScale(getCrowdUnit());
+	Matrix3 displayTransform = transform;
+	displayTransform.Scale(Point3(unitScale, unitScale, unitScale), TRUE);
+
+	float transformScale(displayTransform.GetRow(0).Length());
 	for (size_t iData=0, nbData=_simulationData.length(); iData<nbData; ++iData)
 	{
 		int maxDisplayedEntity = (int)(_simulationData[iData]->_entityCount * displayPercent / 100.f);
@@ -968,15 +973,16 @@ void VRayGolaem::drawEntities(GraphicsWindow *gw, const Matrix3& transform, Time
 			if (_exclusionData.contains(entityId)) continue;
 
 			unsigned int entityType = _simulationData[iData]->_entityTypes[iEntity];
-			float entityRadius = _simulationData[iData]->_entityRadius[iEntity] * transformScale;
-			float entityHeight = _simulationData[iData]->_entityHeight[iEntity] * transformScale;
-			if(_simulationData[iData]->_boneCount[entityType])
+			if (_simulationData[iData]->_boneCount[entityType])
 			{
+				float entityRadius = _simulationData[iData]->_entityRadius[iEntity] * transformScale;
+				float entityHeight = _simulationData[iData]->_entityHeight[iEntity] * transformScale;
+
 				// draw bbox
 				unsigned int iBoneIndex = _simulationData[iData]->_iBoneOffsetPerEntityType[entityType] + _simulationData[iData]->_indexInEntityType[iEntity] * _simulationData[iData]->_boneCount[entityType];
 				Point3 entityPosition(_frameData[iData]->_bonePositions[iBoneIndex][0], _frameData[iData]->_bonePositions[iBoneIndex][1], _frameData[iData]->_bonePositions[iBoneIndex][2]);
 				// axis transformation for max
-				entityPosition = entityPosition * transform;
+				entityPosition = entityPosition * displayTransform;
 				Box3 entityBbox(Point3(entityPosition[0]-entityRadius, entityPosition[1]-entityRadius, entityPosition[2]), Point3(entityPosition[0]+entityRadius, entityPosition[1]+entityRadius, entityPosition[2]+entityHeight));
 				drawBBox(gw, entityBbox); // update node bbox
 				_nodeBbox += entityBbox;
@@ -1086,6 +1092,9 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 	_frustumMargin = pblock2->GetFloat(pb_frustum_margin, t);
 	_cameraMargin = pblock2->GetFloat(pb_camera_margin, t);
 
+	// transform
+	_geoScale = 1 / GetMasterScale(getCrowdUnit());
+
 	// vray
 	_frameOffset = pblock2->GetFloat(pb_fframe_offset, t);
 	_frameOverrideEnable = pblock2->GetInt(pb_frame_override_enable, t) == 1;
@@ -1115,9 +1124,6 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 
 	if (!vrayReflVisibility) _visibleInReflections=false;
 	if (!vrayRefrVisibility) _visibleInRefractions=false;
-
-	// output
-	_tempVRSceneFileDir = getStrParam(pblock2, pb_temp_vrscene_file_dir, t, "TEMP");
 }
 
 
@@ -1135,30 +1141,6 @@ void VRayGolaem::wrapMaterial(VUtils::VRayCore *vray, Mtl *mtl) {
 
 	wrapper->setMaxMtl(mtl, vrenderMtl, this);
 }
-
-/*
-void VRayGolaem::wrapMaterial(VUtils::VRayCore *vray, Mtl *mtl)
-{
-	if (!mtl)
-		return;
-
-	VRenderPluginRendererInterface *pluginRenderer = queryInterface<VRenderPluginRendererInterface>(vray, EXT_VRENDER_PLUGIN_RENDERER);
-	vassert(pluginRenderer);
-
-#pragma warning( push )
-#pragma warning( disable : 4996) // avoid deprecated warning
-	VUtils::VRenderMtl *vrenderMtl = VUtils::getVRenderMtl(mtl, static_cast<VR::VRayRenderer*>(vray));
-#pragma warning( pop )
-
-	if (!vrenderMtl) return; // Material is not V-Ray compatible, can't do anything.
-
-	GET_MBCS(mtl->GetName(), mtlName);
-	BRDFWrapper *wrapper = static_cast<BRDFWrapper*>(static_cast<PluginBase*>(pluginRenderer->newPlugin(MTL_WRAPPER_VRAY_ID, mtlName)));
-	if (!wrapper) return;
-		
-	wrapper->setMaxMtl(mtl, vrenderMtl, this);
-}
-*/
 
 void VRayGolaem::enumMaterials(VUtils::VRayCore *vray, Mtl *mtl) {
 	if (!mtl || mtl->SuperClassID()!=MATERIAL_CLASS_ID)
@@ -1532,10 +1514,6 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 			{
 				VR::TraceTransform t = currentParam->getTransform();
 				Matrix3 transform(Point3(1, 0, 0), Point3(0, 1, 0), Point3(0, 0, 1), Point3(t.offs[0], t.offs[1], t.offs[2]));
-				
-				// scale according to scene unit
-				double scaleRatio (1. / GetMasterScale (getCrowdUnit()));
-				transform.Scale(Point3(scaleRatio, scaleRatio, scaleRatio), true);
 
 				// axis change between max and maya
 				transform = transform * golaemToMax();
@@ -1690,89 +1668,6 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
 	delete tmpVrayScene;
 	delete tempPlugMan;
 
-	return true;
-}
-
-//------------------------------------------------------------
-// writeCrowdVRScene: get the node attributes to create a crowd .vrscene
-//------------------------------------------------------------
-bool VRayGolaem::writeCrowdVRScene(TimeValue t, const VR::CharString& file)
-{
-	// check if this object is not an instance (then it has no max node to query)
-	INode* inode=getNode(this);
-	if (inode == NULL)
-	{
-		CStr logMessage = CStr("VRayGolaem: This object is an 3ds Max instance and is not supported. Please create a copy.");
-		mprintf(logMessage.ToBSTR());
-		return false;
-	}
-	GET_MBCS(inode->GetName(), nodeName);
-	Matrix3 transform = inode->GetObjectTM(t) * maxToGolaem();
-	
-	// check file path
-	std::stringstream outputStr;
-	std::ofstream outputFileStream(file.ptr());
-	if (!outputFileStream.is_open()) return false;
-
-	// correct the name of the shader to call. When exporting a scene from Maya with Vray, some shader name special characters are replaced with not parsable character (":" => "__")
-	// to be able to find the correct shader name to call, we need to apply the same conversion to the shader names contained in the cam file
-	CStr correctedCacheName(_cacheName);
-	convertToValidVrsceneName(_cacheName, correctedCacheName);
-
-	// node
-	outputStr << std::endl;
-	outputStr << "Node " << correctedCacheName << nodeName << "@node" << std::endl;
-	outputStr << "{" << std::endl;
-	outputStr << "\t" << "transform=Transform(Matrix(Vector(1, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1)), Vector(0, 0, 0));" << std::endl;
-	outputStr << "\t" << "geometry=" << correctedCacheName << nodeName << "@mesh1;" << std::endl;
-	outputStr << "\t" << "visible=1;" << std::endl;
-	outputStr << "}" << std::endl;
-	outputStr << std::endl;
-
-	outputStr << "GolaemCrowd " << correctedCacheName << nodeName << "@mesh1" << std::endl;
-	outputStr << "{" << std::endl;
-	outputStr << "\t" << "proxyMatrix=Transform(Matrix(Vector("<< transform.GetRow(0)[0] <<", "<< transform.GetRow(0)[1] <<", "<< transform.GetRow(0)[2] <<")," << 
-														   "Vector("<< transform.GetRow(1)[0] <<", "<< transform.GetRow(1)[1] <<", "<< transform.GetRow(1)[2] <<")," <<
-														   "Vector("<< transform.GetRow(2)[0] <<", "<< transform.GetRow(2)[1] <<", "<< transform.GetRow(2)[2] <<"))," << 
-														   "Vector("<< transform.GetRow(3)[0] <<", "<< transform.GetRow(3)[1] <<", "<< transform.GetRow(3)[2] <<"));" << std::endl;
-	outputStr << "\t" << "frameOffset="<< getCurrentFrameOffset(t) <<";" << std::endl;
-	outputStr << "\t" << "crowdField=\"" << _crowdFields << "\";" << std::endl;
-	outputStr << "\t" << "cacheName=\"" << _cacheName << "\";" << std::endl;
-	outputStr << "\t" << "cacheFileDir=\"" << _cacheDir << "\";" << std::endl;
-	outputStr << "\t" << "proxyName=\"" << nodeName << "\";" << std::endl;
-	outputStr << "\t" << "characterFiles=\"" << _characterFiles << "\";" << std::endl;
-	// layout
-	outputStr << "\t" << "layoutEnable=" << _layoutEnable << ";" << std::endl;
-	outputStr << "\t" << "layoutFile=\"" << _layoutFile << "\";" << std::endl;
-	outputStr << "\t" << "terrainFile=\"" << _terrainFile << "\";" << std::endl;
-	// moblur
-	outputStr << "\t" << "motionBlurEnable=" << _mBlurEnable << ";" << std::endl;
-	if (_overMBlurWindowSize) outputStr << "\t" << "motionBlurWindowSize=" << _mBlurWindowSize << ";" << std::endl;
-	if (_overMBlurSamples) outputStr << "\t" << "motionBlurSamples=" << _mBlurSamples << ";" << std::endl;
-	// frustum culling
-	outputStr << "\t" << "frustumCullingEnable=" << _frustumEnable << ";" << std::endl;
-	outputStr << "\t" << "frustumMargin=" << _frustumMargin << ";" << std::endl;
-	outputStr << "\t" << "cameraMargin=" << _cameraMargin << ";" << std::endl;
-	// vray
-	outputStr << "\t" << "defaultMaterial=\""<< _defaultMaterial <<"\";" << std::endl;
-	outputStr << "\t" << "objectIdBase=" << _objectIDBase << ";" << std::endl;
-	outputStr << "\t" << "objectIdMode=" << _objectIDMode << ";" << std::endl;
-	outputStr << "\t" << "renderPercent=" << _displayPercent << ";" << std::endl;
-	outputStr << "\t" << "geometryTag=" << _geometryTag << ";" << std::endl;
-	outputStr << "\t" << "instancingEnable=" << _instancingEnable << ";" << std::endl;
-	outputStr << "\t" << "cameraVisibility=" << _primaryVisibility << ";" << std::endl;
-	outputStr << "\t" << "shadowsVisibility=" << _castsShadows << ";" << std::endl;
-	outputStr << "\t" << "reflectionsVisibility=" << _visibleInReflections << ";" << std::endl;
-	outputStr << "\t" << "refractionsVisibility=" << _visibleInRefractions << ";" << std::endl;
-
-	outputStr << "\t" << "dccPackage=1;" << std::endl;
-
-	outputStr << "}" << std::endl;
-	outputStr << std::endl;
-
-	// write in file
-	outputFileStream << outputStr.str();
-	outputFileStream.close();
 	return true;
 }
 

@@ -123,6 +123,7 @@ void VRayGolaemInstance::newVRayPlugin(VRayCore &vray)
 	vrayGolaemPlugin->setParameter(pluginRenderer->newFloatParam("cameraMargin", vrayGolaem._cameraMargin));
 	vrayGolaemPlugin->setParameter(pluginRenderer->newFloatParam("frustumMargin", vrayGolaem._frustumMargin));
 	vrayGolaemPlugin->setParameter(pluginRenderer->newFloatParam("renderPercent", vrayGolaem._displayPercent));
+	vrayGolaemPlugin->setParameter(pluginRenderer->newFloatParam("geoScale", vrayGolaem._geoScale));
 
 	vrayGolaemPlugin->setParameter(pluginRenderer->newStringParam("cacheFileDir", vrayGolaem._cacheDir.data()));
 	vrayGolaemPlugin->setParameter(pluginRenderer->newStringParam("cacheName", vrayGolaem._cacheName.data()));
