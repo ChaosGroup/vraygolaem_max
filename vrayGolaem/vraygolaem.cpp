@@ -1232,8 +1232,7 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *vrayCore)
 
 	const VR::VRaySequenceData &sdata = vray->getSequenceData();
 
-	VRenderPluginRendererInterface *pluginRenderer =
-		queryInterface<VRenderPluginRendererInterface>(vray, EXT_VRENDER_PLUGIN_RENDERER);
+	VRenderPluginRendererInterface *pluginRenderer = queryInterface<VRenderPluginRendererInterface>(vray, EXT_VRENDER_PLUGIN_RENDERER);
 	vassert(pluginRenderer);
 
 	pluginRenderer->registerPlugin(wrapperMaterialDesc);
@@ -1241,42 +1240,55 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore *vrayCore)
 
 	updateVRayParams(t);
 
-	// Create wrapper plugins for all 3ds Max materials in the scene,
-	// so that the Golaem plugin can use them, if needed.
-	createMaterials(vray);
-
-#if 1
+	// Load the .vrscene into the plugin manager
 	PluginManager *plugMan = pluginRenderer->getPluginManager();
 	vassert(plugMan);
-
-	// Load the .vrscene into the plugin manager
 	_vrayScene = new VR::VRayScene(plugMan);
+
+
+
+#if 1
 
 	int prevNbPlugins(plugMan->enumPlugins(NULL));
 	int newNbPlugins = prevNbPlugins;
 
-	if (_shadersFile.empty()) {
-		if (sdata.progress) {
+	// Create wrapper plugins for all 3ds Max materials in the scene,
+	// so that the Golaem plugin can use them, if needed.
+	createMaterials(vray);
+
+	newNbPlugins = plugMan->enumPlugins(NULL);
+	if (newNbPlugins != prevNbPlugins)
+	{
+		sdata.progress->info("VRayGolaem: Materials created successfully, %i materials created", newNbPlugins - prevNbPlugins);
+		prevNbPlugins = newNbPlugins;
+	}
+
+	if (_shadersFile.empty()) 
+	{
+		if (sdata.progress) 
+		{
 			sdata.progress->warning("VRayGolaem: No shaders .vrscene file specified");
 		}
 	}
-	else {
+	else 
+	{
 		const VR::ErrorCode errCode = _vrayScene->readFile(_shadersFile.ptr());
 		newNbPlugins = plugMan->enumPlugins(NULL);
-		if (errCode.error()) {
-			if (sdata.progress) {
+		if (errCode.error()) 
+		{
+			if (sdata.progress) 
+			{
 				const VR::CharString errMsg = errCode.getErrorString();
-				sdata.progress->warning("VRayGolaem: Error loading shaders .vrscene file \"%s\": %s",
-					_shadersFile.ptr(), errMsg.ptr());
+				sdata.progress->warning("VRayGolaem: Error loading shaders .vrscene file \"%s\": %s", _shadersFile.ptr(), errMsg.ptr());
 			}
 		}
-		else {
-			if (sdata.progress) {
-				sdata.progress->info("VRayGolaem: Shaders file \"%s\" loaded successfully, %i materials loaded",
-					_shadersFile.ptr(), newNbPlugins-prevNbPlugins);
+		else 
+		{
+			if (sdata.progress) 
+			{
+				sdata.progress->info("VRayGolaem: Shaders file \"%s\" loaded successfully, %i materials loaded", _shadersFile.ptr(), newNbPlugins-prevNbPlugins);
 			}
 		}
-		prevNbPlugins = newNbPlugins;
 	}
 #else
 	PluginManager *plugMan = pluginRenderer->getPluginManager();

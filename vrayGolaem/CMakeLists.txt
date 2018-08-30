@@ -46,10 +46,10 @@ else()
 
     # Install
     install (TARGETS ${TARGET_CROWD3DSMAXVRAY} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}/vrayplugins")
-    install (TARGETS ${TARGET_CROWD3DSMAXVRAY} RUNTIME DESTINATION "${3DSMAXSDK_ROOTDIR}/Plugins/vrayplugins")
+    #install (TARGETS ${TARGET_CROWD3DSMAXVRAY} RUNTIME DESTINATION "${3DSMAXSDK_ROOTDIR}/Plugins/vrayplugins")
 
     install (FILES "vraygolaem.py" DESTINATION "${CMAKE_INSTALL_PREFIX}/scripts")
-    install (FILES "vraygolaem.py" DESTINATION "${3DSMAXSDK_ROOTDIR}/scripts/Python")
+    #install (FILES "vraygolaem.py" DESTINATION "${3DSMAXSDK_ROOTDIR}/scripts/Python")
 endif()
 
 ############################################################
