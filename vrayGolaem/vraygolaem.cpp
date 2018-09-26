@@ -885,6 +885,20 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
     updateVRayParams(t);
     _updateCacheData = false;
 
+	// load gscl first
+	if (_layoutEnable)
+	{
+		_cacheFactory.loadLayoutHistoryFile(_layoutFile);
+
+		// Proxy Matrix
+		Matrix3 nodeTransformNoRot = transform * maxToGolaem();
+		float proxyArray[16];
+		float inverseProxyArray[16];
+		maxToGolaem(nodeTransformNoRot, proxyArray);
+		maxToGolaem(Inverse(nodeTransformNoRot), inverseProxyArray);
+		_cacheFactory.setSimulationProxyMatrix(proxyArray, inverseProxyArray);
+	}
+
     // read caches
     MaxSDK::Array<CStr> crowdFields;
     splitStr(_crowdFields, ';', crowdFields);
@@ -896,18 +910,17 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
         // read caches
         for (size_t iCf = 0, nbCf = crowdFields.length(); iCf < nbCf; ++iCf)
         {
-			CStr cachePrefix(_cacheDir + "/" + _cacheName + "." + crowdFields[iCf] + ".");
-			CStr srcTerrainFile(cachePrefix + "terrain.gtg");
-			if (!fileExists(srcTerrainFile))
-				srcTerrainFile = cachePrefix + "terrain.fbx";
+			CrowdTerrain::Mesh *terrainMeshSource(NULL), *terrainMeshDestination(NULL);
 
 			// load gscl first
 			if (_layoutEnable)
 			{
-				_cacheFactory.loadLayoutHistoryFile(_layoutFile);
-
 				// Terrain
-				CrowdTerrain::Mesh *terrainMeshSource(NULL), *terrainMeshDestination(NULL);
+				CStr cachePrefix(_cacheDir + "/" + _cacheName + "." + crowdFields[iCf] + ".");
+				CStr srcTerrainFile(cachePrefix + "terrain.gtg");
+				if (!fileExists(srcTerrainFile))
+					srcTerrainFile = cachePrefix + "terrain.fbx";
+
 				if (srcTerrainFile.Length())
 					terrainMeshSource = CrowdTerrain::loadTerrainAsset(srcTerrainFile);
 				if (_terrainFile.Length())
@@ -917,14 +930,6 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
 				_cacheFactory.setTerrainMeshes(terrainMeshSource, terrainMeshDestination);
 				glmRaycastClosest = RaycastClosest;
 				glmTerrainSetFrame = TerrainSetFrame;
-
-				// Proxy Matrix
-				Matrix3 nodeTransformNoRot = transform * maxToGolaem();
-				float proxyArray[16];
-				float inverseProxyArray[16];
-				maxToGolaem(nodeTransformNoRot, proxyArray);
-				maxToGolaem(Inverse(nodeTransformNoRot), inverseProxyArray);
-				_cacheFactory.setSimulationProxyMatrix(proxyArray, inverseProxyArray);
 			}
 
 			glm::crowd::CachedSimulation& cachedSimulation = _cacheFactory.getCachedSimulation(_cacheDir, _cacheName, crowdFields[iCf]);
@@ -951,6 +956,13 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
 
             _simDataToDraw.append(simData);
             _frameDataToDraw.append(frameData);
+
+			//clear terrain
+			_cacheFactory.setTerrainMeshes(NULL, NULL);
+			if(terrainMeshDestination && terrainMeshDestination!=terrainMeshSource)
+				CrowdTerrain::closeTerrainAsset(terrainMeshDestination);
+			if(terrainMeshSource)
+				CrowdTerrain::closeTerrainAsset(terrainMeshSource);
         }
     }
 }
