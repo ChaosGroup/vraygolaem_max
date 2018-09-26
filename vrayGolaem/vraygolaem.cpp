@@ -30,11 +30,6 @@
 #pragma comment(lib, "assetmanagement.lib")
 #endif
 
-#define GLMC_IMPLEMENTATION
-#define GLMC_NOT_INCLUDE_MINIZ
-#include "glm_crowd.h"    // golaem cache reader
-#include "glm_crowd_io.h" // golaem cache reader
-
 // no param block script access for VRay free
 #ifdef _FREE_
 #define _FT(X) _T("")
@@ -395,8 +390,8 @@ static ParamBlockDesc2 param_blk(params, STR_DLGTITLE, 0, &vrayGolaemClassDesc, 
 // VRayGolaem
 //------------------------------------------------------------
 VRayGolaem::VRayGolaem()
-    : _simulationData(NULL)
-    , _frameData(NULL)
+    : _simDataToDraw(NULL)
+    , _frameDataToDraw(NULL)
     , _updateCacheData(true)
 {
     static int pblockDesc_inited = false;
@@ -881,14 +876,10 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
         return;
 
     // clean previous data
-    for (size_t iData = 0, nbData = _simulationData.length(); iData < nbData; ++iData)
-    {
-        glmDestroyFrameData(&_frameData[iData], _simulationData[iData]);
-        glmDestroySimulationData(&_simulationData[iData]);
-    }
-    _simulationData.removeAll();
-    _frameData.removeAll();
-    _exclusionData.removeAll();
+	_simDataToDraw.removeAll();
+	_frameDataToDraw.removeAll();
+	_exclusionData.removeAll();
+	_cacheFactory.clear(true, true, true, true);	//is it necessary ?? Couldn't we keep the cache ?
 
     // update params
     updateVRayParams(t);
@@ -900,175 +891,66 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
     if (_cacheName.length() != 0 && _cacheDir.length() != 0)
     {
         // find the current frame
-        float currentFrame, frameMin, frameMax, interpolateFactor;
-        getNodeCurrentFrame(t, currentFrame, frameMin, frameMax, interpolateFactor);
+		float currentFrame = getCurrentFrame(t) + getCurrentFrameOffset(t);
 
         // read caches
         for (size_t iCf = 0, nbCf = crowdFields.length(); iCf < nbCf; ++iCf)
         {
-            CStr cachePrefix(_cacheDir + "/" + _cacheName + "." + crowdFields[iCf] + ".");
-            CStr cacheStream(cachePrefix + "%d.gscf");
-            CStr gscsFileStr(cachePrefix + "gscs");
-            CStr gsclFileStr(_layoutFile);
-            CStr srcTerrainFile(cachePrefix + "terrain.gtg");
-            if (!fileExists(srcTerrainFile))
-                srcTerrainFile = cachePrefix + "terrain.fbx";
-            bool needInterpolate(false);
+			CStr cachePrefix(_cacheDir + "/" + _cacheName + "." + crowdFields[iCf] + ".");
+			CStr srcTerrainFile(cachePrefix + "terrain.gtg");
+			if (!fileExists(srcTerrainFile))
+				srcTerrainFile = cachePrefix + "terrain.fbx";
 
-            // load gscs
-            GlmSimulationCacheStatus status;
-            GlmSimulationData* simulationData(NULL);
-            status = glmCreateAndReadSimulationData(&simulationData, gscsFileStr);
-            if (status != GSC_SUCCESS)
-            {
-                glmDestroySimulationData(&simulationData);
-                DebugPrint(_T("VRayGolaem: Error loading .gscs file \"%s\"\n"), gscsFileStr.data());
-                return;
-            }
+			// load gscl first
+			if (_layoutEnable)
+			{
+				_cacheFactory.loadLayoutHistoryFile(_layoutFile);
 
-            // load gscf
-            GlmFrameData *frameDataFloor(NULL), *frameDataCeil(NULL);
-            // no need to interpolate
-            if (frameMin == frameMax)
-            {
-                CStr currentFrameStr;
-                currentFrameStr.printf("%i", (int)currentFrame);
-                CStr gscfFileStr(cachePrefix + currentFrameStr + ".gscf");
+				// Terrain
+				CrowdTerrain::Mesh *terrainMeshSource(NULL), *terrainMeshDestination(NULL);
+				if (srcTerrainFile.Length())
+					terrainMeshSource = CrowdTerrain::loadTerrainAsset(srcTerrainFile);
+				if (_terrainFile.Length())
+					terrainMeshDestination = CrowdTerrain::loadTerrainAsset(_terrainFile);
+				if (terrainMeshDestination == NULL)
+					terrainMeshDestination = terrainMeshSource;
+				_cacheFactory.setTerrainMeshes(terrainMeshSource, terrainMeshDestination);
+				glmRaycastClosest = RaycastClosest;
+				glmTerrainSetFrame = TerrainSetFrame;
 
-                glmCreateFrameData(&frameDataFloor, simulationData);
-                status = glmReadFrameData(frameDataFloor, simulationData, gscfFileStr);
-                if (status != GSC_SUCCESS)
-                {
-                    glmDestroyFrameData(&frameDataFloor, simulationData);
-                    DebugPrint(_T("VRayGolaem: Error loading .gscf file \"%s\"\n"), gscfFileStr.data());
-                    return;
-                }
-            }
-            else
-            {
-                // frame min
-                CStr currentFrameStr;
-                currentFrameStr.printf("%i", (int)frameMin);
-                CStr gscfFileStr(cachePrefix + currentFrameStr + ".gscf");
+				// Proxy Matrix
+				Matrix3 nodeTransformNoRot = transform * maxToGolaem();
+				float proxyArray[16];
+				float inverseProxyArray[16];
+				maxToGolaem(nodeTransformNoRot, proxyArray);
+				maxToGolaem(Inverse(nodeTransformNoRot), inverseProxyArray);
+				_cacheFactory.setSimulationProxyMatrix(proxyArray, inverseProxyArray);
+			}
 
-                glmCreateFrameData(&frameDataFloor, simulationData);
-                status = glmReadFrameData(frameDataFloor, simulationData, gscfFileStr);
-                if (status != GSC_SUCCESS)
-                {
-                    glmDestroyFrameData(&frameDataFloor, simulationData);
-                    DebugPrint(_T("VRayGolaem: Error loading .gscf file \"%s\"\n"), gscfFileStr.data());
-                    return;
-                }
+			glm::crowd::CachedSimulation& cachedSimulation = _cacheFactory.getCachedSimulation(_cacheDir, _cacheName, crowdFields[iCf]);
+			const GlmSimulationData* simData = cachedSimulation.getModifiedSimulationData();
+			if (!simData)
+			{
+				DebugPrint(_T("VRayGolaem: Error loading .gscs file\n"));
+				return;
+			}
+			const GlmFrameData* frameData = cachedSimulation.getModifiedFrameData(currentFrame, true);
+			if (!frameData)
+			{
+				DebugPrint(_T("VRayGolaem: Error loading .gscf file(s) for frame \"%f\"\n"), currentFrame);
+				return;
+			}
 
-                // frame max
-                currentFrameStr.printf("%i", (int)frameMax);
-                gscfFileStr = (cachePrefix + currentFrameStr + ".gscf");
+			int64_t* entityExclusions = NULL;
+			int entityExclusionCount(0);
+			glmCreateEntityExclusionList(simData, _cacheFactory.getLayoutHistory(), &entityExclusions, &entityExclusionCount);
+			for (int iExcluded = 0; iExcluded < entityExclusionCount; ++iExcluded)
+			{
+				_exclusionData.append(entityExclusions[iExcluded]);
+			}
 
-                glmCreateFrameData(&frameDataCeil, simulationData);
-                status = glmReadFrameData(frameDataCeil, simulationData, gscfFileStr);
-                if (status != GSC_SUCCESS)
-                {
-                    glmDestroyFrameData(&frameDataCeil, simulationData);
-                    DebugPrint(_T("VRayGolaem: Error loading .gscf file \"%s\"\n"), gscfFileStr.data());
-                    return;
-                }
-                needInterpolate = true;
-            }
-
-            // load gscl
-            GlmHistory* history = NULL;
-            GlmEntityTransform* entityTransforms = NULL;
-            int entityTransformCount(0);
-            int64_t* entityExclusions = NULL;
-            int entityExclusionCount(0);
-
-            if (_layoutEnable)
-            {
-                GlmSimulationCacheStatus gsclStatus = glmCreateAndReadHistoryJSON(&history, gsclFileStr);
-                if (gsclStatus == GSC_SUCCESS)
-                {
-                    // Terrain
-                    CrowdTerrain::Mesh *terrainMeshSource(NULL), *terrainMeshDestination(NULL);
-                    if (srcTerrainFile.Length())
-                        terrainMeshSource = CrowdTerrain::loadTerrainAsset(srcTerrainFile);
-                    if (_terrainFile.Length())
-                        terrainMeshDestination = CrowdTerrain::loadTerrainAsset(_terrainFile);
-                    if (terrainMeshDestination == NULL)
-                        terrainMeshDestination = terrainMeshSource;
-                    history->_terrainMeshSource = terrainMeshSource;
-                    history->_terrainMeshDestination = terrainMeshDestination;
-                    glmRaycastClosest = RaycastClosest;
-                    glmTerrainSetFrame = TerrainSetFrame;
-
-                    // Proxy Matrix
-                    Matrix3 nodeTransformNoRot = transform * maxToGolaem();
-                    float proxyArray[16];
-                    maxToGolaem(nodeTransformNoRot, proxyArray);
-                    memcpy(simulationData->_proxyMatrix, proxyArray, 16 * sizeof(float));
-                    maxToGolaem(Inverse(nodeTransformNoRot), proxyArray);
-                    memcpy(simulationData->_proxyMatrixInverse, proxyArray, 16 * sizeof(float));
-
-                    glmCreateEntityTransforms(simulationData, history, &entityTransforms, &entityTransformCount);
-                    glmCreateEntityExclusionList(history, &entityExclusions, &entityExclusionCount);
-
-                    GlmSimulationData* simulationDataOut;
-                    glmCreateModifiedSimulationData(simulationData, entityTransforms, entityTransformCount, &simulationDataOut);
-                    if (frameMin == frameMax)
-                    {
-                        GlmFrameData* frameDataOut;
-                        glmCreateModifiedFrameData(simulationData, frameDataFloor, entityTransforms, entityTransformCount, history, simulationDataOut, &frameDataOut, (int)currentFrame, cacheStream, _cacheDir);
-                        glmDestroyFrameData(&frameDataFloor, simulationData);
-                        frameDataFloor = frameDataOut;
-                    }
-                    else
-                    {
-                        GlmFrameData *frameDataOutFloor, *frameDataOutCeil;
-                        glmCreateModifiedFrameData(simulationData, frameDataFloor, entityTransforms, entityTransformCount, history, simulationDataOut, &frameDataOutFloor, (int)frameMin, cacheStream, _cacheDir);
-                        glmCreateModifiedFrameData(simulationData, frameDataCeil, entityTransforms, entityTransformCount, history, simulationDataOut, &frameDataOutCeil, (int)frameMax, cacheStream, _cacheDir);
-                        glmDestroyFrameData(&frameDataFloor, simulationData);
-                        glmDestroyFrameData(&frameDataCeil, simulationData);
-                        frameDataFloor = frameDataOutFloor;
-                        frameDataCeil = frameDataOutCeil;
-                    }
-
-                    // replace previous simulation & frame data
-                    glmDestroySimulationData(&simulationData);
-                    simulationData = simulationDataOut;
-
-                    // Delete Terrain
-                    if (terrainMeshSource && terrainMeshSource != terrainMeshDestination)
-                        CrowdTerrain::closeTerrainAsset(terrainMeshSource);
-                    if (terrainMeshDestination)
-                        CrowdTerrain::closeTerrainAsset(terrainMeshDestination);
-
-                    // fetch exclusion list
-                    for (int iExcluded = 0; iExcluded < entityExclusionCount; ++iExcluded)
-                    {
-                        _exclusionData.append(entityExclusions[iExcluded]);
-                    }
-                }
-            }
-
-            // has not been interpolated at layout stage but needed it
-            if (needInterpolate)
-            {
-                GlmFrameData* frameDataOut;
-                glmCreateFrameData(&frameDataOut, simulationData);
-                glmInterpolateFrameData(simulationData, frameDataFloor, frameDataCeil, interpolateFactor, frameDataOut);
-                glmDestroyFrameData(&frameDataFloor, simulationData);
-                glmDestroyFrameData(&frameDataCeil, simulationData);
-                frameDataFloor = frameDataOut;
-            }
-
-            if (history)
-                glmDestroyHistory(&history);
-            if (entityTransforms)
-                glmDestroyEntityTransforms(&entityTransforms, entityTransformCount);
-            if (entityExclusions)
-                glmDestroyEntityExclusionList(&entityExclusions);
-
-            _simulationData.append(simulationData);
-            _frameData.append(frameDataFloor);
+            _simDataToDraw.append(simData);
+            _frameDataToDraw.append(frameData);
         }
     }
 }
@@ -1087,7 +969,7 @@ void VRayGolaem::drawEntities(GraphicsWindow* gw, const Matrix3& transform, Time
 
     // update cache if required
     readGolaemCache(transform, t);
-    if (_simulationData.length() == 0 || _frameData.length() == 0 || _simulationData.length() != _frameData.length())
+    if (_simDataToDraw.length() == 0 || _frameDataToDraw.length() == 0 || _simDataToDraw.length() != _frameDataToDraw.length())
         return;
 
     // draw
@@ -1099,25 +981,25 @@ void VRayGolaem::drawEntities(GraphicsWindow* gw, const Matrix3& transform, Time
     displayTransform.Scale(Point3(unitScale, unitScale, unitScale), TRUE);
 
     float transformScale(displayTransform.GetRow(0).Length());
-    for (size_t iData = 0, nbData = _simulationData.length(); iData < nbData; ++iData)
+    for (size_t iData = 0, nbData = _simDataToDraw.length(); iData < nbData; ++iData)
     {
-        int maxDisplayedEntity = (int)(_simulationData[iData]->_entityCount * displayPercent / 100.f);
+        int maxDisplayedEntity = (int)(_simDataToDraw[iData]->_entityCount * displayPercent / 100.f);
         for (size_t iEntity = 0, entityCount = maxDisplayedEntity; iEntity < entityCount; ++iEntity)
         {
-            int64_t entityId = _simulationData[iData]->_entityIds[iEntity];
+            int64_t entityId = _simDataToDraw[iData]->_entityIds[iEntity];
             if (entityId == -1)
                 continue;
             if (_exclusionData.contains(entityId))
                 continue;
 
-            unsigned int entityType = _simulationData[iData]->_entityTypes[iEntity];
-            if (_simulationData[iData]->_boneCount[entityType] > 0)
+            unsigned int entityType = _simDataToDraw[iData]->_entityTypes[iEntity];
+            if (_simDataToDraw[iData]->_boneCount[entityType] > 0)
             {
-                float entityRadius = _simulationData[iData]->_entityRadius[iEntity] * transformScale;
-                float entityHeight = _simulationData[iData]->_entityHeight[iEntity] * transformScale;
+                float entityRadius = _simDataToDraw[iData]->_entityRadius[iEntity] * transformScale;
+                float entityHeight = _simDataToDraw[iData]->_entityHeight[iEntity] * transformScale;
                 // draw bbox
-                unsigned int iBoneIndex = _simulationData[iData]->_iBoneOffsetPerEntityType[entityType] + _simulationData[iData]->_indexInEntityType[iEntity] * _simulationData[iData]->_boneCount[entityType];
-                Point3 entityPosition(_frameData[iData]->_bonePositions[iBoneIndex][0], _frameData[iData]->_bonePositions[iBoneIndex][1], _frameData[iData]->_bonePositions[iBoneIndex][2]);
+                unsigned int iBoneIndex = _simDataToDraw[iData]->_iBoneOffsetPerEntityType[entityType] + _simDataToDraw[iData]->_indexInEntityType[iEntity] * _simDataToDraw[iData]->_boneCount[entityType];
+                Point3 entityPosition(_frameDataToDraw[iData]->_bonePositions[iBoneIndex][0], _frameDataToDraw[iData]->_bonePositions[iBoneIndex][1], _frameDataToDraw[iData]->_bonePositions[iBoneIndex][2]);
                 // axis transformation for max
                 entityPosition = entityPosition * displayTransform;
                 Box3 entityBbox(Point3(entityPosition[0] - entityRadius, entityPosition[1] - entityRadius, entityPosition[2]), Point3(entityPosition[0] + entityRadius, entityPosition[1] + entityRadius, entityPosition[2] + entityHeight));
