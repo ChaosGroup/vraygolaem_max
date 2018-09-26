@@ -16,6 +16,9 @@
 
 #pragma warning(pop)
 
+#include "glmSimulationData.h"
+#include "glmFrameData.h"
+
 // V-Ray plugin ID for the 3ds Max material wrapper
 #define GLM_MTL_WRAPPER_VRAY_ID LARGE_CONST(0x2015080783)
 
@@ -879,23 +882,25 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
 	_simDataToDraw.removeAll();
 	_frameDataToDraw.removeAll();
 	_exclusionData.removeAll();
-	_cacheFactory.clear(true, true, true, true);	//is it necessary ?? Couldn't we keep the cache ?
 
     // update params
     updateVRayParams(t);
     _updateCacheData = false;
 
+	// Proxy Matrix
+	Matrix3 nodeTransformNoRot = transform * maxToGolaem();
+	float proxyArray[16];
+	float inverseProxyArray[16];
+	maxToGolaem(nodeTransformNoRot, proxyArray);
+	maxToGolaem(Inverse(nodeTransformNoRot), inverseProxyArray);
+
+#ifdef NDEBUG
+	_cacheFactory.clear(true, true, true, true);	//is it necessary ?? Couldn't we keep the cache ?
+
 	// load gscl first
 	if (_layoutEnable)
 	{
 		_cacheFactory.loadLayoutHistoryFile(_layoutFile);
-
-		// Proxy Matrix
-		Matrix3 nodeTransformNoRot = transform * maxToGolaem();
-		float proxyArray[16];
-		float inverseProxyArray[16];
-		maxToGolaem(nodeTransformNoRot, proxyArray);
-		maxToGolaem(Inverse(nodeTransformNoRot), inverseProxyArray);
 		_cacheFactory.setSimulationProxyMatrix(proxyArray, inverseProxyArray);
 	}
 
@@ -965,6 +970,7 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
 				CrowdTerrain::closeTerrainAsset(terrainMeshSource);
         }
     }
+#endif
 }
 
 //------------------------------------------------------------
