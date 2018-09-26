@@ -30,6 +30,8 @@
 
 #pragma warning(pop)
 
+#include "glmSimulationCacheFactory.h"
+
 //************************************************************
 // #defines
 //************************************************************
@@ -237,9 +239,11 @@ class VRayGolaem
     CStr _tempVRSceneFileDir;
 
     // Internal attributes
-    MaxSDK::Array<GlmSimulationData*> _simulationData;
-    MaxSDK::Array<GlmFrameData*> _frameData;
-    MaxSDK::Array<int64_t> _exclusionData;
+	glm::crowd::SimulationCacheFactory _cacheFactory;
+	MaxSDK::Array<const GlmSimulationData*> _simDataToDraw;
+	MaxSDK::Array<const GlmFrameData*> _frameDataToDraw;
+
+	MaxSDK::Array<int64_t> _exclusionData;
     bool _updateCacheData;
     Box3 _nodeBbox; //!< Node bbox
 
