@@ -30,7 +30,9 @@
 
 #pragma warning(pop)
 
+#ifdef NDEBUG
 #include "glmSimulationCacheFactory.h"
+#endif
 
 //************************************************************
 // #defines
@@ -239,7 +241,9 @@ class VRayGolaem
     CStr _tempVRSceneFileDir;
 
     // Internal attributes
+#ifdef NDEBUG
 	glm::crowd::SimulationCacheFactory _cacheFactory;
+#endif
 	MaxSDK::Array<const GlmSimulationData*> _simDataToDraw;
 	MaxSDK::Array<const GlmFrameData*> _frameDataToDraw;
 
