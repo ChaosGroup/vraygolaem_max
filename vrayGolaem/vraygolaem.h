@@ -177,10 +177,16 @@ class GolaemBRDFWrapper : public Plugin, public VR::MaterialInterface, public VR
 //************************************************************
 
 // predeclaration
-struct GlmSimulationData_v0;
-typedef GlmSimulationData_v0 GlmSimulationData;
-struct GlmFrameData_v0;
-typedef GlmFrameData_v0 GlmFrameData;
+namespace glm
+{
+	namespace crowdio
+	{
+		struct GlmFrameData_v0;
+		typedef GlmFrameData_v0 GlmFrameData;
+		struct GlmSimulationData_v0;
+		typedef GlmSimulationData_v0 GlmSimulationData;
+	}
+}
 
 class VRayGolaem
     : public GeomObject,
@@ -242,10 +248,10 @@ class VRayGolaem
 
     // Internal attributes
 #ifdef NDEBUG
-	glm::crowd::SimulationCacheFactory _cacheFactory;
+	glm::crowdio::SimulationCacheFactory _cacheFactory;
 #endif
-	MaxSDK::Array<const GlmSimulationData*> _simDataToDraw;
-	MaxSDK::Array<const GlmFrameData*> _frameDataToDraw;
+	MaxSDK::Array<const glm::crowdio::GlmSimulationData*> _simDataToDraw;
+	MaxSDK::Array<const glm::crowdio::GlmFrameData*> _frameDataToDraw;
 
 	MaxSDK::Array<int64_t> _exclusionData;
     bool _updateCacheData;
