@@ -933,8 +933,6 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
 				if (terrainMeshDestination == NULL)
 					terrainMeshDestination = terrainMeshSource;
 				_cacheFactory.setTerrainMeshes(terrainMeshSource, terrainMeshDestination);
-				glm::crowdio::glmRaycastClosest = glm::crowdio::crowdTerrain::RaycastClosest;
-				glm::crowdio::glmTerrainSetFrame = glm::crowdio::crowdTerrain::TerrainSetFrame;
 			}
 
 			glm::crowdio::CachedSimulation& cachedSimulation = _cacheFactory.getCachedSimulation(_cacheDir, _cacheName, crowdFields[iCf]);
