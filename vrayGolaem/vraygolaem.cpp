@@ -915,7 +915,7 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
         // read caches
         for (size_t iCf = 0, nbCf = crowdFields.length(); iCf < nbCf; ++iCf)
         {
-			glm::crowdio::crowdTerrain::Mesh *terrainMeshSource(NULL), *terrainMeshDestination(NULL);
+			glm::crowdio::crowdTerrain::TerrainMesh *terrainMeshSource(NULL), *terrainMeshDestination(NULL);
 
 			// load gscl first
 			if (_layoutEnable)
