@@ -951,7 +951,7 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
 
 			int64_t* entityExclusions = NULL;
 			int entityExclusionCount(0);
-			glmCreateEntityExclusionList(simData, _cacheFactory.getLayoutHistory(), &entityExclusions, &entityExclusionCount);
+			createEntityExclusionList(simData, _cacheFactory.getLayoutHistory(), &entityExclusions, &entityExclusionCount);
 			for (int iExcluded = 0; iExcluded < entityExclusionCount; ++iExcluded)
 			{
 				_exclusionData.append(entityExclusions[iExcluded]);
