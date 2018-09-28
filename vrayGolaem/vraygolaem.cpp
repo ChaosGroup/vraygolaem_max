@@ -915,7 +915,7 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
         // read caches
         for (size_t iCf = 0, nbCf = crowdFields.length(); iCf < nbCf; ++iCf)
         {
-			CrowdTerrain::Mesh *terrainMeshSource(NULL), *terrainMeshDestination(NULL);
+			glm::crowdio::crowdTerrain::Mesh *terrainMeshSource(NULL), *terrainMeshDestination(NULL);
 
 			// load gscl first
 			if (_layoutEnable)
@@ -927,24 +927,24 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
 					srcTerrainFile = cachePrefix + "terrain.fbx";
 
 				if (srcTerrainFile.Length())
-					terrainMeshSource = CrowdTerrain::loadTerrainAsset(srcTerrainFile);
+					terrainMeshSource = glm::crowdio::crowdTerrain::loadTerrainAsset(srcTerrainFile);
 				if (_terrainFile.Length())
-					terrainMeshDestination = CrowdTerrain::loadTerrainAsset(_terrainFile);
+					terrainMeshDestination = glm::crowdio::crowdTerrain::loadTerrainAsset(_terrainFile);
 				if (terrainMeshDestination == NULL)
 					terrainMeshDestination = terrainMeshSource;
 				_cacheFactory.setTerrainMeshes(terrainMeshSource, terrainMeshDestination);
-				glmRaycastClosest = RaycastClosest;
-				glmTerrainSetFrame = TerrainSetFrame;
+				glm::crowdio::glmRaycastClosest = glm::crowdio::crowdTerrain::RaycastClosest;
+				glm::crowdio::glmTerrainSetFrame = glm::crowdio::crowdTerrain::TerrainSetFrame;
 			}
 
-			glm::crowd::CachedSimulation& cachedSimulation = _cacheFactory.getCachedSimulation(_cacheDir, _cacheName, crowdFields[iCf]);
-			const GlmSimulationData* simData = cachedSimulation.getModifiedSimulationData();
+			glm::crowdio::CachedSimulation& cachedSimulation = _cacheFactory.getCachedSimulation(_cacheDir, _cacheName, crowdFields[iCf]);
+			const glm::crowdio::GlmSimulationData* simData = cachedSimulation.getModifiedSimulationData();
 			if (!simData)
 			{
 				DebugPrint(_T("VRayGolaem: Error loading .gscs file\n"));
 				return;
 			}
-			const GlmFrameData* frameData = cachedSimulation.getModifiedFrameData(currentFrame, true);
+			const glm::crowdio::GlmFrameData* frameData = cachedSimulation.getModifiedFrameData(currentFrame, true);
 			if (!frameData)
 			{
 				DebugPrint(_T("VRayGolaem: Error loading .gscf file(s) for frame \"%f\"\n"), currentFrame);
@@ -965,9 +965,9 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
 			//clear terrain
 			_cacheFactory.setTerrainMeshes(NULL, NULL);
 			if(terrainMeshDestination && terrainMeshDestination!=terrainMeshSource)
-				CrowdTerrain::closeTerrainAsset(terrainMeshDestination);
+				glm::crowdio::crowdTerrain::closeTerrainAsset(terrainMeshDestination);
 			if(terrainMeshSource)
-				CrowdTerrain::closeTerrainAsset(terrainMeshSource);
+				glm::crowdio::crowdTerrain::closeTerrainAsset(terrainMeshSource);
         }
     }
 #endif
