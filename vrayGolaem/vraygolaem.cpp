@@ -9,15 +9,15 @@
 
 #include "resource.h"
 
+#include "glmSimulationData.h"
+#include "glmFrameData.h"
+
 #pragma warning(push)
 #pragma warning(disable : 4535)
 
 #include "maxscript/maxscript.h"
 
 #pragma warning(pop)
-
-#include "glmSimulationData.h"
-#include "glmFrameData.h"
 
 // V-Ray plugin ID for the 3ds Max material wrapper
 #define GLM_MTL_WRAPPER_VRAY_ID LARGE_CONST(0x2015080783)
