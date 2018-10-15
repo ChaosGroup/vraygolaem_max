@@ -895,7 +895,7 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
 	maxToGolaem(Inverse(nodeTransformNoRot), inverseProxyArray);
 
 #ifdef NDEBUG
-	_cacheFactory.clear(true, true, true, true);	//is it necessary ?? Couldn't we keep the cache ?
+	_cacheFactory.clear(true, true, true, true, true);	//is it necessary ?? Couldn't we keep the cache ?
 
 	// load gscl first
 	if (_layoutEnable)
