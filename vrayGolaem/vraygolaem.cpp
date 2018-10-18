@@ -949,12 +949,11 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
 				return;
 			}
 
-			int64_t* entityExclusions = NULL;
-			int entityExclusionCount(0);
-			createEntityExclusionList(simData, _cacheFactory.getLayoutHistory(), &entityExclusions, &entityExclusionCount);
-			for (int iExcluded = 0; iExcluded < entityExclusionCount; ++iExcluded)
+			glm::Array<int64_t> killList;
+			createEntityExclusionList(killList, cachedSimulation.getSrcSimulationData(), _cacheFactory.getLayoutHistory());
+			for (size_t iExcluded = 0; iExcluded < killList.size(); ++iExcluded)
 			{
-				_exclusionData.append(entityExclusions[iExcluded]);
+				_exclusionData.append(killList[iExcluded]);
 			}
 
             _simDataToDraw.append(simData);
