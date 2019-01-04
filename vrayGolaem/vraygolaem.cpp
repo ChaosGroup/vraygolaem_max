@@ -10,7 +10,7 @@
 #include "resource.h"
 
 #pragma warning (push)
-#pragma warning (disable: 4535)
+#pragma warning (disable: 4100 4535)
 
 #include "maxscript/maxscript.h"
 
@@ -1093,7 +1093,7 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 	_cameraMargin = pblock2->GetFloat(pb_camera_margin, t);
 
 	// transform
-	_geoScale = 1 / GetMasterScale(getCrowdUnit());
+	_geoScale = (float) (1. / GetMasterScale(getCrowdUnit()));
 
 	// vray
 	_frameOffset = pblock2->GetFloat(pb_fframe_offset, t);
@@ -1127,11 +1127,12 @@ void VRayGolaem::updateVRayParams(TimeValue t)
 }
 
 
-void VRayGolaem::wrapMaterial(VUtils::VRayCore *vray, Mtl *mtl) {
+void VRayGolaem::wrapMaterial(VUtils::VRayCore *vrayCore, Mtl *mtl) {
 	if (!mtl)
 		return;
 
-	VR::VRenderMtl *vrenderMtl=VR::getVRenderMtl(mtl);
+	VR::VRayRenderer *vray = static_cast<VR::VRayRenderer*>(vrayCore);
+	VR::VRenderMtl *vrenderMtl=VR::getVRenderMtl(mtl, vray);
 	if (!vrenderMtl)
 		return; // Material is not V-Ray compatible, can't do anything.
 

@@ -9,6 +9,10 @@
 #include <defparams.h>
 #include <vray_plugins_ids.h>
 
+#pragma warning (push)
+#pragma warning (disable: 4100 4535)
+#pragma warning (pop)
+
 using namespace VUtils;
 
 static const PluginID GolaemMeshInstance_PluginID(LARGE_CONST(2011070866));
@@ -135,9 +139,9 @@ void VRayGolaemInstance::newVRayPlugin(VRayCore &vray)
 	vrayGolaemPlugin->setParameter(pluginRenderer->newStringParam("terrainFile", vrayGolaem._terrainFile.data()));
 
 	if (vrayGolaem._overMBlurWindowSize) {
-		vrayGolaemPlugin->setParameter(pluginRenderer->newBoolParam("motionBlurWindowSize", vrayGolaem._mBlurWindowSize));
+		vrayGolaemPlugin->setParameter(pluginRenderer->newFloatParam("motionBlurWindowSize", vrayGolaem._mBlurWindowSize));
 	}
 	if (vrayGolaem._overMBlurSamples) {
-		vrayGolaemPlugin->setParameter(pluginRenderer->newBoolParam("motionBlurSamples", vrayGolaem._mBlurSamples));
+		vrayGolaemPlugin->setParameter(pluginRenderer->newIntParam("motionBlurSamples", vrayGolaem._mBlurSamples));
 	}
 }
