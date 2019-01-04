@@ -881,18 +881,18 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
 					glmCreateEntityTransforms(simulationData, history, &entityTransforms, &entityTransformCount);
 					glmCreateEntityExclusionList(history, &entityExclusions, &entityExclusionCount);
 
-					GlmSimulationData* simulationDataOut;
+					GlmSimulationData* simulationDataOut(NULL);
 					glmCreateModifiedSimulationData(simulationData, entityTransforms, entityTransformCount, &simulationDataOut);
 					if (frameMin == frameMax)
 					{
-						GlmFrameData* frameDataOut;
+						GlmFrameData* frameDataOut(NULL);
 						glmCreateModifiedFrameData(simulationData, frameDataFloor, entityTransforms, entityTransformCount, history, simulationDataOut, &frameDataOut, (int)currentFrame, cacheStream, _cacheDir);
 						glmDestroyFrameData(&frameDataFloor, simulationData);
 						frameDataFloor = frameDataOut;
 					}
 					else
 					{
-						GlmFrameData* frameDataOutFloor, *frameDataOutCeil;
+						GlmFrameData* frameDataOutFloor(NULL), *frameDataOutCeil(NULL);
 						glmCreateModifiedFrameData(simulationData, frameDataFloor, entityTransforms, entityTransformCount, history, simulationDataOut, &frameDataOutFloor, (int)frameMin, cacheStream, _cacheDir);
 						glmCreateModifiedFrameData(simulationData, frameDataCeil, entityTransforms, entityTransformCount, history, simulationDataOut, &frameDataOutCeil, (int)frameMax, cacheStream, _cacheDir);
 						glmDestroyFrameData(&frameDataFloor, simulationData);
