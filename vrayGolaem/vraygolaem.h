@@ -30,9 +30,7 @@
 
 #pragma warning(pop)
 
-#ifdef NDEBUG
 #include "glmSimulationCacheFactory.h"
-#endif
 
 //************************************************************
 // #defines
@@ -104,7 +102,7 @@ enum param_list
 
 class FindPluginOfTypeCallback : public EnumPluginCallback
 {
-  public:
+public:
     FindPluginOfTypeCallback(PluginID pluginType = 0)
         : _pluginType(pluginType)
     {
@@ -139,7 +137,7 @@ class GolaemBRDFWrapper : public Plugin, public VR::MaterialInterface, public VR
     int _mtlID;
     VRayGolaem* _golaemInstance;
 
-  public:
+public:
     GolaemBRDFWrapper(void);
 
     // From PluginBase
@@ -179,14 +177,14 @@ class GolaemBRDFWrapper : public Plugin, public VR::MaterialInterface, public VR
 // predeclaration
 namespace glm
 {
-	namespace crowdio
-	{
-		struct GlmFrameData_v0;
-		typedef GlmFrameData_v0 GlmFrameData;
-		struct GlmSimulationData_v0;
-		typedef GlmSimulationData_v0 GlmSimulationData;
-	}
-}
+    namespace crowdio
+    {
+        struct GlmFrameData_v0;
+        typedef GlmFrameData_v0 GlmFrameData;
+        struct GlmSimulationData_v0;
+        typedef GlmSimulationData_v0 GlmSimulationData;
+    } // namespace crowdio
+} // namespace glm
 
 class VRayGolaem
     : public GeomObject,
@@ -247,21 +245,20 @@ class VRayGolaem
     CStr _tempVRSceneFileDir;
 
     // Internal attributes
-#ifdef NDEBUG
-	glm::crowdio::SimulationCacheFactory _cacheFactory;
-#endif
-	MaxSDK::Array<const glm::crowdio::GlmSimulationData*> _simDataToDraw;
-	MaxSDK::Array<const glm::crowdio::GlmFrameData*> _frameDataToDraw;
+    glm::crowdio::SimulationCacheFactory _cacheFactory;
 
-	MaxSDK::Array<int64_t> _exclusionData;
+    MaxSDK::Array<const glm::crowdio::GlmSimulationData*> _simDataToDraw;
+    MaxSDK::Array<const glm::crowdio::GlmFrameData*> _frameDataToDraw;
+
+    MaxSDK::Array<int64_t> _exclusionData;
     bool _updateCacheData;
     Box3 _nodeBbox; //!< Node bbox
 
-  public:
+public:
     IParamBlock2* pblock2;
     BOOL suspendSnap; //!< Snap suspension flag (TRUE during creation only)
 
-  public:
+public:
     //////////////////////////////////////////
     // Constructor / Destructor
     //////////////////////////////////////////
@@ -397,11 +394,11 @@ class VRayGolaem
     //////////////////////////////////////////
     // read/write vrscene
     //////////////////////////////////////////
-  protected:
+protected:
     bool readCrowdVRScene(const VR::CharString& file);
     bool writeCrowdVRScene(TimeValue t, const VR::CharString& file);
 
-  public:
+public:
     //////////////////////////////////////////
     // From VRayPluginRendererInterface
     //////////////////////////////////////////
@@ -427,7 +424,7 @@ class VRayGolaem
         return _objectIDBase;
     }
 
-  private:
+private:
     void updateVRayParams(TimeValue t);
 
     // Enable or disable some UI controls based on the settings.
@@ -456,7 +453,7 @@ class VRayGolaemCreateCallBack : public CreateMouseCallBack
     IPoint2 sp0;
     Point3 p0;
 
-  public:
+public:
     int proc(ViewExp* vpt, int msg, int point, int flags, IPoint2 m, Matrix3& mat);
     void SetObj(VRayGolaem* obj)
     {

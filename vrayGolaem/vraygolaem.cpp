@@ -48,7 +48,7 @@
 
 class VRayGolaemClassDesc : public ClassDesc2
 {
-  public:
+public:
     int IsPublic(void)
     {
         return IS_PUBLIC;
@@ -167,7 +167,7 @@ class VRayGolaemDlgProc : public ParamMap2UserDlgProc
 {
     void chooseFileName(IParamBlock2* pblock2, ParamID paramID, const TCHAR* title);
 
-  public:
+public:
     VRayGolaemDlgProc()
     {
     }
@@ -254,136 +254,137 @@ enum
     params,
 };
 
-static ParamBlockDesc2 param_blk(params, STR_DLGTITLE, 0, &vrayGolaemClassDesc, P_AUTO_CONSTRUCT + P_AUTO_UI, REFNO_PBLOCK,
-                                 IDD_VRAYGOLAEM, IDS_VRAYGOLAEM_PARAMS, 0, 0, &vrayGolaemDlgProc,
-                                 // Params
-                                 pb_file, _T("cache_file"), TYPE_FILENAME, P_RESET_DEFAULT, 0,
-                                 p_ui, TYPE_EDITBOX, ED_GOLAEMVRSCENE,
+static ParamBlockDesc2 param_blk(
+    params, STR_DLGTITLE, 0, &vrayGolaemClassDesc, P_AUTO_CONSTRUCT + P_AUTO_UI, REFNO_PBLOCK,
+    IDD_VRAYGOLAEM, IDS_VRAYGOLAEM_PARAMS, 0, 0, &vrayGolaemDlgProc,
+    // Params
+    pb_file, _T("cache_file"), TYPE_FILENAME, P_RESET_DEFAULT, 0,
+    p_ui, TYPE_EDITBOX, ED_GOLAEMVRSCENE,
 #if GET_MAX_RELEASE(VERSION_3DSMAX) >= 11900
-                                 p_assetTypeID, MaxSDK::AssetManagement::AssetType::kExternalLink,
+    p_assetTypeID, MaxSDK::AssetManagement::AssetType::kExternalLink,
 #endif
-                                 PB_END,
-                                 pb_shaders_file, _T("shaders_file"), TYPE_FILENAME, P_RESET_DEFAULT, 0,
-                                 p_ui, TYPE_EDITBOX, ED_SHADERSVRSCENE,
+    PB_END,
+    pb_shaders_file, _T("shaders_file"), TYPE_FILENAME, P_RESET_DEFAULT, 0,
+    p_ui, TYPE_EDITBOX, ED_SHADERSVRSCENE,
 #if GET_MAX_RELEASE(VERSION_3DSMAX) >= 11900
-                                 p_assetTypeID, MaxSDK::AssetManagement::AssetType::kExternalLink,
+    p_assetTypeID, MaxSDK::AssetManagement::AssetType::kExternalLink,
 #endif
-                                 PB_END,
+    PB_END,
 
-                                 // display attributes
-                                 pb_enable_display, _T("enable_display"), TYPE_BOOL, P_RESET_DEFAULT, 0,
-                                 p_default, TRUE,
-                                 p_ui, TYPE_SINGLECHEKBOX, ED_DISPLAYENABLE,
-                                 PB_END,
-                                 pb_display_percentage, _T("display_percentage"), TYPE_FLOAT, P_RESET_DEFAULT, 0,
-                                 p_default, 100.f,
-                                 p_range, 0.f, 100.f,
-                                 p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_DISPLAYPERCENT, ED_DISPLAYPERCENTSPIN, 1.f,
-                                 PB_END,
-                                 pb_display_entity_ids, _T("display_entity_ids"), TYPE_BOOL, P_RESET_DEFAULT, 0,
-                                 p_default, TRUE,
-                                 p_ui, TYPE_SINGLECHEKBOX, ED_DISPLAYENTITYIDS,
-                                 PB_END,
+    // display attributes
+    pb_enable_display, _T("enable_display"), TYPE_BOOL, P_RESET_DEFAULT, 0,
+    p_default, TRUE,
+    p_ui, TYPE_SINGLECHEKBOX, ED_DISPLAYENABLE,
+    PB_END,
+    pb_display_percentage, _T("display_percentage"), TYPE_FLOAT, P_RESET_DEFAULT, 0,
+    p_default, 100.f,
+    p_range, 0.f, 100.f,
+    p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_DISPLAYPERCENT, ED_DISPLAYPERCENTSPIN, 1.f,
+    PB_END,
+    pb_display_entity_ids, _T("display_entity_ids"), TYPE_BOOL, P_RESET_DEFAULT, 0,
+    p_default, TRUE,
+    p_ui, TYPE_SINGLECHEKBOX, ED_DISPLAYENTITYIDS,
+    PB_END,
 
-                                 // cache attributes
-                                 pb_crowd_fields, _T("crowd_fields"), TYPE_STRING, P_RESET_DEFAULT, 0,
-                                 p_ui, TYPE_EDITBOX, ED_CROWDFIELDS,
-                                 PB_END,
-                                 pb_cache_name, _T("cache_name"), TYPE_STRING, P_RESET_DEFAULT, 0,
-                                 p_ui, TYPE_EDITBOX, ED_CACHENAME,
-                                 PB_END,
-                                 pb_cache_dir, _T("cache_dir"), TYPE_STRING, P_RESET_DEFAULT, 0,
-                                 p_ui, TYPE_EDITBOX, ED_CACHEDIR,
-                                 PB_END,
-                                 pb_character_files, _T("character_files"), TYPE_STRING, P_RESET_DEFAULT, 0,
-                                 p_ui, TYPE_EDITBOX, ED_CHARACTERFILES,
-                                 PB_END,
-                                 // layout attributes
-                                 pb_layout_enable, _T("layout_enable"), TYPE_BOOL, P_RESET_DEFAULT, 0,
-                                 p_default, TRUE,
-                                 p_ui, TYPE_SINGLECHEKBOX, ED_LAYOUTENABLE,
-                                 PB_END,
-                                 pb_layout_file, _T("layout_file"), TYPE_STRING, P_RESET_DEFAULT, 0,
-                                 p_ui, TYPE_EDITBOX, ED_LAYOUTFILE,
-                                 PB_END,
-                                 pb_terrain_file, _T("terrain_file"), TYPE_STRING, P_RESET_DEFAULT, 0,
-                                 p_ui, TYPE_EDITBOX, ED_TERRAINFILE,
-                                 PB_END,
-                                 // culling attributes
-                                 pb_frustum_enable, _T("frustum_enable"), TYPE_BOOL, P_RESET_DEFAULT, 0,
-                                 p_default, FALSE,
-                                 p_ui, TYPE_SINGLECHEKBOX, ED_FRUSTUMENABLE,
-                                 PB_END,
-                                 pb_frustum_margin, _T("frustum_margin"), TYPE_FLOAT, P_RESET_DEFAULT, 0,
-                                 p_default, 10.f,
-                                 p_range, -BIGFLOAT, BIGFLOAT,
-                                 p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_FRUSTUMMARGIN, ED_FRUSTUMMARGINSPIN, 1.f,
-                                 PB_END,
-                                 pb_camera_margin, _T("camera_margin"), TYPE_FLOAT, P_RESET_DEFAULT, 0,
-                                 p_default, 10.f,
-                                 p_range, -BIGFLOAT, BIGFLOAT,
-                                 p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_CAMERAMARGIN, ED_CAMERAMARGINSPIN, 1.f,
-                                 PB_END,
+    // cache attributes
+    pb_crowd_fields, _T("crowd_fields"), TYPE_STRING, P_RESET_DEFAULT, 0,
+    p_ui, TYPE_EDITBOX, ED_CROWDFIELDS,
+    PB_END,
+    pb_cache_name, _T("cache_name"), TYPE_STRING, P_RESET_DEFAULT, 0,
+    p_ui, TYPE_EDITBOX, ED_CACHENAME,
+    PB_END,
+    pb_cache_dir, _T("cache_dir"), TYPE_STRING, P_RESET_DEFAULT, 0,
+    p_ui, TYPE_EDITBOX, ED_CACHEDIR,
+    PB_END,
+    pb_character_files, _T("character_files"), TYPE_STRING, P_RESET_DEFAULT, 0,
+    p_ui, TYPE_EDITBOX, ED_CHARACTERFILES,
+    PB_END,
+    // layout attributes
+    pb_layout_enable, _T("layout_enable"), TYPE_BOOL, P_RESET_DEFAULT, 0,
+    p_default, TRUE,
+    p_ui, TYPE_SINGLECHEKBOX, ED_LAYOUTENABLE,
+    PB_END,
+    pb_layout_file, _T("layout_file"), TYPE_STRING, P_RESET_DEFAULT, 0,
+    p_ui, TYPE_EDITBOX, ED_LAYOUTFILE,
+    PB_END,
+    pb_terrain_file, _T("terrain_file"), TYPE_STRING, P_RESET_DEFAULT, 0,
+    p_ui, TYPE_EDITBOX, ED_TERRAINFILE,
+    PB_END,
+    // culling attributes
+    pb_frustum_enable, _T("frustum_enable"), TYPE_BOOL, P_RESET_DEFAULT, 0,
+    p_default, FALSE,
+    p_ui, TYPE_SINGLECHEKBOX, ED_FRUSTUMENABLE,
+    PB_END,
+    pb_frustum_margin, _T("frustum_margin"), TYPE_FLOAT, P_RESET_DEFAULT, 0,
+    p_default, 10.f,
+    p_range, -BIGFLOAT, BIGFLOAT,
+    p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_FRUSTUMMARGIN, ED_FRUSTUMMARGINSPIN, 1.f,
+    PB_END,
+    pb_camera_margin, _T("camera_margin"), TYPE_FLOAT, P_RESET_DEFAULT, 0,
+    p_default, 10.f,
+    p_range, -BIGFLOAT, BIGFLOAT,
+    p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_CAMERAMARGIN, ED_CAMERAMARGINSPIN, 1.f,
+    PB_END,
 
-                                 // vray attributes
-                                 pb_fframe_offset, _T("fframe_offset"), TYPE_FLOAT, P_RESET_DEFAULT, 0.f,
-                                 p_default, 0.f,
-                                 p_range, -BIGFLOAT, BIGFLOAT,
-                                 p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_FFRAMEOFFSET, ED_FFRAMEOFFSETSPIN, 1.f,
-                                 PB_END,
-                                 pb_object_id_mode, _T("objectId_mode"), TYPE_INT, P_RESET_DEFAULT, 0,
-                                 p_ui, TYPE_INT_COMBOBOX, CB_OBJECTIDMODE, 8, CB_OBJECTIDMODE_ITEM1, CB_OBJECTIDMODE_ITEM2, CB_OBJECTIDMODE_ITEM3, CB_OBJECTIDMODE_ITEM4, CB_OBJECTIDMODE_ITEM5, CB_OBJECTIDMODE_ITEM6, CB_OBJECTIDMODE_ITEM7, CB_OBJECTIDMODE_ITEM8,
-                                 p_vals, 0, 1, 2, 3, 4, 5, 6, 7,
-                                 p_default, 0,
-                                 PB_END,
-                                 pb_geometry_tag, _T("geometry_tag"), TYPE_INT, P_RESET_DEFAULT, 0,
-                                 p_default, 0,
-                                 p_range, 0, 9,
-                                 p_ui, TYPE_SPINNER, EDITTYPE_INT, ED_GEOMETRYTAG, ED_GEOMETRYTAGSPIN, 1,
-                                 PB_END,
-                                 pb_default_material, _T("default_material"), TYPE_STRING, P_RESET_DEFAULT, 0,
-                                 p_ui, TYPE_EDITBOX, ED_DEFAULTMATERIAL,
-                                 PB_END,
-                                 pb_temp_vrscene_file_dir, _T("temp_vrscene_file_dir"), TYPE_STRING, P_RESET_DEFAULT, 0,
-                                 p_default, _T("TEMP"),
-                                 p_ui, TYPE_EDITBOX, ED_TEMPVRSCENEFILEDIR,
-                                 PB_END,
-                                 pb_instancing_enable, _T("instancing_enable"), TYPE_BOOL, P_RESET_DEFAULT, 0,
-                                 p_default, TRUE,
-                                 p_ui, TYPE_SINGLECHEKBOX, ED_INSTANCINGENABLE,
-                                 PB_END,
+    // vray attributes
+    pb_fframe_offset, _T("fframe_offset"), TYPE_FLOAT, P_RESET_DEFAULT, 0.f,
+    p_default, 0.f,
+    p_range, -BIGFLOAT, BIGFLOAT,
+    p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_FFRAMEOFFSET, ED_FFRAMEOFFSETSPIN, 1.f,
+    PB_END,
+    pb_object_id_mode, _T("objectId_mode"), TYPE_INT, P_RESET_DEFAULT, 0,
+    p_ui, TYPE_INT_COMBOBOX, CB_OBJECTIDMODE, 8, CB_OBJECTIDMODE_ITEM1, CB_OBJECTIDMODE_ITEM2, CB_OBJECTIDMODE_ITEM3, CB_OBJECTIDMODE_ITEM4, CB_OBJECTIDMODE_ITEM5, CB_OBJECTIDMODE_ITEM6, CB_OBJECTIDMODE_ITEM7, CB_OBJECTIDMODE_ITEM8,
+    p_vals, 0, 1, 2, 3, 4, 5, 6, 7,
+    p_default, 0,
+    PB_END,
+    pb_geometry_tag, _T("geometry_tag"), TYPE_INT, P_RESET_DEFAULT, 0,
+    p_default, 0,
+    p_range, 0, 9,
+    p_ui, TYPE_SPINNER, EDITTYPE_INT, ED_GEOMETRYTAG, ED_GEOMETRYTAGSPIN, 1,
+    PB_END,
+    pb_default_material, _T("default_material"), TYPE_STRING, P_RESET_DEFAULT, 0,
+    p_ui, TYPE_EDITBOX, ED_DEFAULTMATERIAL,
+    PB_END,
+    pb_temp_vrscene_file_dir, _T("temp_vrscene_file_dir"), TYPE_STRING, P_RESET_DEFAULT, 0,
+    p_default, _T("TEMP"),
+    p_ui, TYPE_EDITBOX, ED_TEMPVRSCENEFILEDIR,
+    PB_END,
+    pb_instancing_enable, _T("instancing_enable"), TYPE_BOOL, P_RESET_DEFAULT, 0,
+    p_default, TRUE,
+    p_ui, TYPE_SINGLECHEKBOX, ED_INSTANCINGENABLE,
+    PB_END,
 
-                                 // time override attributes
-                                 pb_frame_override_enable, _T("frame_override_enable"), TYPE_BOOL, P_RESET_DEFAULT, 0,
-                                 p_default, FALSE,
-                                 p_ui, TYPE_SINGLECHEKBOX, ED_FRAMEOVERRIDEENABLE,
-                                 PB_END,
-                                 pb_frame_override, _T("frame_override"), TYPE_FLOAT, P_RESET_DEFAULT + P_ANIMATABLE, 0,
-                                 p_default, 0.f,
-                                 p_range, -BIGFLOAT, BIGFLOAT,
-                                 p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_FRAMEOVERRIDE, ED_FRAMEOVERRIDESPIN, 1.f,
-                                 PB_END,
+    // time override attributes
+    pb_frame_override_enable, _T("frame_override_enable"), TYPE_BOOL, P_RESET_DEFAULT, 0,
+    p_default, FALSE,
+    p_ui, TYPE_SINGLECHEKBOX, ED_FRAMEOVERRIDEENABLE,
+    PB_END,
+    pb_frame_override, _T("frame_override"), TYPE_FLOAT, P_RESET_DEFAULT + P_ANIMATABLE, 0,
+    p_default, 0.f,
+    p_range, -BIGFLOAT, BIGFLOAT,
+    p_ui, TYPE_SPINNER, EDITTYPE_FLOAT, ED_FRAMEOVERRIDE, ED_FRAMEOVERRIDESPIN, 1.f,
+    PB_END,
 
-                                 // not used anymore but kept for retrocomp
-                                 pb_frame_offset, _T(""), TYPE_INT, 0, 0, PB_END,
-                                 pb_display_percent, _T(""), TYPE_INT, 0, 0, PB_END,
-                                 pb_use_node_attributes, _T(""), TYPE_BOOL, 0, 0, PB_END,
-                                 pb_motion_blur_enable, _T(""), TYPE_BOOL, 0, 0, PB_END,
-                                 pb_motion_blur_start, _T(""), TYPE_FLOAT, 0, 0, PB_END,
-                                 pb_motion_blur_window_size, _T(""), TYPE_FLOAT, 0, 0, PB_END,
-                                 pb_motion_blur_samples, _T(""), TYPE_INT, 0, 0, PB_END,
-                                 pb_scale_transform, _T(""), TYPE_FLOAT, 0, 0, PB_END,
-                                 pb_object_id_base, _T(""), TYPE_INT, 0, 0, PB_END,
-                                 pb_primary_visibility, _T(""), TYPE_BOOL, 0, 0, PB_END,
-                                 pb_casts_shadows, _T(""), TYPE_BOOL, 0, 0, PB_END,
-                                 pb_visible_in_reflections, _T(""), TYPE_BOOL, 0, 0, PB_END,
-                                 pb_visible_in_refractions, _T(""), TYPE_BOOL, 0, 0, PB_END,
-                                 pb_override_node_properties, _T(""), TYPE_BOOL, 0, 0, PB_END,
-                                 pb_excluded_entities, _T(""), TYPE_STRING, 0, 0, PB_END,
-                                 pb_layout_name, _T(""), TYPE_STRING, 0, 0, PB_END,
-                                 pb_layout_dir, _T(""), TYPE_STRING, 0, 0, PB_END,
+    // not used anymore but kept for retrocomp
+    pb_frame_offset, _T(""), TYPE_INT, 0, 0, PB_END,
+    pb_display_percent, _T(""), TYPE_INT, 0, 0, PB_END,
+    pb_use_node_attributes, _T(""), TYPE_BOOL, 0, 0, PB_END,
+    pb_motion_blur_enable, _T(""), TYPE_BOOL, 0, 0, PB_END,
+    pb_motion_blur_start, _T(""), TYPE_FLOAT, 0, 0, PB_END,
+    pb_motion_blur_window_size, _T(""), TYPE_FLOAT, 0, 0, PB_END,
+    pb_motion_blur_samples, _T(""), TYPE_INT, 0, 0, PB_END,
+    pb_scale_transform, _T(""), TYPE_FLOAT, 0, 0, PB_END,
+    pb_object_id_base, _T(""), TYPE_INT, 0, 0, PB_END,
+    pb_primary_visibility, _T(""), TYPE_BOOL, 0, 0, PB_END,
+    pb_casts_shadows, _T(""), TYPE_BOOL, 0, 0, PB_END,
+    pb_visible_in_reflections, _T(""), TYPE_BOOL, 0, 0, PB_END,
+    pb_visible_in_refractions, _T(""), TYPE_BOOL, 0, 0, PB_END,
+    pb_override_node_properties, _T(""), TYPE_BOOL, 0, 0, PB_END,
+    pb_excluded_entities, _T(""), TYPE_STRING, 0, 0, PB_END,
+    pb_layout_name, _T(""), TYPE_STRING, 0, 0, PB_END,
+    pb_layout_dir, _T(""), TYPE_STRING, 0, 0, PB_END,
 
-                                 PB_END);
+    PB_END);
 
 //************************************************************
 // VRayGolaem implementation
@@ -879,30 +880,29 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
         return;
 
     // clean previous data
-	_simDataToDraw.removeAll();
-	_frameDataToDraw.removeAll();
-	_exclusionData.removeAll();
+    _simDataToDraw.removeAll();
+    _frameDataToDraw.removeAll();
+    _exclusionData.removeAll();
 
     // update params
     updateVRayParams(t);
     _updateCacheData = false;
 
-	// Proxy Matrix
-	Matrix3 nodeTransformNoRot = transform * maxToGolaem();
-	float proxyArray[16];
-	float inverseProxyArray[16];
-	maxToGolaem(nodeTransformNoRot, proxyArray);
-	maxToGolaem(Inverse(nodeTransformNoRot), inverseProxyArray);
+    // Proxy Matrix
+    Matrix3 nodeTransformNoRot = transform * maxToGolaem();
+    float proxyArray[16];
+    float inverseProxyArray[16];
+    maxToGolaem(nodeTransformNoRot, proxyArray);
+    maxToGolaem(Inverse(nodeTransformNoRot), inverseProxyArray);
 
-#ifdef NDEBUG
-	_cacheFactory.clear(true, true, true, true, true);	//is it necessary ?? Couldn't we keep the cache ?
+    _cacheFactory.clear(true, true, true, true, true); //is it necessary ?? Couldn't we keep the cache ?
 
-	// load gscl first
-	if (_layoutEnable)
-	{
-		_cacheFactory.loadLayoutHistoryFile(_layoutFile);
-		_cacheFactory.setSimulationProxyMatrix(proxyArray, inverseProxyArray);
-	}
+    // load gscl first
+    if (_layoutEnable)
+    {
+        _cacheFactory.loadLayoutHistoryFile(_layoutFile);
+        _cacheFactory.setSimulationProxyMatrix(proxyArray, inverseProxyArray);
+    }
 
     // read caches
     MaxSDK::Array<CStr> crowdFields;
@@ -910,64 +910,63 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
     if (_cacheName.length() != 0 && _cacheDir.length() != 0)
     {
         // find the current frame
-		float currentFrame = getCurrentFrame(t) + getCurrentFrameOffset(t);
+        float currentFrame = getCurrentFrame(t) + getCurrentFrameOffset(t);
 
         // read caches
         for (size_t iCf = 0, nbCf = crowdFields.length(); iCf < nbCf; ++iCf)
         {
-			glm::crowdio::crowdTerrain::TerrainMesh *terrainMeshSource(NULL), *terrainMeshDestination(NULL);
+            glm::crowdio::crowdTerrain::TerrainMesh *terrainMeshSource(NULL), *terrainMeshDestination(NULL);
 
-			// load gscl first
-			if (_layoutEnable)
-			{
-				// Terrain
-				CStr cachePrefix(_cacheDir + "/" + _cacheName + "." + crowdFields[iCf] + ".");
-				CStr srcTerrainFile(cachePrefix + "terrain.gtg");
-				if (!fileExists(srcTerrainFile))
-					srcTerrainFile = cachePrefix + "terrain.fbx";
+            // load gscl first
+            if (_layoutEnable)
+            {
+                // Terrain
+                CStr cachePrefix(_cacheDir + "/" + _cacheName + "." + crowdFields[iCf] + ".");
+                CStr srcTerrainFile(cachePrefix + "terrain.gtg");
+                if (!fileExists(srcTerrainFile))
+                    srcTerrainFile = cachePrefix + "terrain.fbx";
 
-				if (srcTerrainFile.Length())
-					terrainMeshSource = glm::crowdio::crowdTerrain::loadTerrainAsset(srcTerrainFile);
-				if (_terrainFile.Length())
-					terrainMeshDestination = glm::crowdio::crowdTerrain::loadTerrainAsset(_terrainFile);
-				if (terrainMeshDestination == NULL)
-					terrainMeshDestination = terrainMeshSource;
-				_cacheFactory.setTerrainMeshes(terrainMeshSource, terrainMeshDestination);
-			}
+                if (srcTerrainFile.Length())
+                    terrainMeshSource = glm::crowdio::crowdTerrain::loadTerrainAsset(srcTerrainFile);
+                if (_terrainFile.Length())
+                    terrainMeshDestination = glm::crowdio::crowdTerrain::loadTerrainAsset(_terrainFile);
+                if (terrainMeshDestination == NULL)
+                    terrainMeshDestination = terrainMeshSource;
+                _cacheFactory.setTerrainMeshes(terrainMeshSource, terrainMeshDestination);
+            }
 
-			glm::crowdio::CachedSimulation& cachedSimulation = _cacheFactory.getCachedSimulation(_cacheDir, _cacheName, crowdFields[iCf]);
-			const glm::crowdio::GlmSimulationData* simData = cachedSimulation.getModifiedSimulationData();
-			if (!simData)
-			{
-				DebugPrint(_T("VRayGolaem: Error loading .gscs file\n"));
-				return;
-			}
-			const glm::crowdio::GlmFrameData* frameData = cachedSimulation.getModifiedFrameData(currentFrame, true);
-			if (!frameData)
-			{
-				DebugPrint(_T("VRayGolaem: Error loading .gscf file(s) for frame \"%f\"\n"), currentFrame);
-				return;
-			}
+            glm::crowdio::CachedSimulation& cachedSimulation = _cacheFactory.getCachedSimulation(_cacheDir, _cacheName, crowdFields[iCf]);
+            const glm::crowdio::GlmSimulationData* simData = cachedSimulation.getModifiedSimulationData();
+            if (!simData)
+            {
+                DebugPrint(_T("VRayGolaem: Error loading .gscs file\n"));
+                return;
+            }
+            const glm::crowdio::GlmFrameData* frameData = cachedSimulation.getModifiedFrameData(currentFrame, true);
+            if (!frameData)
+            {
+                DebugPrint(_T("VRayGolaem: Error loading .gscf file(s) for frame \"%f\"\n"), currentFrame);
+                return;
+            }
 
-			glm::Array<int64_t> killList;
-			createEntityExclusionList(killList, cachedSimulation.getSrcSimulationData(), _cacheFactory.getLayoutHistory());
-			for (size_t iExcluded = 0; iExcluded < killList.size(); ++iExcluded)
-			{
-				_exclusionData.append(killList[iExcluded]);
-			}
+            glm::PODArray<int64_t> killList;
+            createEntityExclusionList(killList, cachedSimulation.getSrcSimulationData(), _cacheFactory.getLayoutHistory());
+            for (size_t iExcluded = 0; iExcluded < killList.size(); ++iExcluded)
+            {
+                _exclusionData.append(killList[iExcluded]);
+            }
 
             _simDataToDraw.append(simData);
             _frameDataToDraw.append(frameData);
 
-			//clear terrain
-			_cacheFactory.setTerrainMeshes(NULL, NULL);
-			if(terrainMeshDestination && terrainMeshDestination!=terrainMeshSource)
-				glm::crowdio::crowdTerrain::closeTerrainAsset(terrainMeshDestination);
-			if(terrainMeshSource)
-				glm::crowdio::crowdTerrain::closeTerrainAsset(terrainMeshSource);
+            //clear terrain
+            _cacheFactory.setTerrainMeshes(NULL, NULL);
+            if (terrainMeshDestination && terrainMeshDestination != terrainMeshSource)
+                glm::crowdio::crowdTerrain::closeTerrainAsset(terrainMeshDestination);
+            if (terrainMeshSource)
+                glm::crowdio::crowdTerrain::closeTerrainAsset(terrainMeshSource);
         }
     }
-#endif
 }
 
 //------------------------------------------------------------
@@ -1244,7 +1243,7 @@ void VRayGolaem::createMaterials(VR::VRayCore* vray)
 
 class GolaemBRDFMaterialDesc : public PluginDesc
 {
-  public:
+public:
     PluginID getPluginID(void) VRAY_OVERRIDE
     {
         return GLM_MTL_WRAPPER_VRAY_ID;
@@ -2176,7 +2175,7 @@ struct MtlShadeData : VR::ShadeData
         return VR::ShadeData::newInterface(id);
     }
 
-  protected:
+protected:
     int initMapChannel(const VR::VRayContext& rc, int channelIndex)
     {
         if (lastMapChannelIndex == channelIndex)
