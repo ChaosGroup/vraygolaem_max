@@ -10,35 +10,45 @@
 
 using namespace VR;
 
-VRayGolaemInstanceBase::VRayGolaemInstanceBase(VRayGolaem *_vrayGolaem, INode *node, VRayCore *vray, int renderID) {
-	VRenderInstance::init(_vrayGolaem, node, vray, renderID);
+VRayGolaemInstanceBase::VRayGolaemInstanceBase(VRayGolaem* _vrayGolaem, INode* node, VRayCore* vray, int renderID)
+{
+    VRenderInstance::init(_vrayGolaem, node, vray, renderID);
 }
 
-void VRayGolaemInstanceBase::freeMem(void) {
+void VRayGolaemInstanceBase::freeMem(void)
+{
 }
 
-VRayGolaemInstanceBase::~VRayGolaemInstanceBase(void) {
-	freeMem();
+VRayGolaemInstanceBase::~VRayGolaemInstanceBase(void)
+{
+    freeMem();
 }
 
-void VRayGolaemInstanceBase::renderBegin(TimeValue t, VRayCore *vray) {
-	VRenderInstance::renderBegin(t, vray);
+void VRayGolaemInstanceBase::renderBegin(TimeValue t, VRayCore* vray)
+{
+    VRenderInstance::renderBegin(t, vray);
 }
 
-void VRayGolaemInstanceBase::renderEnd(VRayCore *vray) {
-	VRenderInstance::renderEnd(vray);
+void VRayGolaemInstanceBase::renderEnd(VRayCore* vray)
+{
+    VRenderInstance::renderEnd(vray);
 }
 
-void VRayGolaemInstanceBase::frameBegin(TimeValue t, VRayCore *vray) {
-	VRenderInstance::frameBegin(t, vray);
-	mesh=&dummyMesh;
+void VRayGolaemInstanceBase::frameBegin(TimeValue t, VRayCore* vray)
+{
+    VRenderInstance::frameBegin(t, vray);
+    mesh = &dummyMesh;
 }
 
-void VRayGolaemInstanceBase::frameEnd(VRayCore *vray) {
-	VRenderInstance::frameEnd(vray);
-	if (!renderObject) return;
+void VRayGolaemInstanceBase::frameEnd(VRayCore* vray)
+{
+    VRenderInstance::frameEnd(vray);
+    if (!renderObject)
+        return;
 }
 
-void VRayGolaemInstanceBase::compileGeometry(VR::VRayCore* /*vray*/) {
-	if (!renderObject) return;
+void VRayGolaemInstanceBase::compileGeometry(VR::VRayCore* /*vray*/)
+{
+    if (!renderObject)
+        return;
 }

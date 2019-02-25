@@ -8,9 +8,7 @@
 
 #pragma warning(push)
 #pragma warning(disable : 4840)
-
 #include "max.h"
-
 #pragma warning(pop)
 
 #pragma warning(push)
@@ -143,12 +141,15 @@ public:
     // From PluginBase
     PluginInterface* newInterface(InterfaceID id) VRAY_OVERRIDE
     {
-        if (id == EXT_MATERIAL)
+        switch (id)
+        {
+        case EXT_MATERIAL:
             return static_cast<MaterialInterface*>(this);
-        else if (id == EXT_BSDF)
+        case EXT_BSDF:
             return static_cast<BSDFInterface*>(this);
-        else
+        default:
             return PluginBase::newInterface(id);
+        }
     }
 
     // From PluginInterface
@@ -160,7 +161,17 @@ public:
     // From MaterialInterface
     void shade(VR::VRayContext& rc) VRAY_OVERRIDE;
     int getMaterialRenderID(const VR::VRayContext& rc) VRAY_OVERRIDE;
-    int isOpaque(void) VRAY_OVERRIDE;
+    int getBSDFFlags(void) VRAY_OVERRIDE;
+
+    inline int isOpaqueForShadows(void) const
+    {
+        return (_maxMtlFlags & (VRAY_MTLREQ_OPAQUE_SHADOWS | MTLREQ_TRANSP)) == VRAY_MTLREQ_OPAQUE_SHADOWS;
+    }
+
+    inline int needs2SidedLighting(void) const
+    {
+        return (_maxMtlFlags & VRAY_MTLREQ_2SIDED_LIGHTING) != 0;
+    }
 
     // From BSDFInterface
     VR::BSDFSampler* newBSDF(const VR::VRayContext& rc, VR::BSDFFlags flags) VRAY_OVERRIDE;
