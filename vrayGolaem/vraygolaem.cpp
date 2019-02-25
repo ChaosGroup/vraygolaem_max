@@ -4,10 +4,10 @@
 *                                                                          *
 ***************************************************************************/
 #include "vraygolaem.h"
-
 #include "instance.h"
-
 #include "resource.h"
+
+#include "vrayver.h"
 
 #include "glmSimulationData.h"
 #include "glmFrameData.h"
@@ -1270,9 +1270,15 @@ public:
     }
 
     /// Returns the name of the plugin class (human readable name).
-    tchar* getName(void) VRAY_OVERRIDE
+    virtual VRAY3_CONST_COMPAT tchar* getName(void) VRAY_OVERRIDE
     {
         return "GolaemMtlMaxWrapper";
+    }
+
+    /// Returns a brief explanation of the purpose of the plugin
+    virtual const tchar* getDescription() const VRAY_OVERRIDE
+    {
+        return "Golaem material 3dsMax Wrapper";
     }
 };
 
@@ -1720,7 +1726,7 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
         else
         {
             // CROWDVRAYPLUGINID not found = not loaded or env not configured
-            CStr vrayEnvVar = CStr(VRAYRT_PLUGINS) + CStr("_") + CStr(PROCESSOR_ARCHITECTURE);
+            CStr vrayEnvVar = CStr(VRAYSTD_PLUGINS);
             CStr logMessage = CStr("VRayGolaem: Error loading .vrscene file \"") + CStr(file.ptr()) + CStr("\". vray_glmCrowdVRayPlugin.dll plugin was not found in environment variable \"") + vrayEnvVar + CStr("\" (") + CStr(getVRayPluginsPath().ptr()) + CStr(").\n");
             mprintf(logMessage.ToBSTR());
         }
@@ -2089,14 +2095,17 @@ struct MtlShadeData : VR::ShadeData
         orig_rc->rayresult.surfaceProps = orig_sp;
     }
 
-    VR::Vector getUVWcoords(const VR::VRayContext& rc, int channel)
+    VR::ShadeVec getUVWcoords(const VR::VRayContext& rc, int channel) VRAY_OVERRIDE
     {
-        if (!initMapChannel(rc, channel))
-            return VR::Vector(0.0f, 0.0f, 0.0f);
-        return lastMapChannelTransform.offs;
+        VR::ShadeVec result(0.0f, 0.0f, 0.0f);
+        if (initMapChannel(rc, channel))
+        {
+            result = lastMapChannelTransform.offs;
+        }
+        return result;
     }
 
-    void getUVWderivs(const VR::VRayContext& rc, int channel, VR::Vector derivs[2])
+    void getUVWderivs(const VR::VRayContext& rc, int channel, VR::ShadeVec derivs[2]) VRAY_OVERRIDE
     {
         if (!initMapChannel(rc, channel))
         {
@@ -2110,7 +2119,7 @@ struct MtlShadeData : VR::ShadeData
         }
     }
 
-    void getUVWbases(const VR::VRayContext& rc, int channel, VR::Vector bases[3])
+    void getUVWbases(const VR::VRayContext& rc, int channel, VR::ShadeVec bases[3]) VRAY_OVERRIDE
     {
         if (!initMapChannel(rc, channel))
         {
@@ -2126,48 +2135,48 @@ struct MtlShadeData : VR::ShadeData
         }
     }
 
-    VR::Vector getUVWnormal(const VR::VRayContext& rc, int channel)
+    VR::ShadeVec getUVWnormal(const VR::VRayContext& rc, int channel) VRAY_OVERRIDE
     {
         if (!initMapChannel(rc, channel))
         {
-            return VR::Vector(0.0f, 0.0f, 1.0f);
+            return VR::ShadeVec(0.0f, 0.0f, 1.0f);
         }
         else
         {
-            return crossf(lastMapChannelTransform.m[0], lastMapChannelTransform.m[1]);
+            return VR::simd::crossf(lastMapChannelTransform.m[0], lastMapChannelTransform.m[1]);
         }
     }
 
-    int getMtlID(const VR::VRayContext& rc)
+    int getMtlID(const VR::VRayContext& rc) VRAY_OVERRIDE
     {
         VR::SurfaceInfoInterface* surfaceInfo = static_cast<VR::SurfaceInfoInterface*>(GET_INTERFACE(orig_sd, EXT_SURFACE_INFO));
         if (surfaceInfo)
             return surfaceInfo->getFaceID(rc);
         return 0;
     }
-    int getGBufID(void)
+    int getGBufID(void) VRAY_OVERRIDE
     {
         return objectID;
     }
-    int getSmoothingGroup(const VR::VRayContext&)
+    int getSmoothingGroup(const VR::VRayContext&) VRAY_OVERRIDE
     {
         return 0;
     }
-    int getEdgeVisibility(const VR::VRayContext&)
+    int getEdgeVisibility(const VR::VRayContext&) VRAY_OVERRIDE
     {
         return 7;
     }
 
-    int getSurfaceRenderID(const VR::VRayContext&)
+    int getSurfaceRenderID(const VR::VRayContext&) VRAY_OVERRIDE
     {
         return renderID;
     }
-    int getMaterialRenderID(const VR::VRayContext&)
+    int getMaterialRenderID(const VR::VRayContext&) VRAY_OVERRIDE
     {
         return gbufID;
     }
 
-    PluginInterface* newInterface(InterfaceID id)
+    PluginInterface* newInterface(InterfaceID id) VRAY_OVERRIDE
     {
         PluginInterface* res = orig_sd->newInterface(id);
         if (res)
@@ -2190,7 +2199,7 @@ protected:
         }
 
         // In 3ds Max, mapping channels start from 1, so that's why we subtract 1 from the channelIndex here.
-        lastMapChannelTransform = mappedSurface->getLocalUVWTransform(rc, channelIndex - 1);
+        mappedSurface->getLocalUVWTransform(rc, channelIndex - 1, lastMapChannelTransform);
         lastMapChannelIndex = channelIndex;
         return true;
     }
@@ -2199,7 +2208,7 @@ protected:
     VR::VRayShadeData* orig_sd;
     VR::VRaySurfaceProperties* orig_sp;
     int lastMapChannelIndex;
-    VR::Transform lastMapChannelTransform;
+    VR::ShadeTransform lastMapChannelTransform;
     int gbufID, renderID, objectID;
 };
 
@@ -2219,12 +2228,12 @@ void GolaemBRDFWrapper::shade(VR::VRayContext& rc)
         if (alphaContrib >= 0.0f)
         {
             rc.mtlresult.alpha *= alphaContrib;
-            rc.mtlresult.alphaTransp = VR::Color(1.0f, 1.0f, 1.0f) * (1.0f - alphaContrib) + rc.mtlresult.alphaTransp * alphaContrib;
+            rc.mtlresult.alphaTransp = VR::ShadeCol(1.0f, 1.0f, 1.0f) * (1.0f - alphaContrib) + rc.mtlresult.alphaTransp * alphaContrib;
         }
         else
         {
             rc.mtlresult.alpha.makeZero();
-            rc.mtlresult.alphaTransp = VR::Color(1.0f, 1.0f, 1.0f) * (1.0f + alphaContrib) - rc.mtlresult.alphaTransp * alphaContrib;
+            rc.mtlresult.alphaTransp = VR::ShadeCol(1.0f, 1.0f, 1.0f) * (1.0f + alphaContrib) - rc.mtlresult.alphaTransp * alphaContrib;
         }
     }
 }
@@ -2234,13 +2243,14 @@ int GolaemBRDFWrapper::getMaterialRenderID(const VR::VRayContext&)
     return _mtlID;
 }
 
-int GolaemBRDFWrapper::isOpaque(void)
+int GolaemBRDFWrapper::getBSDFFlags(void)
 {
-#ifdef VRAY_MTLREQ_OPAQUE_SHADOWS
-    return (_maxMtlFlags & (VRAY_MTLREQ_OPAQUE_SHADOWS | MTLREQ_TRANSP)) == VRAY_MTLREQ_OPAQUE_SHADOWS;
-#else
-    return false;
-#endif
+    int res = 0;
+    if (isOpaqueForShadows())
+        res |= VUtils::bsdfFlag_opaqueForShadows;
+    if (needs2SidedLighting())
+        res |= VUtils::bsdfFlag_cantUsePremultLightCache;
+    return res;
 }
 
 VR::BSDFSampler* GolaemBRDFWrapper::newBSDF(const VR::VRayContext& rc, VR::BSDFFlags flags)
