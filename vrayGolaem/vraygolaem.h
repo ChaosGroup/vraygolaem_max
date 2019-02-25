@@ -7,7 +7,7 @@
 #pragma once
 
 #pragma warning(push)
-#pragma warning(disable : 4840)
+#pragma warning(disable : 4840 4458)
 #include "max.h"
 #pragma warning(pop)
 

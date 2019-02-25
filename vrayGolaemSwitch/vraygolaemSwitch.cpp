@@ -8,8 +8,6 @@
 
 #include "resource.h"
 
-#include "vraygolaemSwitch_impl.h"
-
 #pragma warning(push)
 #pragma warning(disable : 4535)
 
@@ -103,7 +101,7 @@ private:
     int sameObjectOnly, ignoreSelfOcclusion;
     float cosMult;
     int workWithTransparency;
-    VR::Vector startPoint;
+    VR::ShadeVec startPoint;
     bool bAllTranspLevels;
     int mode, sampleEnvironment;
 
@@ -113,9 +111,9 @@ private:
 
     float finalOcclusion;
 
-    VR::Color occludedColor, unoccludedColor;
+    VR::ShadeCol occludedColor, unoccludedColor;
 
-    VR::Matrix nm; // A matrix for transforming from local surface space to world space.
+    VR::ShadeMatrix nm; // A matrix for transforming from local surface space to world space.
 
     stExcludeIDList& renderIDs;
     stExcludeIDList& affectresultIDs;
@@ -134,9 +132,10 @@ public:
     {
     }
 
-    void init(const VR::VRayContext& rc, VR::Vector& normal, float rad, float distr, int sameOnly, float fall, float csm,
-              int workWithTransparencyParam, const VR::Vector& p, const VR::Color& _occludedColor, const VR::Color& _unoccludedColor,
-              bool AllTranspLevels = true, int _ignoreSelfOcclusion = false, int _mode = 0, int _sampleEnvironment = false, int _excludedObjectsTransparent = false)
+    void init(
+        const VR::VRayContext& rc, VR::ShadeVec& normal, float rad, float distr, int sameOnly, float fall, float csm,
+        int workWithTransparencyParam, const VR::ShadeVec& p, const VR::ShadeCol& _occludedColor, const VR::ShadeCol& _unoccludedColor,
+        bool AllTranspLevels = true, int _ignoreSelfOcclusion = false, int _mode = 0, int _sampleEnvironment = false, int _excludedObjectsTransparent = false)
     {
         radius = rad;
         distribution = distr;
@@ -149,7 +148,7 @@ public:
         }
         else
         {
-            VR::Vector reflectDir = VR::getReflectDir(rc.rayparams.viewDir, normal);
+            VR::ShadeVec reflectDir = VR::getReflectDir(rc.rayparams.viewDir, normal);
             VR::makeNormalMatrix(reflectDir, nm);
         }
         cosMult = csm;
@@ -166,7 +165,7 @@ public:
         finalOcclusion = 0.0f;
     }
 
-    VR::Vector getSpecularDir(float pu, float pv, float pn)
+    VR::ShadeVec getSpecularDir(float pu, float pv, float pn)
     {
         float thetaSin;
         if (pn >= 0.0f)
@@ -179,17 +178,17 @@ public:
         }
         float thetaCos = sqrtf(VR::Max(0.0f, 1.0f - thetaSin * thetaSin));
         float phi = 2.0f * VR::pi() * pv;
-        return VR::Vector(cosf(phi) * thetaCos, sinf(phi) * thetaCos, thetaSin);
+        return VR::ShadeVec(cosf(phi) * thetaCos, sinf(phi) * thetaCos, thetaSin);
     }
 
-    VR::Color sampleColor(const VR::VRayContext& rc, VR::VRayContext& nrc, float uc, VR::ValidType& valid)
+    VR::ShadeCol sampleColor(const VR::VRayContext& rc, VR::VRayContext& nrc, float uc, VR::ValidType& valid) VRAY_OVERRIDE
     {
         // Compute a sampling direction.
-        VR::Vector dir;
+        VR::ShadeVec dir;
         if (mode == 0)
         {
             // Ambient occlusion
-            dir = VR::normalize0(nm * this->getSpecularDir(uc, getDMCParam(nrc, 1), distribution));
+            dir = VR::simd::normalize0(nm * this->getSpecularDir(uc, getDMCParam(nrc, 1), distribution));
         }
         else if (distribution < 0.0f)
         {
@@ -203,12 +202,12 @@ public:
             {
             case 1:
                 // Ambient occlusion/Phong reflection
-                dir = VR::normalize0(nm * VR::getSpecularDir(uc, getDMCParam(nrc, 1), distribution));
+                dir = VR::ShadeVec(VR::normalize0(nm * VR::getSpecularDir(uc, getDMCParam(nrc, 1), distribution)));
                 break;
             case 2:
             {
                 // Blinn reflection
-                VR::Vector nrm = VR::normalize0(nm * VR::getSpecularDir(uc, getDMCParam(nrc, 1), distribution));
+                VR::ShadeVec nrm = VR::ShadeVec(VR::normalize0(nm * VR::getSpecularDir(uc, getDMCParam(nrc, 1), distribution)));
                 dir = VR::getReflectDir(rc.rayparams.viewDir, nrm);
                 break;
             }
@@ -224,7 +223,7 @@ public:
                 VR::Vector hn = VR::getSphereDir(thetaCos, getDMCParam(nrc, 1));
                 VR::Vector nrm = VR::normalize0(nm * hn);
 
-                dir = VR::getReflectDir(rc.rayparams.viewDir, nrm);
+                dir = VR::ShadeVec(VR::getReflectDir(rc.rayparams.viewDir.toVector(), nrm));
                 break;
             }
             }
@@ -235,7 +234,7 @@ public:
         if (n < 0.0f)
         {
             valid = false;
-            return Vlado::Color(0, 0, 0);
+            return VR::ShadeCol(0.f, 0.f, 0.f);
         }
 
         // Set up the ray context for tracing in the given direction.
@@ -286,10 +285,14 @@ public:
                      (sameObjectOnly && isData.sb == rc.rayresult.sb)) &&
                     (!ignoreSelfOcclusion || isData.sb != rc.rayresult.sb) &&
                     (sd2 && !renderIDs.Find(sd2->getSurfaceRenderID(nrc))) &&
-                    (!isData.surfaceProps || !isData.surfaceProps->getFlag(VR::surfPropFlag_excludeInAO)))
+                    !isData.surfaceProps)
+                {
                     k = (falloff > 1e-6f) ? powf(1.0f - (float)isData.wpointCoeff / radius, falloff) : 1.0f;
+                }
                 else
+                {
                     excluded = true;
+                }
 
                 // Evaluate the transparency of the material
                 if (workWithTransparency || (excluded && excludedObjectsTransparent))
@@ -332,7 +335,7 @@ public:
 
         finalOcclusion += occlusion;
 
-        VR::Color envFilter;
+        VR::ShadeCol envFilter;
         if (!sampleEnvironment || occlusion > 1.0f - 1e-6f)
             envFilter.makeWhite();
         else

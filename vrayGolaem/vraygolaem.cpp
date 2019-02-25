@@ -1270,9 +1270,15 @@ public:
     }
 
     /// Returns the name of the plugin class (human readable name).
-    tchar* getName(void) VRAY_OVERRIDE
+    virtual VRAY3_CONST_COMPAT tchar* getName(void) VRAY_OVERRIDE
     {
         return "GolaemMtlMaxWrapper";
+    }
+
+    /// Returns a brief explanation of the purpose of the plugin
+    virtual const tchar* getDescription() const VRAY_OVERRIDE
+    {
+        return "Golaem material 3dsMax Wrapper";
     }
 };
 
