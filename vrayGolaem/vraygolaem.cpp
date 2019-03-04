@@ -895,7 +895,7 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
     maxToGolaem(nodeTransformNoRot, proxyArray);
     maxToGolaem(Inverse(nodeTransformNoRot), inverseProxyArray);
 
-    _cacheFactory.clear(true, true, true, true, true); //is it necessary ?? Couldn't we keep the cache ?
+    _cacheFactory.clear(glm::crowdio::FactoryClearMode::ALL); //is it necessary ?? Couldn't we keep the cache ?
 
     // load gscl first
     if (_layoutEnable)
