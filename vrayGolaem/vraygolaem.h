@@ -202,7 +202,7 @@ class VRayGolaem
       public VR::VRenderObject,
       public ObjectIDWrapperInterface
 {
-    friend class VRayGolaemInstanceBase;
+    friend struct VRayGolaemInstance;
     friend class VRayGolaemDlgProc;
 
     //////////////////////////////////////////
@@ -237,6 +237,9 @@ class VRayGolaem
     float _frustumMargin;
     float _cameraMargin;
 
+    // transform attributes
+    float _geoScale;
+
     // Vray attributes
     float _frameOffset;
     bool _frameOverrideEnable;
@@ -251,9 +254,6 @@ class VRayGolaem
     bool _visibleInReflections;
     bool _visibleInRefractions;
     CStr _defaultMaterial;
-
-    // Output attributes
-    CStr _tempVRSceneFileDir;
 
     // Internal attributes
     glm::crowdio::SimulationCacheFactory _cacheFactory;
@@ -407,7 +407,6 @@ public:
     //////////////////////////////////////////
 protected:
     bool readCrowdVRScene(const VR::CharString& file);
-    bool writeCrowdVRScene(TimeValue t, const VR::CharString& file);
 
 public:
     //////////////////////////////////////////
@@ -472,8 +471,16 @@ public:
     }
 };
 
+struct VrayGolaemContext
+{
+    VrayGolaemContext();
+    ~VrayGolaemContext();
+
+    static VrayGolaemContext& getVrayGolaemContext();
+};
+
 //************************************************************
-// Inline
+// Accessors
 //************************************************************
 
 bool isCharInvalidVrscene(char c);
@@ -485,9 +492,44 @@ void drawBBox(GraphicsWindow* gw, const Box3& b);
 void drawSphere(GraphicsWindow* gw, const Point3& pos, float radius, int nsegs);
 void drawText(GraphicsWindow* gw, const MCHAR* text, const Point3& pos);
 
-Matrix3 golaemToMax();
-Matrix3 maxToGolaem();
-void maxToGolaem(const Matrix3& matrix, float* outArray);
+//************************************************************
+// Inline
+//************************************************************
 
-INode* FindNodeRef(ReferenceTarget* rt);
-INode* GetNodeRef(ReferenceMaker* rm);
+inline Matrix3 golaemToMax();
+inline Matrix3 maxToGolaem();
+inline void maxToGolaem(const Matrix3& matrix, float* outArray);
+
+//************************************************************
+// Inline draw functions
+//************************************************************
+
+inline Matrix3 golaemToMax()
+{
+    return RotateXMatrix((float)pi / 2);
+}
+
+inline Matrix3 maxToGolaem()
+{
+    return RotateXMatrix(-(float)pi / 2);
+}
+
+inline void maxToGolaem(const Matrix3& matrix, float* outArray)
+{
+    outArray[0] = matrix[0][0];
+    outArray[1] = matrix[0][1];
+    outArray[2] = matrix[0][2];
+    outArray[3] = 0.f;
+    outArray[4] = matrix[1][0];
+    outArray[5] = matrix[1][1];
+    outArray[6] = matrix[1][2];
+    outArray[7] = 0.f;
+    outArray[8] = matrix[2][0];
+    outArray[9] = matrix[2][1];
+    outArray[10] = matrix[2][2];
+    outArray[11] = 0.f;
+    outArray[12] = matrix[3][0];
+    outArray[13] = matrix[3][1];
+    outArray[14] = matrix[3][2];
+    outArray[15] = 1.f;
+}
