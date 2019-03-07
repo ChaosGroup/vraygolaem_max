@@ -9,8 +9,11 @@
 
 #include "vrayver.h"
 
+#include "glmCrowdIO.h"
+
 #include "glmSimulationData.h"
 #include "glmFrameData.h"
+
 
 #pragma warning(push)
 #pragma warning(disable : 4535)
@@ -408,6 +411,7 @@ VRayGolaem::VRayGolaem()
     vrayGolaemClassDesc.MakeAutoParamBlocks(this);
     assert(pblock2);
     suspendSnap = FALSE;
+    VrayGolaemContext::getVrayGolaemContext();
 }
 
 VRayGolaem::~VRayGolaem()
@@ -1128,6 +1132,9 @@ void VRayGolaem::updateVRayParams(TimeValue t)
     _frustumMargin = pblock2->GetFloat(pb_frustum_margin, t);
     _cameraMargin = pblock2->GetFloat(pb_camera_margin, t);
 
+    // transform
+    _geoScale = (float)(1. / GetMasterScale(getCrowdUnit()));
+
     // vray
     _frameOffset = pblock2->GetFloat(pb_fframe_offset, t);
     _frameOverrideEnable = pblock2->GetInt(pb_frame_override_enable, t) == 1;
@@ -1161,17 +1168,15 @@ void VRayGolaem::updateVRayParams(TimeValue t)
         _visibleInReflections = false;
     if (!vrayRefrVisibility)
         _visibleInRefractions = false;
-
-    // output
-    _tempVRSceneFileDir = getStrParam(pblock2, pb_temp_vrscene_file_dir, t, "TEMP");
 }
 
-void VRayGolaem::wrapMaterial(VUtils::VRayCore* vray, Mtl* mtl)
+void VRayGolaem::wrapMaterial(VUtils::VRayCore* vrayCore, Mtl* mtl)
 {
     if (!mtl)
         return;
 
-    VR::VRenderMtl* vrenderMtl = VR::getVRenderMtl(mtl, static_cast<VR::VRayRenderer*>(vray));
+    VR::VRayRenderer* vray = static_cast<VR::VRayRenderer*>(vrayCore);
+    VR::VRenderMtl* vrenderMtl = VR::getVRenderMtl(mtl, vray);
     if (!vrenderMtl)
         return; // Material is not V-Ray compatible, can't do anything.
 
@@ -1181,30 +1186,6 @@ void VRayGolaem::wrapMaterial(VUtils::VRayCore* vray, Mtl* mtl)
 
     wrapper->setMaxMtl(mtl, vrenderMtl, this);
 }
-
-/*
-void VRayGolaem::wrapMaterial(VUtils::VRayCore *vray, Mtl *mtl)
-{
-	if (!mtl)
-		return;
-
-	VRenderPluginRendererInterface *pluginRenderer = queryInterface<VRenderPluginRendererInterface>(vray, EXT_VRENDER_PLUGIN_RENDERER);
-	vassert(pluginRenderer);
-
-#pragma warning( push )
-#pragma warning( disable : 4996) // avoid deprecated warning
-	VUtils::VRenderMtl *vrenderMtl = VUtils::getVRenderMtl(mtl, static_cast<VR::VRayRenderer*>(vray));
-#pragma warning( pop )
-
-	if (!vrenderMtl) return; // Material is not V-Ray compatible, can't do anything.
-
-	GET_MBCS(mtl->GetName(), mtlName);
-	BRDFWrapper *wrapper = static_cast<BRDFWrapper*>(static_cast<PluginBase*>(pluginRenderer->newPlugin(MTL_WRAPPER_VRAY_ID, mtlName)));
-	if (!wrapper) return;
-		
-	wrapper->setMaxMtl(mtl, vrenderMtl, this);
-}
-*/
 
 void VRayGolaem::enumMaterials(VUtils::VRayCore* vray, Mtl* mtl)
 {
@@ -1225,10 +1206,10 @@ void VRayGolaem::enumMaterials(VUtils::VRayCore* vray, Mtl* mtl)
 
 void VRayGolaem::createMaterials(VR::VRayCore* vray)
 {
+    const VR::VRaySequenceData& sdata = vray->getSequenceData();
     INode* inode = getNode(this);
-    if (NULL == inode)
+    if (!inode)
     {
-        const VR::VRaySequenceData& sdata = vray->getSequenceData();
         if (sdata.progress)
         {
             const TCHAR* name_wstr = GetObjectName();
@@ -1236,6 +1217,11 @@ void VRayGolaem::createMaterials(VR::VRayCore* vray)
             sdata.progress->warning("No node found for Golaem object \"%s\"; can't create materials", name_mbcs ? name_mbcs : "<unknown>");
         }
         return;
+    }
+
+    if (sdata.progress)
+    {
+        sdata.progress->info("VRayGolaem: Create materials attached to the VRayGolaem node");
     }
 
     enumMaterials(vray, inode->GetMtl());
@@ -1287,20 +1273,70 @@ static GolaemBRDFMaterialDesc golaemWrapperMaterialDesc;
 //------------------------------------------------------------
 // renderBegin / renderEnd
 //------------------------------------------------------------
-void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore* _vray)
+void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore* vrayCore)
 {
-    VR::VRayRenderer* vray = static_cast<VR::VRayRenderer*>(_vray);
+    VR::VRayRenderer* vray = static_cast<VR::VRayRenderer*>(vrayCore);
     VRenderObject::renderBegin(t, vray);
-
-    updateVRayParams(t);
 
     const VR::VRaySequenceData& sdata = vray->getSequenceData();
 
     VRenderPluginRendererInterface* pluginRenderer = queryInterface<VRenderPluginRendererInterface>(vray, EXT_VRENDER_PLUGIN_RENDERER);
-    pluginRenderer->registerPlugin(wrapperMaterialDesc);
-    pluginRenderer->registerPlugin(golaemWrapperMaterialDesc);
     vassert(pluginRenderer);
 
+    pluginRenderer->registerPlugin(wrapperMaterialDesc);
+    pluginRenderer->registerPlugin(golaemWrapperMaterialDesc);
+
+    updateVRayParams(t);
+
+    // Load the .vrscene into the plugin manager
+    PluginManager* plugMan = pluginRenderer->getPluginManager();
+    vassert(plugMan);
+    _vrayScene = new VR::VRayScene(plugMan);
+
+#if 1
+
+    int prevNbPlugins(plugMan->enumPlugins(NULL));
+    int newNbPlugins = prevNbPlugins;
+
+    // Create wrapper plugins for all 3ds Max materials in the scene,
+    // so that the Golaem plugin can use them, if needed.
+    createMaterials(vray);
+
+    newNbPlugins = plugMan->enumPlugins(NULL);
+    if (newNbPlugins != prevNbPlugins)
+    {
+        sdata.progress->info("VRayGolaem: Materials created successfully, %i materials created", newNbPlugins - prevNbPlugins);
+        prevNbPlugins = newNbPlugins;
+    }
+
+    if (_shadersFile.empty())
+    {
+        if (sdata.progress)
+        {
+            sdata.progress->warning("VRayGolaem: No shaders .vrscene file specified");
+        }
+    }
+    else
+    {
+        const VR::ErrorCode errCode = _vrayScene->readFile(_shadersFile.ptr());
+        newNbPlugins = plugMan->enumPlugins(NULL);
+        if (errCode.error())
+        {
+            if (sdata.progress)
+            {
+                const VR::CharString errMsg = errCode.getErrorString();
+                sdata.progress->warning("VRayGolaem: Error loading shaders .vrscene file \"%s\": %s", _shadersFile.ptr(), errMsg.ptr());
+            }
+        }
+        else
+        {
+            if (sdata.progress)
+            {
+                sdata.progress->info("VRayGolaem: Shaders file \"%s\" loaded successfully, %i materials loaded", _shadersFile.ptr(), newNbPlugins - prevNbPlugins);
+            }
+        }
+    }
+#else
     PluginManager* plugMan = pluginRenderer->getPluginManager();
     vassert(plugMan);
 
@@ -1339,9 +1375,6 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore* _vray)
     int prevNbPlugins(plugMan->enumPlugins(NULL));
     int newNbPlugins(prevNbPlugins);
 
-    // Create wrapper plugins for all 3ds Max materials in the scene, so that the Golaem plugin can use them, if needed
-    sdata.progress->info("VRayGolaem: Create materials attached to the VRayGolaem node");
-    createMaterials(vray);
     newNbPlugins = plugMan->enumPlugins(NULL);
     sdata.progress->info("VRayGolaem: Materials created successfully, %i materials created", newNbPlugins - prevNbPlugins);
     prevNbPlugins = newNbPlugins;
@@ -1477,6 +1510,7 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore* _vray)
     {
         sdata.progress->warning("VRayGolaem: No GolaemCrowd node found in the current scene");
     }
+#endif
 }
 
 void VRayGolaem::renderEnd(VR::VRayCore* _vray)
@@ -1511,23 +1545,25 @@ void VRayGolaem::frameEnd(VR::VRayCore* _vray)
 //------------------------------------------------------------
 VR::VRenderInstance* VRayGolaem::newRenderInstance(INode* inode, VR::VRayCore* vray, int renderID)
 {
-    if (vray)
+    vassert(vray);
+
+    const VR::VRaySequenceData& sdata = vray->getSequenceData();
+    if (sdata.progress)
     {
-        const VR::VRaySequenceData& sdata = vray->getSequenceData();
-        if (sdata.progress)
-        {
-            const TCHAR* nodeName = inode ? inode->GetName() : _T("");
-            GET_MBCS(nodeName, nodeName_mbcs);
-            sdata.progress->debug("VRayGolaem: newRenderInstance() for node \"%s\"", nodeName_mbcs);
-        }
+        const TCHAR* nodeName = inode ? inode->GetName() : _T("");
+        GET_MBCS(nodeName, nodeName_mbcs);
+        sdata.progress->debug("VRayGolaem: newRenderInstance() for node \"%s\"", nodeName_mbcs);
     }
-    VRayGolaemInstanceBase* golaemInstance = new VRayGolaemInstanceBase(this, inode, vray, renderID);
+
+    VRayGolaemInstance* golaemInstance = new VRayGolaemInstance(*this, inode, vray, renderID);
+    golaemInstance->newVRayPlugin(*vray);
+
     return golaemInstance;
 }
 
 void VRayGolaem::deleteRenderInstance(VR::VRenderInstance* ri)
 {
-    delete static_cast<VRayGolaemInstanceBase*>(ri);
+    delete static_cast<VRayGolaemInstance*>(ri);
 }
 
 //************************************************************
@@ -1743,126 +1779,6 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
     return true;
 }
 
-//------------------------------------------------------------
-// writeCrowdVRScene: get the node attributes to create a crowd .vrscene
-//------------------------------------------------------------
-bool VRayGolaem::writeCrowdVRScene(TimeValue t, const VR::CharString& file)
-{
-    // check if this object is not an instance (then it has no max node to query)
-    INode* inode = getNode(this);
-    if (inode == NULL)
-    {
-        CStr logMessage = CStr("VRayGolaem: This object is an 3ds Max instance and is not supported. Please create a copy.");
-        mprintf(logMessage.ToBSTR());
-        return false;
-    }
-    GET_MBCS(inode->GetName(), nodeName);
-    Matrix3 transform = inode->GetObjectTM(t) * maxToGolaem();
-
-    // check file path
-    std::stringstream outputStr;
-    std::ofstream outputFileStream(file.ptr());
-    if (!outputFileStream.is_open())
-        return false;
-
-    // correct the name of the shader to call. When exporting a scene from Maya with Vray, some shader name special characters are replaced with not parsable character (":" => "__")
-    // to be able to find the correct shader name to call, we need to apply the same conversion to the shader names contained in the cam file
-    CStr correctedCacheName(_cacheName);
-    convertToValidVrsceneName(_cacheName, correctedCacheName);
-
-    double unitScale = 1 / GetMasterScale(getCrowdUnit());
-
-    // node
-    outputStr << std::endl;
-    outputStr << "Node " << correctedCacheName << nodeName << "@node" << std::endl;
-    outputStr << "{" << std::endl;
-    outputStr << "\t"
-              << "transform=Transform(Matrix(Vector(1, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1)), Vector(0, 0, 0));" << std::endl;
-    outputStr << "\t"
-              << "geometry=" << correctedCacheName << nodeName << "@mesh1;" << std::endl;
-    outputStr << "\t"
-              << "visible=1;" << std::endl;
-    outputStr << "}" << std::endl;
-    outputStr << std::endl;
-
-    outputStr << "GolaemCrowd " << correctedCacheName << nodeName << "@mesh1" << std::endl;
-    outputStr << "{" << std::endl;
-    outputStr << "\t"
-              << "geoScale=" << unitScale << ";" << std::endl;
-    outputStr << "\t"
-              << "proxyMatrix=Transform(Matrix(Vector(" << transform.GetRow(0)[0] << ", " << transform.GetRow(0)[1] << ", " << transform.GetRow(0)[2] << "),"
-              << "Vector(" << transform.GetRow(1)[0] << ", " << transform.GetRow(1)[1] << ", " << transform.GetRow(1)[2] << "),"
-              << "Vector(" << transform.GetRow(2)[0] << ", " << transform.GetRow(2)[1] << ", " << transform.GetRow(2)[2] << ")),"
-              << "Vector(" << transform.GetRow(3)[0] << ", " << transform.GetRow(3)[1] << ", " << transform.GetRow(3)[2] << "));" << std::endl;
-    outputStr << "\t"
-              << "frameOffset=" << getCurrentFrameOffset(t) << ";" << std::endl;
-    outputStr << "\t"
-              << "crowdField=\"" << _crowdFields << "\";" << std::endl;
-    outputStr << "\t"
-              << "cacheName=\"" << _cacheName << "\";" << std::endl;
-    outputStr << "\t"
-              << "cacheFileDir=\"" << _cacheDir << "\";" << std::endl;
-    outputStr << "\t"
-              << "proxyName=\"" << nodeName << "\";" << std::endl;
-    outputStr << "\t"
-              << "characterFiles=\"" << _characterFiles << "\";" << std::endl;
-    // layout
-    outputStr << "\t"
-              << "layoutEnable=" << _layoutEnable << ";" << std::endl;
-    outputStr << "\t"
-              << "layoutFile=\"" << _layoutFile << "\";" << std::endl;
-    outputStr << "\t"
-              << "terrainFile=\"" << _terrainFile << "\";" << std::endl;
-    // moblur
-    outputStr << "\t"
-              << "motionBlurEnable=" << _mBlurEnable << ";" << std::endl;
-    if (_overMBlurWindowSize)
-        outputStr << "\t"
-                  << "motionBlurWindowSize=" << _mBlurWindowSize << ";" << std::endl;
-    if (_overMBlurSamples)
-        outputStr << "\t"
-                  << "motionBlurSamples=" << _mBlurSamples << ";" << std::endl;
-    // frustum culling
-    outputStr << "\t"
-              << "frustumCullingEnable=" << _frustumEnable << ";" << std::endl;
-    outputStr << "\t"
-              << "frustumMargin=" << _frustumMargin << ";" << std::endl;
-    outputStr << "\t"
-              << "cameraMargin=" << _cameraMargin << ";" << std::endl;
-    // vray
-    outputStr << "\t"
-              << "defaultMaterial=\"" << _defaultMaterial << "\";" << std::endl;
-    outputStr << "\t"
-              << "objectIdBase=" << _objectIDBase << ";" << std::endl;
-    outputStr << "\t"
-              << "objectIdMode=" << _objectIDMode << ";" << std::endl;
-    outputStr << "\t"
-              << "renderPercent=" << _displayPercent << ";" << std::endl;
-    outputStr << "\t"
-              << "geometryTag=" << _geometryTag << ";" << std::endl;
-    outputStr << "\t"
-              << "instancingEnable=" << _instancingEnable << ";" << std::endl;
-    outputStr << "\t"
-              << "cameraVisibility=" << _primaryVisibility << ";" << std::endl;
-    outputStr << "\t"
-              << "shadowsVisibility=" << _castsShadows << ";" << std::endl;
-    outputStr << "\t"
-              << "reflectionsVisibility=" << _visibleInReflections << ";" << std::endl;
-    outputStr << "\t"
-              << "refractionsVisibility=" << _visibleInRefractions << ";" << std::endl;
-
-    outputStr << "\t"
-              << "dccPackage=1;" << std::endl;
-
-    outputStr << "}" << std::endl;
-    outputStr << std::endl;
-
-    // write in file
-    outputFileStream << outputStr.str();
-    outputFileStream.close();
-    return true;
-}
-
 //************************************************************
 // Inline utility functions
 //************************************************************
@@ -1955,7 +1871,7 @@ void splitStr(const CStr& input, char delim, MaxSDK::Array<CStr>& result)
 }
 
 //************************************************************
-// Inline draw functions
+// Accessors draw functions
 //************************************************************
 
 inline void drawLine(GraphicsWindow* gw, const Point3& p0, const Point3& p1)
@@ -2039,36 +1955,6 @@ inline void drawText(GraphicsWindow* gw, const MCHAR* text, const Point3& pos)
     ipt.y--;
     gw->setColor(TEXT_COLOR, 1.0f, 1.0f, 1.0f);
     gw->wText(&ipt, text);
-}
-
-inline Matrix3 golaemToMax()
-{
-    return RotateXMatrix((float)pi / 2);
-}
-
-inline Matrix3 maxToGolaem()
-{
-    return RotateXMatrix(-(float)pi / 2);
-}
-
-inline void maxToGolaem(const Matrix3& matrix, float* outArray)
-{
-    outArray[0] = matrix[0][0];
-    outArray[1] = matrix[0][1];
-    outArray[2] = matrix[0][2];
-    outArray[3] = 0.f;
-    outArray[4] = matrix[1][0];
-    outArray[5] = matrix[1][1];
-    outArray[6] = matrix[1][2];
-    outArray[7] = 0.f;
-    outArray[8] = matrix[2][0];
-    outArray[9] = matrix[2][1];
-    outArray[10] = matrix[2][2];
-    outArray[11] = 0.f;
-    outArray[12] = matrix[3][0];
-    outArray[13] = matrix[3][1];
-    outArray[14] = matrix[3][2];
-    outArray[15] = 1.f;
 }
 
 // V-Ray materials expect rc.rayresult.sd to derive from VR::ShadeData, but this is not true for
@@ -2291,4 +2177,22 @@ GolaemBRDFWrapper::GolaemBRDFWrapper(void)
     , _mtlID(0)
     , _golaemInstance(NULL)
 {
+}
+
+//-----------------------------------------------------------------------------
+VrayGolaemContext::VrayGolaemContext()
+{
+    glm::crowdio::init();
+}
+//-----------------------------------------------------------------------------
+VrayGolaemContext::~VrayGolaemContext()
+{
+    glm::crowdio::finish();
+}
+
+//-----------------------------------------------------------------------------
+VrayGolaemContext& VrayGolaemContext::getVrayGolaemContext()
+{
+    static VrayGolaemContext vrayGolaemContext;
+    return vrayGolaemContext;
 }
