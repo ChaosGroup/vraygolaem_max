@@ -953,8 +953,10 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
                 return;
             }
 
-            glm::PODArray<int64_t> killList;
-            createEntityExclusionList(killList, cachedSimulation.getSrcSimulationData(), _cacheFactory.getLayoutHistory());
+			glm::PODArray<int64_t> killList;
+			const glm::crowdio::glmHistoryRuntimeStructure* historyStructure = _cacheFactory.getHistoryRuntimeStructure(_cacheDir, _cacheName, crowdFields[iCf]);
+			createEntityExclusionList(killList, cachedSimulation.getSrcSimulationData(), _cacheFactory.getLayoutHistory(), historyStructure);
+           
             for (size_t iExcluded = 0; iExcluded < killList.size(); ++iExcluded)
             {
                 _exclusionData.append(killList[iExcluded]);
