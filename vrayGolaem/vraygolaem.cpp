@@ -14,7 +14,6 @@
 #include "glmSimulationData.h"
 #include "glmFrameData.h"
 
-
 #pragma warning(push)
 #pragma warning(disable : 4535)
 
@@ -953,10 +952,10 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
                 return;
             }
 
-			glm::PODArray<int64_t> killList;
-			const glm::crowdio::glmHistoryRuntimeStructure* historyStructure = _cacheFactory.getHistoryRuntimeStructure(_cacheDir, _cacheName, crowdFields[iCf]);
-			createEntityExclusionList(killList, cachedSimulation.getSrcSimulationData(), _cacheFactory.getLayoutHistory(), historyStructure);
-           
+            glm::PODArray<int64_t> killList;
+            const glm::crowdio::glmHistoryRuntimeStructure* historyStructure = cachedSimulation.getHistoryRuntimeStructure();
+            createEntityExclusionList(killList, cachedSimulation.getSrcSimulationData(), _cacheFactory.getLayoutHistory(), historyStructure);
+
             for (size_t iExcluded = 0; iExcluded < killList.size(); ++iExcluded)
             {
                 _exclusionData.append(killList[iExcluded]);
