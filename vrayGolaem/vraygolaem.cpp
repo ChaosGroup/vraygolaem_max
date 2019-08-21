@@ -903,7 +903,15 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
     // load gscl first
     if (_layoutEnable)
     {
-        _cacheFactory.loadLayoutHistoryFile(_layoutFile);
+		// parse sparse array of layout files
+		glm::GlmString layoutFiles = _layoutFile.data();
+		glm::Array<glm::GlmString> layoutFilesArray;
+		glm::split(layoutFiles, ";", layoutFilesArray);
+		for (size_t iLayoutFile = 0; iLayoutFile < layoutFilesArray.size(); iLayoutFile++)
+		{
+			_cacheFactory.loadLayoutHistoryFile(iLayoutFile, layoutFilesArray[iLayoutFile].c_str());
+		}
+        
         _cacheFactory.setSimulationProxyMatrix(proxyArray, inverseProxyArray);
     }
 
@@ -939,13 +947,13 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
             }
 
             glm::crowdio::CachedSimulation& cachedSimulation = _cacheFactory.getCachedSimulation(_cacheDir, _cacheName, crowdFields[iCf]);
-            const glm::crowdio::GlmSimulationData* simData = cachedSimulation.getModifiedSimulationData();
+            const glm::crowdio::GlmSimulationData* simData = cachedSimulation.getFinalSimulationData();
             if (!simData)
             {
                 DebugPrint(_T("VRayGolaem: Error loading .gscs file\n"));
                 return;
             }
-            const glm::crowdio::GlmFrameData* frameData = cachedSimulation.getModifiedFrameData(currentFrame, true);
+            const glm::crowdio::GlmFrameData* frameData = cachedSimulation.getFinalFrameData(currentFrame, UINT32_MAX, true); // UINT32_MAX = output of layout after all nodes
             if (!frameData)
             {
                 DebugPrint(_T("VRayGolaem: Error loading .gscf file(s) for frame \"%f\"\n"), currentFrame);
@@ -953,8 +961,9 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
             }
 
             glm::PODArray<int64_t> killList;
-            const glm::crowdio::glmHistoryRuntimeStructure* historyStructure = cachedSimulation.getHistoryRuntimeStructure();
-            createEntityExclusionList(killList, cachedSimulation.getSrcSimulationData(), _cacheFactory.getLayoutHistory(), historyStructure);
+			glm::Array<const glm::crowdio::glmHistoryRuntimeStructure*> historyRuntimes;
+            cachedSimulation.getHistoryRuntimeStructures(historyRuntimes);
+            createEntityExclusionList(killList, cachedSimulation.getSrcSimulationData(), _cacheFactory.getLayoutHistories(), historyRuntimes);
 
             for (size_t iExcluded = 0; iExcluded < killList.size(); ++iExcluded)
             {
