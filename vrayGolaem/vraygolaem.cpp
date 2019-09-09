@@ -664,6 +664,14 @@ void VRayGolaem::ReleaseInterface(ULONG id, void* ip)
     GeomObject::ReleaseInterface(id, ip);
 }
 
+int VRayGolaem::RenderBegin(TimeValue t, ULONG flags) {
+	// This is called at the start of the rendering before the render instances are created and the scene is built;
+	// we must make sure the parameters are cached before newRenderInstance() is called.
+	updateVRayParams(t);
+
+	return TRUE;
+}
+
 Mesh* VRayGolaem::GetRenderMesh(TimeValue /*t*/, INode* /*inode*/, View& /*view*/, BOOL& needDelete)
 {
     needDelete = false;
