@@ -354,6 +354,8 @@ public:
     void* GetInterface(ULONG id);
     void ReleaseInterface(ULONG id, void* ip);
 
+	int RenderBegin(TimeValue t, ULONG flags) override;
+
     //////////////////////////////////////////
     // Direct paramblock access
     //////////////////////////////////////////
