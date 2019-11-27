@@ -12,7 +12,7 @@
 #pragma warning(pop)
 
 #pragma warning(push)
-#pragma warning(disable : 4100 4251 4275 4996 4512 4201 4244 4189 4389 4245 4127 4458 4457)
+#pragma warning(disable : 4100 4251 4275 4996 4512 4201 4244 4189 4389 4245 4127 4456 4457 4458 )
 
 #include "utils.h"
 #include "rayserver.h"

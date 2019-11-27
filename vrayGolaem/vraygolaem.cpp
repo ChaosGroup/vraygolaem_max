@@ -7,7 +7,10 @@
 #include "instance.h"
 #include "resource.h"
 
+#pragma warning(push)
+#pragma warning(disable : 4456)
 #include "vrayver.h"
+#pragma warning(pop)
 
 #include "glmCrowdIO.h"
 
@@ -16,9 +19,7 @@
 
 #pragma warning(push)
 #pragma warning(disable : 4535)
-
 #include "maxscript/maxscript.h"
-
 #pragma warning(pop)
 
 // V-Ray plugin ID for the 3ds Max material wrapper
