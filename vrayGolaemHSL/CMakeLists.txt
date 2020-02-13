@@ -11,7 +11,7 @@ list_files( "." "h;cpp;c;def;rc" )
 add_library( ${PROJECT_NAME} SHARED ${LIST_FILES} )
 
 # Flags
-add_definitions(-DUNICODE -D_UNICODE)
+target_compile_options(${PROJECT_NAME} PUBLIC "-DUNICODE" "-D_UNICODE")
 
 if(NOT VRAYGOLAEM_STANDALONE_BUILD)
     crowd_label_project( ${PROJECT_NAME} )
@@ -28,8 +28,8 @@ if(NOT VRAYGOLAEM_STANDALONE_BUILD)
     crowd_install_dependencies()
 else()
     # Include
-    include_directories( ${3DSMAXSDK_INCDIR_${3DSMAX_VERSION}} )
-    include_directories( ${VRAYFOR3DSMAX_INCDIR_${3DSMAX_VERSION}} )
+    target_include_directories(${PROJECT_NAME} PUBLIC ${3DSMAXSDK_INCDIR_${3DSMAX_VERSION}} )
+    target_include_directories(${PROJECT_NAME} PUBLIC ${VRAYFOR3DSMAX_INCDIR_${3DSMAX_VERSION}} )
 
     # Link
     target_link_libraries( ${PROJECT_NAME} "${SYSTEM_LIBS}")
