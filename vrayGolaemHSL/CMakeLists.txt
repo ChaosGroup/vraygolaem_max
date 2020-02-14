@@ -11,7 +11,7 @@ list_files( "." "h;cpp;c;def;rc" )
 add_library( ${PROJECT_NAME} SHARED ${LIST_FILES} )
 
 # Flags
-target_compile_options(${PROJECT_NAME} PUBLIC "-DUNICODE" "-D_UNICODE")
+target_compile_options(${PROJECT_NAME} PRIVATE "-DUNICODE" "-D_UNICODE")
 
 if(NOT VRAYGOLAEM_STANDALONE_BUILD)
     crowd_label_project( ${PROJECT_NAME} )
@@ -22,14 +22,14 @@ if(NOT VRAYGOLAEM_STANDALONE_BUILD)
 
     set_target_extension( ${PROJECT_NAME} CUSTOM ".dlt" )
 
-	target_compile_options(${PROJECT_NAME} PUBLIC -MD -U_DEBUG)
+	target_compile_options(${PROJECT_NAME} PRIVATE -MD -U_DEBUG)
 
     CROWD_INSTALL_RUNTIME_LIBRARY( ${PROJECT_NAME} "procedurals/3dsmax" "vrayGolaemHSL${3DSMAX_VERSION}")
     crowd_install_dependencies()
 else()
     # Include
-    target_include_directories(${PROJECT_NAME} PUBLIC ${3DSMAXSDK_INCDIR_${3DSMAX_VERSION}} )
-    target_include_directories(${PROJECT_NAME} PUBLIC ${VRAYFOR3DSMAX_INCDIR_${3DSMAX_VERSION}} )
+    target_include_directories(${PROJECT_NAME} PRIVATE ${3DSMAXSDK_INCDIR_${3DSMAX_VERSION}} )
+    target_include_directories(${PROJECT_NAME} PRIVATE ${VRAYFOR3DSMAX_INCDIR_${3DSMAX_VERSION}} )
 
     # Link
     target_link_libraries( ${PROJECT_NAME} "${SYSTEM_LIBS}")
