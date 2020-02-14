@@ -11,7 +11,7 @@ list_files( "." "h;cpp;c;def;rc;py" )
 add_library( ${PROJECT_NAME} SHARED ${LIST_FILES} )
 
 # Flags
-add_definitions(-DUNICODE -D_UNICODE)
+target_compile_options(${PROJECT_NAME} PRIVATE "-DUNICODE" "-D_UNICODE")
 
 if(NOT VRAYGOLAEM_STANDALONE_BUILD)
     crowd_label_project( ${PROJECT_NAME} )
@@ -22,7 +22,7 @@ if(NOT VRAYGOLAEM_STANDALONE_BUILD)
 
     set_target_extension( ${PROJECT_NAME} CUSTOM ".dlo" )
 
-	target_compile_options(${PROJECT_NAME} PUBLIC -MD -U_DEBUG)
+	target_compile_options(${PROJECT_NAME} PRIVATE -MD -U_DEBUG)
 
     CROWD_INSTALL_RUNTIME_LIBRARY( ${PROJECT_NAME} "procedurals/3dsmax" "vrayGolaem${3DSMAX_VERSION}")
     crowd_install_dependencies()
@@ -31,9 +31,9 @@ if(NOT VRAYGOLAEM_STANDALONE_BUILD)
 
 else()
     # Include
-    include_directories( ${3DSMAXSDK_INCDIR_${3DSMAX_VERSION}} )
-    include_directories( ${VRAYFOR3DSMAX_INCDIR_${3DSMAX_VERSION}} )
-    include_directories( ${GOLAEMDEVKIT_INCDIR} )
+    target_include_directories(${PROJECT_NAME} PRIVATE ${3DSMAXSDK_INCDIR_${3DSMAX_VERSION}} )
+    target_include_directories(${PROJECT_NAME} PRIVATE ${VRAYFOR3DSMAX_INCDIR_${3DSMAX_VERSION}} )
+    target_include_directories(${PROJECT_NAME} PRIVATE ${GOLAEMDEVKIT_INCDIR} )
 
     # Link
     target_link_libraries( ${PROJECT_NAME} "${SYSTEM_LIBS}")
