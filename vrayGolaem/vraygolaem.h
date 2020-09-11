@@ -92,6 +92,8 @@ enum param_list
     // time override
     pb_frame_override_enable,
     pb_frame_override,
+	// lod
+	pb_lod_enable,
 };
 
 //************************************************************
@@ -233,6 +235,7 @@ class VRayGolaem
     int _mBlurSamples;
 
     // Culling attributes
+	bool _lodEnable;
     bool _frustumEnable;
     float _frustumMargin;
     float _cameraMargin;

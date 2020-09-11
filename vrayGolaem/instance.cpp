@@ -116,9 +116,10 @@ void VRayGolaemInstance::newVRayPlugin(VRayCore& vray)
 
     vrayGolaemPlugin->setParameter(pluginRenderer->newBoolParam("cameraVisibility", vrayGolaem._primaryVisibility));
     vrayGolaemPlugin->setParameter(pluginRenderer->newBoolParam("dccPackage", true));
+	vrayGolaemPlugin->setParameter(pluginRenderer->newBoolParam("LODEnable", vrayGolaem._lodEnable));
     vrayGolaemPlugin->setParameter(pluginRenderer->newBoolParam("frustumCullingEnable", vrayGolaem._frustumEnable));
     vrayGolaemPlugin->setParameter(pluginRenderer->newBoolParam("instancingEnable", vrayGolaem._instancingEnable));
-    vrayGolaemPlugin->setParameter(pluginRenderer->newBoolParam("layoutEnable", vrayGolaem._layoutEnable));
+	vrayGolaemPlugin->setParameter(pluginRenderer->newBoolParam("layoutEnable", vrayGolaem._layoutEnable));
     vrayGolaemPlugin->setParameter(pluginRenderer->newBoolParam("motionBlurEnable", vrayGolaem._mBlurEnable));
     vrayGolaemPlugin->setParameter(pluginRenderer->newBoolParam("reflectionsVisibility", vrayGolaem._visibleInReflections));
     vrayGolaemPlugin->setParameter(pluginRenderer->newBoolParam("refractionsVisibility", vrayGolaem._visibleInRefractions));
