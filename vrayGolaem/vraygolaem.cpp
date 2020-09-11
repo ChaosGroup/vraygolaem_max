@@ -314,6 +314,10 @@ static ParamBlockDesc2 param_blk(
     p_ui, TYPE_EDITBOX, ED_TERRAINFILE,
     PB_END,
     // culling attributes
+	pb_lod_enable, _T("lod_enable"), TYPE_BOOL, P_RESET_DEFAULT, 0,
+	p_default, FALSE,
+	p_ui, TYPE_SINGLECHEKBOX, ED_LODENABLE,
+	PB_END,
     pb_frustum_enable, _T("frustum_enable"), TYPE_BOOL, P_RESET_DEFAULT, 0,
     p_default, FALSE,
     p_ui, TYPE_SINGLECHEKBOX, ED_FRUSTUMENABLE,
@@ -1147,6 +1151,7 @@ void VRayGolaem::updateVRayParams(TimeValue t)
     _mBlurEnable = !(_overMBlurSamples && _mBlurSamples == 1); // moblur is disabled if the object geo samples == 1
 
     // culling attributes
+	_lodEnable = pblock2->GetInt(pb_lod_enable, t) == 1;
     _frustumEnable = pblock2->GetInt(pb_frustum_enable, t) == 1;
     _frustumMargin = pblock2->GetFloat(pb_frustum_margin, t);
     _cameraMargin = pblock2->GetFloat(pb_camera_margin, t);
@@ -1702,6 +1707,9 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
             }
 
             // frustum culling
+			currentParam = plugin->getParameter("LODEnable");
+			if (currentParam)
+				pblock2->SetValue(pb_lod_enable, 0, currentParam->getBool() == 1);
             currentParam = plugin->getParameter("frustumCullingEnable");
             if (currentParam)
                 pblock2->SetValue(pb_frustum_enable, 0, currentParam->getBool() == 1);
