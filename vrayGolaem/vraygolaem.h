@@ -94,6 +94,7 @@ enum param_list
     pb_frame_override,
 	// lod
 	pb_lod_enable,
+	pb_log_level,
 };
 
 //************************************************************
@@ -257,9 +258,10 @@ class VRayGolaem
     bool _visibleInReflections;
     bool _visibleInRefractions;
     CStr _defaultMaterial;
+	short _logLevel;
 
     // Internal attributes
-    glm::crowdio::SimulationCacheFactory _cacheFactory;
+    glm::crowdio::SimulationCacheFactory* _cacheFactory;
 
     MaxSDK::Array<const glm::crowdio::GlmSimulationData*> _simDataToDraw;
     MaxSDK::Array<const glm::crowdio::GlmFrameData*> _frameDataToDraw;

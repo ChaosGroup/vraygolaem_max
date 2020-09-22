@@ -69,8 +69,7 @@ void VRayGolaemInstance::newVRayPlugin(VRayCore& vray)
 {
     const VRaySequenceData& sdata = vray.getSequenceData();
 
-    VRenderPluginRendererInterface* pluginRenderer =
-        queryInterface<VRenderPluginRendererInterface>(vray, EXT_VRENDER_PLUGIN_RENDERER);
+    VRenderPluginRendererInterface* pluginRenderer = queryInterface<VRenderPluginRendererInterface>(vray, EXT_VRENDER_PLUGIN_RENDERER);
     vassert(pluginRenderer);
 
     const TimeValue t = GetCOREInterface()->GetTime();
@@ -82,10 +81,9 @@ void VRayGolaemInstance::newVRayPlugin(VRayCore& vray)
     // to be able to find the correct shader name to call, we need to apply the same conversion
     // to the shader names contained in the cam file
     CStr correctedCacheName(vrayGolaem._cacheName);
-    convertToValidVrsceneName(vrayGolaem._cacheName, correctedCacheName);
+	convertToValidVrsceneName((vrayGolaem._cacheName + nodeName), correctedCacheName);
 
-    VRayPlugin* vrayGolaemPlugin =
-        pluginRenderer->newPlugin(GolaemMeshInstance_PluginID, correctedCacheName.data());
+    VRayPlugin* vrayGolaemPlugin = pluginRenderer->newPlugin(GolaemMeshInstance_PluginID, correctedCacheName.data());
     if (!vrayGolaemPlugin)
     {
         if (sdata.progress)
@@ -95,8 +93,8 @@ void VRayGolaemInstance::newVRayPlugin(VRayCore& vray)
         return;
     }
 
-    VRayPlugin* nodePlugin =
-        pluginRenderer->newPlugin(PluginId::Node, nodeName);
+    VRayPlugin* nodePlugin = pluginRenderer->newPlugin(PluginId::Node, nodeName);
+	sdata.progress->info("VRayGolaemInstance: Start rendering for node %s", nodeName);
     vassert(nodePlugin);
 
     // XXX: Some dummy material may require.
@@ -124,6 +122,7 @@ void VRayGolaemInstance::newVRayPlugin(VRayCore& vray)
     vrayGolaemPlugin->setParameter(pluginRenderer->newBoolParam("reflectionsVisibility", vrayGolaem._visibleInReflections));
     vrayGolaemPlugin->setParameter(pluginRenderer->newBoolParam("refractionsVisibility", vrayGolaem._visibleInRefractions));
     vrayGolaemPlugin->setParameter(pluginRenderer->newBoolParam("shadowsVisibility", vrayGolaem._castsShadows));
+	vrayGolaemPlugin->setParameter(pluginRenderer->newBoolParam("logLevel", vrayGolaem._logLevel));
 
     vrayGolaemPlugin->setParameter(pluginRenderer->newIntParam("geometryTag", vrayGolaem._geometryTag));
     vrayGolaemPlugin->setParameter(pluginRenderer->newIntParam("objectIdBase", vrayGolaem._objectIDBase));
