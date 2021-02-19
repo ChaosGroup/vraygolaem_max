@@ -12,7 +12,7 @@
 #pragma warning(pop)
 
 #pragma warning(push)
-#pragma warning(disable : 4100 4251 4275 4996 4512 4201 4244 4189 4389 4245 4127 4456 4457 4458 )
+#pragma warning(disable : 4100 4251 4275 4996 4512 4201 4244 4189 4389 4245 4127 4456 4457 4458 4505 )
 
 #include "utils.h"
 #include "rayserver.h"
@@ -202,8 +202,8 @@ namespace glm
 
 class VRayGolaem
     : public GeomObject,
-      public VR::VRenderObject,
-      public ObjectIDWrapperInterface
+      public VR::VRenderObject/*,
+      public ObjectIDWrapperInterface*/
 {
     friend struct VRayGolaemInstance;
     friend class VRayGolaemDlgProc;
@@ -436,7 +436,7 @@ public:
     void frameEnd(VR::VRayCore* vray);
 
     // From ObjectIDWrapperInterface
-    int getObjectID() VRAY_OVERRIDE
+    int getObjectID() /*VRAY_OVERRIDE*/
     {
         return _objectIDBase;
     }
