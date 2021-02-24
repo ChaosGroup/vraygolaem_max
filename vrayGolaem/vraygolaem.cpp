@@ -3,6 +3,10 @@
 *  Copyright (C) Chaos Group & Golaem S.A. - All Rights Reserved.          *
 *                                                                          *
 ***************************************************************************/
+#include "glmCrowdIO.h"
+#include "glmSimulationData.h"
+#include "glmFrameData.h"
+
 #include "vraygolaem.h"
 #include "instance.h"
 #include "resource.h"
@@ -11,11 +15,6 @@
 #pragma warning(disable : 4456)
 #include "vrayver.h"
 #pragma warning(pop)
-
-#include "glmCrowdIO.h"
-
-#include "glmSimulationData.h"
-#include "glmFrameData.h"
 
 #pragma warning(push)
 #pragma warning(disable : 4535)
@@ -314,10 +313,10 @@ static ParamBlockDesc2 param_blk(
     p_ui, TYPE_EDITBOX, ED_TERRAINFILE,
     PB_END,
     // culling attributes
-	pb_lod_enable, _T("lod_enable"), TYPE_BOOL, P_RESET_DEFAULT, 0,
-	p_default, FALSE,
-	p_ui, TYPE_SINGLECHEKBOX, ED_LODENABLE,
-	PB_END,
+    pb_lod_enable, _T("lod_enable"), TYPE_BOOL, P_RESET_DEFAULT, 0,
+    p_default, FALSE,
+    p_ui, TYPE_SINGLECHEKBOX, ED_LODENABLE,
+    PB_END,
     pb_frustum_enable, _T("frustum_enable"), TYPE_BOOL, P_RESET_DEFAULT, 0,
     p_default, FALSE,
     p_ui, TYPE_SINGLECHEKBOX, ED_FRUSTUMENABLE,
@@ -360,11 +359,11 @@ static ParamBlockDesc2 param_blk(
     p_default, TRUE,
     p_ui, TYPE_SINGLECHEKBOX, ED_INSTANCINGENABLE,
     PB_END,
-	pb_log_level, _T("log_level"), TYPE_INT, P_RESET_DEFAULT, 0,
-	p_ui, TYPE_INT_COMBOBOX, CB_LOGLEVEL, 4, CB_LOGLEVEL_ITEM1, CB_LOGLEVEL_ITEM2, CB_LOGLEVEL_ITEM3, CB_LOGLEVEL_ITEM4,
-	p_vals, 0, 1, 2, 3,
-	p_default, 1,
-	PB_END,
+    pb_log_level, _T("log_level"), TYPE_INT, P_RESET_DEFAULT, 0,
+    p_ui, TYPE_INT_COMBOBOX, CB_LOGLEVEL, 4, CB_LOGLEVEL_ITEM1, CB_LOGLEVEL_ITEM2, CB_LOGLEVEL_ITEM3, CB_LOGLEVEL_ITEM4,
+    p_vals, 0, 1, 2, 3,
+    p_default, 1,
+    PB_END,
 
     // time override attributes
     pb_frame_override_enable, _T("frame_override_enable"), TYPE_BOOL, P_RESET_DEFAULT, 0,
@@ -421,12 +420,12 @@ VRayGolaem::VRayGolaem()
     assert(pblock2);
     suspendSnap = FALSE;
     VrayGolaemContext::getVrayGolaemContext();
-	_cacheFactory = new glm::crowdio::SimulationCacheFactory();
+    _cacheFactory = new glm::crowdio::SimulationCacheFactory();
 }
 
 VRayGolaem::~VRayGolaem()
 {
-	GLM_SAFE_DELETE(_cacheFactory);
+    GLM_SAFE_DELETE(_cacheFactory);
 }
 
 //------------------------------------------------------------
@@ -676,12 +675,13 @@ void VRayGolaem::ReleaseInterface(ULONG id, void* ip)
     GeomObject::ReleaseInterface(id, ip);
 }
 
-int VRayGolaem::RenderBegin(TimeValue t, ULONG /*flags*/) {
-	// This is called at the start of the rendering before the render instances are created and the scene is built;
-	// we must make sure the parameters are cached before newRenderInstance() is called.
-	updateVRayParams(t);
+int VRayGolaem::RenderBegin(TimeValue t, ULONG /*flags*/)
+{
+    // This is called at the start of the rendering before the render instances are created and the scene is built;
+    // we must make sure the parameters are cached before newRenderInstance() is called.
+    updateVRayParams(t);
 
-	return TRUE;
+    return TRUE;
 }
 
 Mesh* VRayGolaem::GetRenderMesh(TimeValue /*t*/, INode* /*inode*/, View& /*view*/, BOOL& needDelete)
@@ -923,15 +923,15 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
     // load gscl first
     if (_layoutEnable)
     {
-		// parse sparse array of layout files
-		glm::GlmString layoutFiles = _layoutFile.data();
-		glm::Array<glm::GlmString> layoutFilesArray;
-		glm::split(layoutFiles, ";", layoutFilesArray);
-		for (size_t iLayoutFile = 0; iLayoutFile < layoutFilesArray.size(); iLayoutFile++)
-		{
-			_cacheFactory->loadLayoutHistoryFile(iLayoutFile, layoutFilesArray[iLayoutFile].c_str());
-		}
-        
+        // parse sparse array of layout files
+        glm::GlmString layoutFiles = _layoutFile.data();
+        glm::Array<glm::GlmString> layoutFilesArray;
+        glm::split(layoutFiles, ";", layoutFilesArray);
+        for (size_t iLayoutFile = 0; iLayoutFile < layoutFilesArray.size(); iLayoutFile++)
+        {
+            _cacheFactory->loadLayoutHistoryFile(iLayoutFile, layoutFilesArray[iLayoutFile].c_str());
+        }
+
         _cacheFactory->setSimulationProxyMatrix(proxyArray, inverseProxyArray);
     }
 
@@ -981,7 +981,7 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
             }
 
             glm::PODArray<int64_t> killList;
-			glm::Array<const glm::crowdio::glmHistoryRuntimeStructure*> historyRuntimes;
+            glm::Array<const glm::crowdio::glmHistoryRuntimeStructure*> historyRuntimes;
             cachedSimulation.getHistoryRuntimeStructures(historyRuntimes);
             createEntityExclusionList(killList, cachedSimulation.getSrcSimulationData(), _cacheFactory->getLayoutHistories(), historyRuntimes);
 
@@ -1158,7 +1158,7 @@ void VRayGolaem::updateVRayParams(TimeValue t)
     _mBlurEnable = !(_overMBlurSamples && _mBlurSamples == 1); // moblur is disabled if the object geo samples == 1
 
     // culling attributes
-	_lodEnable = pblock2->GetInt(pb_lod_enable, t) == 1;
+    _lodEnable = pblock2->GetInt(pb_lod_enable, t) == 1;
     _frustumEnable = pblock2->GetInt(pb_frustum_enable, t) == 1;
     _frustumMargin = pblock2->GetFloat(pb_frustum_margin, t);
     _cameraMargin = pblock2->GetFloat(pb_camera_margin, t);
@@ -1174,7 +1174,7 @@ void VRayGolaem::updateVRayParams(TimeValue t)
     _displayPercent = pblock2->GetFloat(pb_display_percentage, t);
     _geometryTag = pblock2->GetInt(pb_geometry_tag, t);
     _instancingEnable = pblock2->GetInt(pb_instancing_enable, t) == 1;
-	_logLevel = (short)pblock2->GetInt(pb_log_level, t);
+    _logLevel = (short)pblock2->GetInt(pb_log_level, t);
 
     // object properties
     _objectIDBase = inode->GetGBufID();
@@ -1240,7 +1240,7 @@ void VRayGolaem::createMaterials(VR::VRayCore* vray)
 {
     const VR::VRaySequenceData& sdata = vray->getSequenceData();
     INode* inode = getNode(this);
-	const TCHAR* name_wstr = GetObjectName();
+    const TCHAR* name_wstr = GetObjectName();
     if (!inode)
     {
         if (sdata.progress)
@@ -1253,8 +1253,8 @@ void VRayGolaem::createMaterials(VR::VRayCore* vray)
 
     if (sdata.progress)
     {
-		GET_MBCS(node->GetName(), nodeName);
-		sdata.progress->info("VRayGolaem: Create materials attached to the VRayGolaem node %s", nodeName);
+        GET_MBCS(node->GetName(), nodeName);
+        sdata.progress->info("VRayGolaem: Create materials attached to the VRayGolaem node %s", nodeName);
     }
 
     enumMaterials(vray, inode->GetMtl());
@@ -1328,8 +1328,8 @@ void VRayGolaem::renderBegin(TimeValue t, VR::VRayCore* vrayCore)
 
 #if 1
 
-	GET_MBCS(node->GetName(), nodeName);
-	int prevNbPlugins(plugMan->enumPlugins(NULL));
+    GET_MBCS(node->GetName(), nodeName);
+    int prevNbPlugins(plugMan->enumPlugins(NULL));
     int newNbPlugins = prevNbPlugins;
 
     // Create wrapper plugins for all 3ds Max materials in the scene,
@@ -1586,7 +1586,7 @@ VR::VRenderInstance* VRayGolaem::newRenderInstance(INode* inode, VR::VRayCore* v
     {
         const TCHAR* nodeName = inode ? inode->GetName() : _T("");
         GET_MBCS(nodeName, nodeName_mbcs);
-		sdata.progress->debug("VRayGolaem: newRenderInstance() for node \"%s\"", nodeName_mbcs);
+        sdata.progress->debug("VRayGolaem: newRenderInstance() for node \"%s\"", nodeName_mbcs);
     }
 
     VRayGolaemInstance* golaemInstance = new VRayGolaemInstance(*this, inode, vray, renderID);
@@ -1717,9 +1717,9 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
             }
 
             // frustum culling
-			currentParam = plugin->getParameter("LODEnable");
-			if (currentParam)
-				pblock2->SetValue(pb_lod_enable, 0, currentParam->getBool() == 1);
+            currentParam = plugin->getParameter("LODEnable");
+            if (currentParam)
+                pblock2->SetValue(pb_lod_enable, 0, currentParam->getBool() == 1);
             currentParam = plugin->getParameter("frustumCullingEnable");
             if (currentParam)
                 pblock2->SetValue(pb_frustum_enable, 0, currentParam->getBool() == 1);
@@ -1749,9 +1749,9 @@ bool VRayGolaem::readCrowdVRScene(const VR::CharString& file)
             currentParam = plugin->getParameter("instancingEnable");
             if (currentParam)
                 pblock2->SetValue(pb_instancing_enable, 0, currentParam->getBool() == 1);
-			currentParam = plugin->getParameter("logLevel");
-			if (currentParam)
-				pblock2->SetValue(pb_log_level, 0, currentParam->getInt());
+            currentParam = plugin->getParameter("logLevel");
+            if (currentParam)
+                pblock2->SetValue(pb_log_level, 0, currentParam->getInt());
 
             // properties (copy them in the max node as well if it exists)
             int objectIDBase(0);
@@ -2031,7 +2031,7 @@ struct MtlShadeData : VR::ShadeData
         return result;
     }
 
-	void getUVWderivs(const VR::VRayContext& rc, int channel, VR::ShadeVec derivs[2], const VR::UVWFlags /*uvwFlags*/) VRAY_OVERRIDE
+    void getUVWderivs(const VR::VRayContext& rc, int channel, VR::ShadeVec derivs[2], const VR::UVWFlags /*uvwFlags*/) VRAY_OVERRIDE
     {
         if (!initMapChannel(rc, channel))
         {

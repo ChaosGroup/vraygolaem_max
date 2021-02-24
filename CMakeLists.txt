@@ -59,6 +59,8 @@ if(VRAYGOLAEM_STANDALONE_BUILD)
 	############################################################
 	project (vraygolaem)
 
+	add_definitions(-DWITH_DR1)
+
 	set(CMAKE_CXX_FLAGS "/DWIN32 /D_WINDOWS /GR /EHsc /MD")
 
 	# Enable multi core compilation
@@ -85,9 +87,9 @@ if(VRAYGOLAEM_STANDALONE_BUILD)
 	set( VRAYFOR3DSMAX_ROOTDIR "VRay Root Dir" CACHE PATH "VRay Root directory" )
 	set( GOLAEMDEVKIT_ROOTDIR "Golaem Devkit Root Dir" CACHE PATH "Golaem DevKit directory" )
 
-	set( 3DSMAXSDK_INCDIR "${3DSMAXSDK_ROOTDIR}/include" CACHE PATH "")
+	set( 3DSMAXSDK_INCDIR "${3DSMAXSDK_ROOTDIR}/include" "${3DSMAXSDK_ROOTDIR}/include/maxscript" CACHE PATH "")
 	set( 3DSMAXSDK_LIBDIR "${3DSMAXSDK_ROOTDIR}/lib/x64/Release"  CACHE PATH "")
-	set( VRAYFOR3DSMAX_INCDIR "${VRAYFOR3DSMAX_ROOTDIR}/include" )
+	set( VRAYFOR3DSMAX_INCDIR "${VRAYFOR3DSMAX_ROOTDIR}/include" "${VRAYFOR3DSMAX_ROOTDIR}/include/" )
 	set( VRAYFOR3DSMAX_LIBDIR "${VRAYFOR3DSMAX_ROOTDIR}/lib/x64" )
 	set( GOLAEMDEVKIT_INCDIR "${GOLAEMDEVKIT_ROOTDIR}/include" )
 	set( GOLAEMDEVKIT_LIBDIR "${GOLAEMDEVKIT_ROOTDIR}/lib" )

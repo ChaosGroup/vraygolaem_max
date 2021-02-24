@@ -5,7 +5,6 @@
 ***************************************************************************/
 
 #include "instance.h"
-
 #include "vraygolaem.h"
 
 #pragma warning(push)
