@@ -6,13 +6,15 @@
 
 #pragma once
 
+#include "glmSimulationCacheFactory.h"
+
 #pragma warning(push)
 #pragma warning(disable : 4840 4458)
 #include "max.h"
 #pragma warning(pop)
 
 #pragma warning(push)
-#pragma warning(disable : 4100 4251 4275 4996 4512 4201 4244 4189 4389 4245 4127 4456 4457 4458 )
+#pragma warning(disable : 4100 4251 4275 4996 4512 4201 4244 4189 4389 4245 4127 4456 4457 4458 4505 4535 )
 
 #include "utils.h"
 #include "rayserver.h"
@@ -21,14 +23,11 @@
 #include "vraygeom.h"
 
 #include <vrender_plugin_renderer_brdf_wrapper.h>
-
 #include "vraysceneplugman.h"
 #include <vrender_plugin_renderer_interface.h>
 #include "pb2template_generator.h"
 
 #pragma warning(pop)
-
-#include "glmSimulationCacheFactory.h"
 
 //************************************************************
 // #defines
@@ -202,8 +201,8 @@ namespace glm
 
 class VRayGolaem
     : public GeomObject,
-      public VR::VRenderObject,
-      public ObjectIDWrapperInterface
+      public VR::VRenderObject/*,
+      public ObjectIDWrapperInterface*/
 {
     friend struct VRayGolaemInstance;
     friend class VRayGolaemDlgProc;
@@ -436,7 +435,7 @@ public:
     void frameEnd(VR::VRayCore* vray);
 
     // From ObjectIDWrapperInterface
-    int getObjectID() VRAY_OVERRIDE
+    int getObjectID() /*VRAY_OVERRIDE*/
     {
         return _objectIDBase;
     }

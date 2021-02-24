@@ -7,12 +7,12 @@
 #pragma once
 
 #pragma warning(push)
-#pragma warning(disable : 4840 4458)
+#pragma warning(disable : 4840 4458 )
 #include "max.h"
 #pragma warning(pop)
 
 #pragma warning(push)
-#pragma warning(disable : 4100 4189 4127 4201 4244 4251 4324 4389 4456 4457 4458 4512 4996)
+#pragma warning(disable : 4100 4189 4127 4201 4244 4251 4324 4389 4456 4457 4458 4512 4505 4535 4996)
 #include "vraygeom.h"
 #include <vrender_plugin_renderer_interface.h>
 #pragma warning(pop)

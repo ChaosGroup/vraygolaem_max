@@ -5,11 +5,10 @@
 ***************************************************************************/
 
 #include "instance.h"
-
 #include "vraygolaem.h"
 
 #pragma warning(push)
-#pragma warning(disable : 4100 4251 4324 4456 4458 4535)
+#pragma warning(disable : 4100 4251 4324 4456 4458 4505 4535)
 #include <defparams.h>
 #include <maxutils/tomax.h>
 #include <vray_plugins_ids.h>
@@ -29,6 +28,12 @@ VRayGolaemInstance::VRayGolaemInstance(VRayGolaem& vrayGolaem, INode* node, VRay
 
     // Set dummy mesh
     mesh = &dummyMesh;
+}
+
+static TraceTransform getTraceTransform(INode* inode, TimeValue t)
+{
+    vassert(inode);
+    return toTraceTransform(inode->GetObjectTM(t, &validForever) * maxToGolaem());
 }
 
 static Transform getTransform(INode* inode, TimeValue t)
@@ -58,7 +63,7 @@ void VRayGolaemInstance::frameBegin(TimeValue t, VRayCore* vray)
         queryInterface<VRaySettableParamInterface>(paramFrameOffset, EXT_SETTABLE_PARAM);
     vassert(settableFrameOffset);
 
-    const Transform& tm = getTransform(node, t);
+    const TraceTransform& tm = getTraceTransform(node, t);
     settableTransform->setTransform(tm, 0, time);
 
     const float frameOffset = vrayGolaem.getCurrentFrameOffset(t);
