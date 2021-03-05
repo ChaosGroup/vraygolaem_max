@@ -2,15 +2,16 @@
 # BEGIN Project
 ############################################################
 
-project(${TARGET_CROWD3DSMAXVRAYHSL${3DSMAX_VERSION}})
+project("${TARGET_CROWD3DSMAX${3DSMAX_VERSION}VRAYHSL40}")
 
 # List Files
-list_files( "." "h;cpp;c;def;rc" )
+list_files( "." "h;cpp;c;def;rc" "${CMAKE_CURRENT_SOURCE_DIR}/../_shared")
 
 # Create a library
 add_library( ${PROJECT_NAME} SHARED ${LIST_FILES} )
 
 # Flags
+target_compile_options(${PROJECT_NAME} PRIVATE "-DGLM_USE_VRAY40")
 target_compile_options(${PROJECT_NAME} PRIVATE "-DUNICODE" "-D_UNICODE")
 
 if(NOT VRAYGOLAEM_STANDALONE_BUILD)
@@ -24,7 +25,8 @@ if(NOT VRAYGOLAEM_STANDALONE_BUILD)
 
 	target_compile_options(${PROJECT_NAME} PRIVATE -MD -U_DEBUG)
 
-    CROWD_INSTALL_RUNTIME_LIBRARY( ${PROJECT_NAME} "procedurals/3dsmax" "vrayGolaemHSL${3DSMAX_VERSION}")
+    #CROWD_INSTALL_RUNTIME_LIBRARY( ${PROJECT_NAME} "procedurals/3dsmax" "vrayGolaemHSL${3DSMAX_VERSION}")
+    CROWD_INSTALL_PLUGIN( ${PROJECT_NAME} "procedurals/3dsmax" )
     crowd_install_dependencies()
 else()
     # Include

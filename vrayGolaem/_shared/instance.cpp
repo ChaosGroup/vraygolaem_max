@@ -30,11 +30,13 @@ VRayGolaemInstance::VRayGolaemInstance(VRayGolaem& vrayGolaem, INode* node, VRay
     mesh = &dummyMesh;
 }
 
+#ifdef GLM_USE_VRAY50
 static TraceTransform getTraceTransform(INode* inode, TimeValue t)
 {
     vassert(inode);
     return toTraceTransform(inode->GetObjectTM(t, &validForever) * maxToGolaem());
 }
+#endif
 
 static Transform getTransform(INode* inode, TimeValue t)
 {
@@ -63,7 +65,11 @@ void VRayGolaemInstance::frameBegin(TimeValue t, VRayCore* vray)
         queryInterface<VRaySettableParamInterface>(paramFrameOffset, EXT_SETTABLE_PARAM);
     vassert(settableFrameOffset);
 
+#ifdef GLM_USE_VRAY50
     const TraceTransform& tm = getTraceTransform(node, t);
+#else
+    const Transform& tm = getTransform(node, t);
+#endif
     settableTransform->setTransform(tm, 0, time);
 
     const float frameOffset = vrayGolaem.getCurrentFrameOffset(t);

@@ -2031,7 +2031,11 @@ struct MtlShadeData : VR::ShadeData
         return result;
     }
 
+#ifdef GLM_USE_VRAY50
     void getUVWderivs(const VR::VRayContext& rc, int channel, VR::ShadeVec derivs[2], const VR::UVWFlags /*uvwFlags*/) VRAY_OVERRIDE
+#else
+    void getUVWderivs(const VR::VRayContext& rc, int channel, VR::ShadeVec derivs[2]) VRAY_OVERRIDE
+#endif
     {
         if (!initMapChannel(rc, channel))
         {
@@ -2045,7 +2049,11 @@ struct MtlShadeData : VR::ShadeData
         }
     }
 
+#ifdef GLM_USE_VRAY50
     void getUVWbases(const VR::VRayContext& rc, int channel, VR::ShadeVec bases[3], const VR::UVWFlags /*uvwFlags*/) VRAY_OVERRIDE
+#else
+    void getUVWbases(const VR::VRayContext& rc, int channel, VR::ShadeVec bases[3]) VRAY_OVERRIDE
+#endif
     {
         if (!initMapChannel(rc, channel))
         {
@@ -2125,7 +2133,11 @@ protected:
         }
 
         // In 3ds Max, mapping channels start from 1, so that's why we subtract 1 from the channelIndex here.
+#ifdef GLM_USE_VRAY50
         mappedSurface->getLocalUVWTransform(rc, channelIndex - 1, lastMapChannelTransform, VR::UVWFlags::uvwFlags_default);
+#else
+        mappedSurface->getLocalUVWTransform(rc, channelIndex - 1, lastMapChannelTransform);
+#endif
         lastMapChannelIndex = channelIndex;
         return true;
     }
