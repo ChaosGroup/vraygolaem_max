@@ -14,7 +14,7 @@
 #pragma warning(pop)
 
 #pragma warning(push)
-#pragma warning(disable : 4100 4251 4275 4996 4512 4201 4244 4189 4389 4245 4127 4456 4457 4458 4505 4535 )
+#pragma warning(disable : 4100 4251 4275 4996 4512 4201 4244 4189 4389 4245 4127 4456 4457 4458 4505 4535)
 
 #include "utils.h"
 #include "rayserver.h"
@@ -91,9 +91,9 @@ enum param_list
     // time override
     pb_frame_override_enable,
     pb_frame_override,
-	// lod
-	pb_lod_enable,
-	pb_log_level,
+    // lod
+    pb_lod_enable,
+    pb_log_level,
 };
 
 //************************************************************
@@ -201,8 +201,11 @@ namespace glm
 
 class VRayGolaem
     : public GeomObject,
-      public VR::VRenderObject/*,
-      public ObjectIDWrapperInterface*/
+      public VR::VRenderObject
+#ifdef GLM_USE_VRAY40
+    ,
+      public ObjectIDWrapperInterface
+#endif
 {
     friend struct VRayGolaemInstance;
     friend class VRayGolaemDlgProc;
@@ -235,7 +238,7 @@ class VRayGolaem
     int _mBlurSamples;
 
     // Culling attributes
-	bool _lodEnable;
+    bool _lodEnable;
     bool _frustumEnable;
     float _frustumMargin;
     float _cameraMargin;
@@ -257,7 +260,7 @@ class VRayGolaem
     bool _visibleInReflections;
     bool _visibleInRefractions;
     CStr _defaultMaterial;
-	short _logLevel;
+    short _logLevel;
 
     // Internal attributes
     glm::crowdio::SimulationCacheFactory* _cacheFactory;
@@ -358,7 +361,7 @@ public:
     void* GetInterface(ULONG id);
     void ReleaseInterface(ULONG id, void* ip);
 
-	int RenderBegin(TimeValue t, ULONG flags) override;
+    int RenderBegin(TimeValue t, ULONG flags) override;
 
     //////////////////////////////////////////
     // Direct paramblock access
@@ -435,7 +438,11 @@ public:
     void frameEnd(VR::VRayCore* vray);
 
     // From ObjectIDWrapperInterface
-    int getObjectID() /*VRAY_OVERRIDE*/
+#ifdef GLM_USE_VRAY50
+    int getObjectID()
+#else
+    int getObjectID() VRAY_OVERRIDE
+#endif
     {
         return _objectIDBase;
     }
