@@ -11,7 +11,9 @@ list_files( "." "h;cpp;c;def;rc;py" "${CMAKE_CURRENT_SOURCE_DIR}/../_shared")
 add_library( ${PROJECT_NAME} SHARED ${LIST_FILES} )
 
 # Flags
-target_compile_options(${PROJECT_NAME} PRIVATE "-DGLM_USE_VRAY40")
+string( REGEX MATCHALL "[0-9]+" VERSIONS ${PROJECT_NAME}) # Extract numbers from project name (3;2018;40)
+list(GET VERSIONS -1 VERSION) # Get last element
+target_compile_options(${PROJECT_NAME} PRIVATE "-DGLM_USE_VRAY${VERSION}")
 target_compile_options(${PROJECT_NAME} PRIVATE "-DUNICODE" "-D_UNICODE")
 
 if(NOT VRAYGOLAEM_STANDALONE_BUILD)
@@ -25,11 +27,10 @@ if(NOT VRAYGOLAEM_STANDALONE_BUILD)
 
 	target_compile_options(${PROJECT_NAME} PRIVATE -MD -U_DEBUG)
 
-    #CROWD_INSTALL_RUNTIME_LIBRARY( ${PROJECT_NAME} "procedurals/3dsmax" "vrayGolaem${3DSMAX_VERSION}")
-    CROWD_INSTALL_PLUGIN( ${PROJECT_NAME} "procedurals/3dsmax" )
+    CROWD_INSTALL_PLUGIN( ${PROJECT_NAME} "procedurals/3dsmax/${VERSION}" )
     crowd_install_dependencies()
-    install( FILES "${CMAKE_CURRENT_SOURCE_DIR}/../_shared/vraygolaem.py" CONFIGURATIONS Debug DESTINATION "${CROWD_INSTALL_PATH_Debug}/procedurals/3dsmax/scripts" )
-    install( FILES "${CMAKE_CURRENT_SOURCE_DIR}/../_shared/vraygolaem.py" CONFIGURATIONS Release DESTINATION "${CROWD_INSTALL_PATH_Release}/procedurals/3dsmax/scripts" )
+    install( FILES "${CMAKE_CURRENT_SOURCE_DIR}/../_shared/vraygolaem.py" CONFIGURATIONS Debug DESTINATION "${CROWD_INSTALL_PATH_Debug}/procedurals/3dsmax/${VERSION}/scripts" )
+    install( FILES "${CMAKE_CURRENT_SOURCE_DIR}/../_shared/vraygolaem.py" CONFIGURATIONS Release DESTINATION "${CROWD_INSTALL_PATH_Release}/procedurals/3dsmax/${VERSION}/scripts" )
 
 else()
     # Include
