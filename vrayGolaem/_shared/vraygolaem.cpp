@@ -905,8 +905,6 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
     // clean previous data
     _simDataToDraw.removeAll();
     _frameDataToDraw.removeAll();
-    _exclusionData.removeAll();
-
     // update params
     updateVRayParams(t);
     _updateCacheData = false;
