@@ -980,16 +980,6 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
                 return;
             }
 
-            glm::PODArray<int64_t> killList;
-            glm::Array<const glm::crowdio::glmHistoryRuntimeStructure*> historyRuntimes;
-            cachedSimulation.getHistoryRuntimeStructures(historyRuntimes);
-            createEntityExclusionList(killList, cachedSimulation.getSrcSimulationData(), _cacheFactory->getLayoutHistories(), historyRuntimes);
-
-            for (size_t iExcluded = 0; iExcluded < killList.size(); ++iExcluded)
-            {
-                _exclusionData.append(killList[iExcluded]);
-            }
-
             _simDataToDraw.append(simData);
             _frameDataToDraw.append(frameData);
 
@@ -1037,8 +1027,11 @@ void VRayGolaem::drawEntities(GraphicsWindow* gw, const Matrix3& transform, Time
             int64_t entityId = _simDataToDraw[iData]->_entityIds[iEntity];
             if (entityId == -1)
                 continue;
-            if (_exclusionData.contains(entityId))
+
+            if (_frameDataToDraw[iData]->_entityEnabled != 1)
+            {
                 continue;
+            }
 
             unsigned int entityType = _simDataToDraw[iData]->_entityTypes[iEntity];
             if (_simDataToDraw[iData]->_boneCount[entityType] > 0)

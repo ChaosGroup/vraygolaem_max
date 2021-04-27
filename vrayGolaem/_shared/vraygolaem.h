@@ -268,7 +268,6 @@ class VRayGolaem
     MaxSDK::Array<const glm::crowdio::GlmSimulationData*> _simDataToDraw;
     MaxSDK::Array<const glm::crowdio::GlmFrameData*> _frameDataToDraw;
 
-    MaxSDK::Array<int64_t> _exclusionData;
     bool _updateCacheData;
     Box3 _nodeBbox; //!< Node bbox
 
