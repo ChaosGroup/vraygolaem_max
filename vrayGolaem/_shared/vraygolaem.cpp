@@ -1026,7 +1026,7 @@ void VRayGolaem::drawEntities(GraphicsWindow* gw, const Matrix3& transform, Time
             if (entityId == -1)
                 continue;
 
-            if (_frameDataToDraw[iData]->_entityEnabled != 1)
+            if (_frameDataToDraw[iData]->_entityEnabled[iEntity] != 1)
             {
                 continue;
             }
