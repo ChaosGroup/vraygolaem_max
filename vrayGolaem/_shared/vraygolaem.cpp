@@ -227,23 +227,53 @@ CStr getEnvironmentVariable(const CStr& envVarName)
     return envVarValue;
 }
 
-short getCrowdUnit()
+double getCrowdUnitScale()
 {
-    short crowdUnit(UNITS_CENTIMETERS);
-    CStr crowdUnitStr(getEnvironmentVariable("GLMCROWD_UNIT"));
-    if (crowdUnitStr == "0")
-        crowdUnit = UNITS_MILLIMETERS;
-    else if (crowdUnitStr == "1")
-        crowdUnit = UNITS_CENTIMETERS;
-    // else if (crowdUnitStr == "2") crowdUnit = UNITS_DECIMETERS; // not supported
-    else if (crowdUnitStr == "3")
-        crowdUnit = UNITS_METERS;
-    else if (crowdUnitStr == "4")
-        crowdUnit = UNITS_INCHES;
-    else if (crowdUnitStr == "5")
-        crowdUnit = UNITS_FEET;
-    //else if (crowdUnitStr == "6") crowdUnit = UNITS_YARDS; // not supported
-    return crowdUnit;
+	double maxUnitsInMeter = GetMasterScale(UNITS_METERS);
+	double glmUnitsInMeter(0.01);	//default is centimeters
+    CStr glmcrowd_unit_Str(getEnvironmentVariable("GLMCROWD_UNIT"));
+	int glmcrowd_unit = atoi(glmcrowd_unit_Str.data());
+
+	switch(glmcrowd_unit)
+	{
+	case 0:	//millimeters
+	{
+		glmUnitsInMeter = 0.001;
+	}
+	break;
+	case 1:	//centimeters
+	{
+		glmUnitsInMeter = 0.01;
+	}
+	break;
+	case 2:	//decimeters
+	{
+		glmUnitsInMeter = 0.1;
+	}
+	break;
+	case 3:	//meters
+	{
+		glmUnitsInMeter = 1;
+	}
+	break;
+	case 4:	//inches
+	{
+		glmUnitsInMeter = 0.0254;	//http://en.wikipedia.org/wiki/Inch
+	}
+	break;
+	case 5:	//feet
+	{
+		glmUnitsInMeter = 0.3048;	//http://en.wikipedia.org/wiki/Foot_%28length%29
+	}
+	break;
+	case 6:	//yards
+	{
+		glmUnitsInMeter = 0.9144;	//http://en.wikipedia.org/wiki/Yard
+	}
+	break;
+	}
+
+	return glmUnitsInMeter / maxUnitsInMeter;
 }
 
 //************************************************************
@@ -1012,7 +1042,7 @@ void VRayGolaem::drawEntities(GraphicsWindow* gw, const Matrix3& transform, Time
     _nodeBbox.Init();
 
     // rescale the display according to unit because cache is in golaem units
-    double unitScale = 1 / GetMasterScale(getCrowdUnit());
+    double unitScale = getCrowdUnitScale();
     Matrix3 displayTransform = transform;
     displayTransform.Scale(Point3(unitScale, unitScale, unitScale), TRUE);
 
@@ -1155,7 +1185,7 @@ void VRayGolaem::updateVRayParams(TimeValue t)
     _cameraMargin = pblock2->GetFloat(pb_camera_margin, t);
 
     // transform
-    _geoScale = (float)(1. / GetMasterScale(getCrowdUnit()));
+    _geoScale = (float)getCrowdUnitScale();
 
     // vray
     _frameOffset = pblock2->GetFloat(pb_fframe_offset, t);
