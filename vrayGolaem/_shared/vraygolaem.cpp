@@ -6,6 +6,7 @@
 #include "glmCrowdIO.h"
 #include "glmSimulationData.h"
 #include "glmFrameData.h"
+#include "glmGolaemCharacter.h"
 
 #include "vraygolaem.h"
 #include "instance.h"
@@ -948,6 +949,8 @@ void VRayGolaem::readGolaemCache(const Matrix3& transform, TimeValue t)
 
     _cacheFactory->clear(glm::crowdio::FactoryClearMode::ALL); //is it necessary ?? Couldn't we keep the cache ?
 
+    _cacheFactory->loadGolaemCharacters(_characterFiles.data());
+
     // load gscl first
     if (_layoutEnable)
     {
@@ -1046,6 +1049,8 @@ void VRayGolaem::drawEntities(GraphicsWindow* gw, const Matrix3& transform, Time
     Matrix3 displayTransform = transform;
     displayTransform.Scale(Point3(unitScale, unitScale, unitScale), TRUE);
 
+    glm::Vector3 shapeExtents;
+
     float transformScale(displayTransform.GetRow(0).Length());
     for (size_t iData = 0, nbData = _simDataToDraw.length(); iData < nbData; ++iData)
     {
@@ -1061,11 +1066,26 @@ void VRayGolaem::drawEntities(GraphicsWindow* gw, const Matrix3& transform, Time
                 continue;
             }
 
+            int32_t characterIdx = _simDataToDraw[iData]->_characterIdx[iEntity];
+            const glm::GolaemCharacter* character = _cacheFactory->getGolaemCharacter(characterIdx);
+            if (character == NULL)
+            {
+                continue;
+            }
+
             unsigned int entityType = _simDataToDraw[iData]->_entityTypes[iEntity];
             if (_simDataToDraw[iData]->_boneCount[entityType] > 0)
             {
-                float entityRadius = _simDataToDraw[iData]->_entityRadius[iEntity] * transformScale;
-                float entityHeight = _simDataToDraw[iData]->_entityHeight[iEntity] * transformScale;
+                float* cacheShapeExtents = _simDataToDraw[iData]->_shapeExtents[entityType];
+                // cache is in maya coordinates, get back to golaem coordinates
+                shapeExtents.setValues(cacheShapeExtents[0], cacheShapeExtents[2], cacheShapeExtents[1]);
+                if (glm::approxEqual(shapeExtents, glm::Vector3::getNullVector(), GLM_EPSILON))
+                {
+                    shapeExtents = character->_converterMapping.getOrientationToZUpXFront() * character->_perceptionShapeExtents;
+                }
+                shapeExtents *= _simDataToDraw[iData]->_scales[iEntity];
+                float entityRadius = shapeExtents.projectZ().norm() * transformScale;
+                float entityHeight = shapeExtents.z * transformScale;
                 // draw bbox
                 unsigned int iBoneIndex = _simDataToDraw[iData]->_iBoneOffsetPerEntityType[entityType] + _simDataToDraw[iData]->_indexInEntityType[iEntity] * _simDataToDraw[iData]->_boneCount[entityType];
                 Point3 entityPosition(_frameDataToDraw[iData]->_bonePositions[iBoneIndex][0], _frameDataToDraw[iData]->_bonePositions[iBoneIndex][1], _frameDataToDraw[iData]->_bonePositions[iBoneIndex][2]);
