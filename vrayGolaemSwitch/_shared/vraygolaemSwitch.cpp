@@ -417,6 +417,12 @@ public:
     {
         return STR_CLASSNAME;
     }
+#if MAX_RELEASE >= 24000
+	const TCHAR* NonLocalizedClassName()
+	{
+		return STR_CLASSNAME;
+	}
+#endif
     SClass_ID SuperClassID()
     {
         return TEXMAP_CLASS_ID;
@@ -709,10 +715,15 @@ void SkeletonTexmap::SetReference(int /*i*/, RefTargetHandle rtarg)
     pblock = (IParamBlock2*)rtarg;
 }
 
+#if MAX_RELEASE >= 24000
+TSTR SkeletonTexmap::SubAnimName(int /*i*/, bool /*localized*/)
+#else
 TSTR SkeletonTexmap::SubAnimName(int /*i*/)
+#endif
 {
     return STR_DLGTITLE;
 }
+
 
 Animatable* SkeletonTexmap::SubAnim(int /*i*/)
 {
@@ -1012,7 +1023,11 @@ void SkeletonTexmap::SetSubTexmap(int i, Texmap* m)
     else if (i == 11)
         pblock->SetValue(pb_map_shader9, 0, m);
 }
+#if MAX_RELEASE >= 24000
+TSTR SkeletonTexmap::GetSubTexmapSlotName(int i, bool /*localized*/)
+#else
 TSTR SkeletonTexmap::GetSubTexmapSlotName(int i)
+#endif
 {
     if (i == 0)
         return TSTR(STR_SELECTORNAME);

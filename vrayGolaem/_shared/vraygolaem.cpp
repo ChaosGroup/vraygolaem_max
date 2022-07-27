@@ -64,6 +64,12 @@ public:
     {
         return STR_CLASSNAME;
     }
+#if MAX_RELEASE >= 24000
+	const TCHAR* NonLocalizedClassName()
+	{
+		return STR_CLASSNAME;
+	}
+#endif
     SClass_ID SuperClassID(void)
     {
         return GEOMOBJECT_CLASS_ID;
@@ -230,7 +236,11 @@ CStr getEnvironmentVariable(const CStr& envVarName)
 
 double getCrowdUnitScale()
 {
+#if MAX_RELEASE >= 24000
+	double maxUnitsInMeter = GetSystemUnitScale(UNITS_METERS);
+#else
 	double maxUnitsInMeter = GetMasterScale(UNITS_METERS);
+#endif
 	double glmUnitsInMeter(0.01);	//default is centimeters
     CStr glmcrowd_unit_Str(getEnvironmentVariable("GLMCROWD_UNIT"));
 	int glmcrowd_unit = atoi(glmcrowd_unit_Str.data());
@@ -509,7 +519,11 @@ Animatable* VRayGolaem::SubAnim(int i)
     }
 }
 
+#if MAX_RELEASE >= 24000
+TSTR VRayGolaem::SubAnimName(int i, bool /*localized*/)
+#else
 TSTR VRayGolaem::SubAnimName(int i)
+#endif
 {
     switch (i)
     {
@@ -779,9 +793,14 @@ INT_PTR VRayGolaemDlgProc::DlgProc(TimeValue t, IParamMap2* map, HWND /*hWnd*/, 
 
                 GET_MBCS(node->GetName(), nodeName);
                 CStr sourceCmd = CStr("python.ExecuteFile \"vraygolaem.py\"");
-                ExecuteMAXScriptScript(sourceCmd.ToBSTR());
-                CStr callbackCmd = CStr("python.Execute \"glmVRayGolaemPostCreationCallback('") + CStr(nodeName) + CStr("')\"");
-                ExecuteMAXScriptScript(callbackCmd.ToBSTR());
+				CStr callbackCmd = CStr("python.Execute \"glmVRayGolaemPostCreationCallback('") + CStr(nodeName) + CStr("')\"");
+#if MAX_RELEASE >= 24000
+				ExecuteMAXScriptScript(sourceCmd.ToBSTR(), MAXScript::ScriptSource::NonEmbedded);
+				ExecuteMAXScriptScript(callbackCmd.ToBSTR(), MAXScript::ScriptSource::NonEmbedded);
+#else
+				ExecuteMAXScriptScript(sourceCmd.ToBSTR());
+				ExecuteMAXScriptScript(callbackCmd.ToBSTR());
+#endif
             }
         }
         break;
@@ -1963,7 +1982,7 @@ inline void drawLine(GraphicsWindow* gw, const Point3& p0, const Point3& p1)
 
 inline void drawBBox(GraphicsWindow* gw, const Box3& b)
 {
-    gw->setTransform(Matrix3(1));
+    gw->setTransform(Matrix3::Identity);
     Point3 p[8];
     for (int i = 0; i < 8; i++)
         p[i] = b[i];

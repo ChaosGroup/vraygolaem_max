@@ -119,7 +119,11 @@ public:
     int NumSubTexmaps();
     Texmap* GetSubTexmap(int i);
     void SetSubTexmap(int i, Texmap* m);
-    TSTR GetSubTexmapSlotName(int i);
+#if MAX_RELEASE >= 24000
+    TSTR GetSubTexmapSlotName(int i, bool localized);
+#else
+	TSTR GetSubTexmapSlotName(int i);
+#endif
 
     Class_ID ClassID()
     {
@@ -129,10 +133,15 @@ public:
     {
         return TEXMAP_CLASS_ID;
     }
-    void GetClassName(TSTR& s)
+#if MAX_RELEASE >= 24000
+	void GetClassName(MSTR& s, bool /*localized*/)
+#else
+	void GetClassName(MSTR& s)
+#endif
     {
-        s = STR_CLASSNAME;
+		s = STR_CLASSNAME;
     }
+
     void DeleteThis()
     {
         delete this;
@@ -144,7 +153,11 @@ public:
         return 1;
     }
     Animatable* SubAnim(int i);
-    TSTR SubAnimName(int i);
+#if MAX_RELEASE >= 24000
+	TSTR SubAnimName(int i, bool localized);
+#else
+	TSTR SubAnimName(int i);
+#endif
     int SubNumToRefNum(int subNum)
     {
         return subNum;

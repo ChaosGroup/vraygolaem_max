@@ -349,7 +349,11 @@ public:
     {
         return PLUGIN_CLASSID;
     }
-    void GetClassName(TSTR& s)
+#if MAX_RELEASE >= 24000
+    void GetClassName(TSTR& s, bool /*localized*/)
+#else
+	void GetClassName(TSTR& s)
+#endif
     {
         s = _T("VRayGolaem");
     }
@@ -383,7 +387,11 @@ public:
         return 1;
     }
     Animatable* SubAnim(int i);
-    TSTR SubAnimName(int i);
+#if MAX_RELEASE >= 24000
+	TSTR SubAnimName(int i, bool localized);
+#else
+	TSTR SubAnimName(int i);
+#endif
 
     //////////////////////////////////////////
     // From ref
